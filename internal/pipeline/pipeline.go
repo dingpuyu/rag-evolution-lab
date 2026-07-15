@@ -33,10 +33,16 @@ func (p *Pipeline) Query(ctx context.Context, request domain.QueryRequest) (*dom
 
 	started := time.Now()
 	results, err := p.retriever.Search(ctx, request)
-	recorder.Add("retrieval", started, map[string]any{
+	attributes := map[string]any{
 		"retriever":    p.retriever.Name(),
 		"result_count": len(results),
-	})
+	}
+	if provider, ok := p.retriever.(retrieval.TraceAttributesProvider); ok {
+		for key, value := range provider.TraceAttributes(request) {
+			attributes[key] = value
+		}
+	}
+	recorder.Add("retrieval", started, attributes)
 	if err != nil {
 		return nil, err
 	}

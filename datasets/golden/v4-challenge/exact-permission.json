@@ -1,0 +1,18 @@
+{
+  "id": "challenge_exact_001",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "exact_match",
+  "query": "report.export.all 会默认授予管理员吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "reports", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["reports-permissions-v2.3"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["不会默认获得", "单独审批"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "结构化权限标识符应走精确检索。"
+}

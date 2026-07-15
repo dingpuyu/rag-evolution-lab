@@ -83,9 +83,9 @@
 
 ### 任务
 
-- Query Classification
+- [x] Query Classification
 - Query Rewrite
-- Retrieval Router
+- [x] Retrieval Router
 - Multi-query 实验
 - Reranker
 - Context Packing
@@ -97,6 +97,14 @@
 - 不同 Query 应选择不同策略。
 - Rerank 改善精度但增加延迟。
 - 更长 Context 不必然带来更好答案。
+
+### V4 实际结果
+
+- 确定性分类器将 Query 路由为 exact、semantic、access-sensitive 和 unanswerable-risk。
+- Development 20 条与 V4 Challenge 8 条均达到 Hit@5 / MRR / Recall@5 1.000，Metadata 与 Unauthorized Violations 为 0。
+- 路由将 Development 上的 Vector Query 调用从 20 次降到 9 次。
+- Challenge 首轮暴露租户同义表达误路由，并推动 Tenant Scope Gate 在检索前 Fail Closed。
+- 当前 28 条均为小型合成数据，Blind Split 和 60 条规模扩充仍未完成。
 
 ## Phase 4：V6 / V7 进阶能力
 

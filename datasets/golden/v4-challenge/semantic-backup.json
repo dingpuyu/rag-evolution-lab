@@ -1,0 +1,18 @@
+{
+  "id": "challenge_semantic_002",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "semantic_paraphrase",
+  "query": "主机房出问题时，副本能预先放在异地吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "storage", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["storage-backup-v2.3"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["跨区域复制"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "使用灾备场景描述代替跨区域备份术语。"
+}

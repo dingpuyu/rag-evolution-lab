@@ -25,9 +25,16 @@ Pipeline Registry ─────────────── Pipeline Config
     ▼
 Query Processor
     │
-    ├── Classifier
+    ├── Intent / Risk Classifier
     ├── Metadata Extractor
     └── Query Rewriter
+    │
+    ▼
+Retrieval Router
+    ├── Exact → Metadata BM25
+    ├── Semantic → Hybrid Union
+    ├── Access → Tenant Gate + Consensus
+    └── Risk → Anchor Gate + Consensus
     │
     ▼
 Retriever
@@ -191,6 +198,7 @@ query_completed
 对外部能力定义小接口：
 
 - `Embedder`
+- `Classifier`
 - `Generator`
 - `Reranker`
 - `KeywordIndex`

@@ -68,10 +68,20 @@ Phase 3 已完成首轮 Hybrid Retrieval 实验：
 - Union / Consensus 两种证据策略对照
 - Qwen3-Embedding-4B 本地真实模型评测
 
+Phase 4 Query Routing 已完成：
+
+- Exact / Semantic / Access-sensitive / Unanswerable-risk 分类
+- Metadata BM25 / Hybrid Union / Hybrid Consensus 动态路由
+- Tenant Scope Gate 与结构化 Anchor Gate
+- Route、Reason、Strategy Trace
+- 8 条独立 V4 Challenge Query
+- Development 与 Challenge 共 28 条 Case 全部通过
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
 Hybrid Retrieval 的分类权衡见 [Phase 3 Hybrid Retrieval Report](eval/reports/phase3-hybrid-retrieval.md)。
+Query Routing 与 Challenge Split 结果见 [Phase 4 Query Routing Report](eval/reports/phase4-query-routing.md)。
 
 ## 文档导航
 
@@ -106,6 +116,8 @@ go run ./cmd/raglab eval --pipeline v1-vector --split development
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata
 go run ./cmd/raglab compare --baseline v2-metadata --candidate v3-hybrid-metadata
+go run ./cmd/raglab eval --pipeline v4-router --split development
+go run ./cmd/raglab eval --pipeline v4-router --split v4-challenge
 ```
 
 ### 使用 Ollama 本地 Embedding
@@ -143,6 +155,7 @@ make test
 make validate
 make compare
 make compare-metadata
+make compare-routing
 ```
 
 ## Phase 1 基线
@@ -161,7 +174,14 @@ make compare-metadata
 
 这个实验保持 BM25、语料、切块和评测集不变，只增加检索前的 Product、Version 和 Lifecycle 约束。它说明 ACL 安全不等于知识有效：V0 虽然没有跨租户泄漏，Top-K 中仍有 41 次 Metadata 污染。
 
-这些结果不是目标上限。项目仍刻意保留语义改写、精确标识符、无答案和噪声拒答等失败，用于驱动后续版本。
+## Phase 4 Query Routing
+
+| Split | Cases | Hit Rate@5 | MRR | Document Recall@5 | Metadata / Unauthorized |
+|---|---:|---:|---:|---:|---:|
+| Development | 20 | 1.000 | 1.000 | 1.000 | 0 / 0 |
+| V4 Challenge | 8 | 1.000 | 1.000 | 1.000 | 0 / 0 |
+
+Development 中 11 条 Exact Query 直接使用 Metadata BM25，只有 9 条进入包含 Vector 的策略。当前满分只代表 28 条合成 Case 全部通过，不代表生产泛化；下一步会扩展到 60 条并增加不参与规则迭代的 Blind Split。
 
 ## License
 

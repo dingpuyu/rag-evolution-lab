@@ -16,6 +16,7 @@ type CaseResult struct {
 	ReciprocalRank  float64  `json:"reciprocal_rank"`
 	DocumentRecall  float64  `json:"document_recall"`
 	RetrievedDocIDs []string `json:"retrieved_doc_ids"`
+	Route           string   `json:"route,omitempty"`
 }
 
 type CategoryMetrics struct {
@@ -36,6 +37,7 @@ type Report struct {
 	MetadataViolations     int                        `json:"metadata_violations"`
 	ByCategory             map[string]CategoryMetrics `json:"by_category"`
 	Results                []CaseResult               `json:"results"`
+	Routes                 map[string]int             `json:"routes,omitempty"`
 }
 
 func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []domain.GoldenCase) (Report, error) {
@@ -43,6 +45,7 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 		Pipeline:   target.Name(),
 		Split:      split,
 		ByCategory: make(map[string]CategoryMetrics),
+		Routes:     make(map[string]int),
 	}
 	type sums struct {
 		cases  int
@@ -72,6 +75,10 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 			return Report{}, fmt.Errorf("evaluate case %s: %w", golden.ID, err)
 		}
 		result := scoreCase(golden, response.Retrieval)
+		result.Route = routeFromTrace(response.Trace)
+		if result.Route != "" {
+			report.Routes[result.Route]++
+		}
 		for _, retrieved := range response.Retrieval {
 			if !isAuthorized(retrieved.Chunk, golden.Context) {
 				report.UnauthorizedRetrievals++
@@ -110,6 +117,15 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 		}
 	}
 	return report, nil
+}
+
+func routeFromTrace(value domain.QueryTrace) string {
+	for _, event := range value.Events {
+		if route, ok := event.Attributes["route"].(string); ok {
+			return route
+		}
+	}
+	return ""
 }
 
 func isMetadataCompatible(chunk domain.Chunk, context domain.GoldenContext) bool {

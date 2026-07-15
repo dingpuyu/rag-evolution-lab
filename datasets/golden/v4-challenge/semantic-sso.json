@@ -1,0 +1,18 @@
+{
+  "id": "challenge_semantic_001",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "semantic_paraphrase",
+  "query": "员工切换公司内部应用时不想反复输入密码，该怎么接入？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "identity", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["identity-sso-guide-v2.3"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["SSO"],
+    "forbidden_facts": ["安全设置"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "避开单点登录和只登录一次等已有措辞。"
+}

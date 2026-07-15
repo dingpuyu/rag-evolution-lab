@@ -9,6 +9,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/pipeline"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
+	"github.com/dingpuyu/rag-evolution-lab/internal/routing"
 )
 
 type Runtime struct {
@@ -38,23 +39,27 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 	for _, document := range documents {
 		chunks = append(chunks, chunker.Chunk(document)...)
 	}
-	keyword := pipeline.New("v0-keyword", retrieval.NewBM25(chunks))
-	metadata := pipeline.New("v2-metadata", retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}))
+	keywordIndex := retrieval.NewBM25(chunks)
+	metadataIndex := retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true})
+	keyword := pipeline.New("v0-keyword", keywordIndex)
+	metadata := pipeline.New("v2-metadata", metadataIndex)
 	hashIndex, err := retrieval.NewVector(ctx, chunks, retrieval.HashEmbedder{Dimensions: 512})
 	if err != nil {
 		return nil, err
 	}
 	vector := pipeline.New("v1-vector", hashIndex)
-	hybrid := pipeline.New("v3-hybrid", retrieval.NewRRF(retrieval.NewBM25(chunks), hashIndex))
-	hybridMetadata := pipeline.New("v3-hybrid-metadata", retrieval.NewRRF(
-		retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
-		hashIndex.WithOptions(retrieval.Options{UseMetadata: true}),
-	))
-	hybridConsensus := pipeline.New("v3-hybrid-metadata-consensus", retrieval.NewRRFWithOptions(
+	hashMetadata := hashIndex.WithOptions(retrieval.Options{UseMetadata: true})
+	hybridIndex := retrieval.NewRRF(keywordIndex, hashIndex)
+	hybridMetadataIndex := retrieval.NewRRF(metadataIndex, hashMetadata)
+	hybridConsensusIndex := retrieval.NewRRFWithOptions(
 		retrieval.RRFOptions{MinSourceMatches: 2},
-		retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
-		hashIndex.WithOptions(retrieval.Options{UseMetadata: true}),
-	))
+		metadataIndex,
+		hashMetadata,
+	)
+	hybrid := pipeline.New("v3-hybrid", hybridIndex)
+	hybridMetadata := pipeline.New("v3-hybrid-metadata", hybridMetadataIndex)
+	hybridConsensus := pipeline.New("v3-hybrid-metadata-consensus", hybridConsensusIndex)
+	router := pipeline.New("v4-router", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex))
 	pipelines := map[string]*pipeline.Pipeline{
 		keyword.Name():         keyword,
 		vector.Name():          vector,
@@ -62,6 +67,7 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		hybrid.Name():          hybrid,
 		hybridMetadata.Name():  hybridMetadata,
 		hybridConsensus.Name(): hybridConsensus,
+		router.Name():          router,
 	}
 	if options.OllamaModel != "" {
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
@@ -78,25 +84,39 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		}
 		ollama := pipeline.New("v1-ollama", ollamaIndex)
 		pipelines[ollama.Name()] = ollama
-		ollamaHybrid := pipeline.New("v3-ollama-hybrid", retrieval.NewRRF(retrieval.NewBM25(chunks), ollamaIndex))
+		ollamaMetadata := ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true})
+		ollamaHybridIndex := retrieval.NewRRF(keywordIndex, ollamaIndex)
+		ollamaHybrid := pipeline.New("v3-ollama-hybrid", ollamaHybridIndex)
 		pipelines[ollamaHybrid.Name()] = ollamaHybrid
-		ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", retrieval.NewRRF(
-			retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
-			ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true}),
-		))
+		ollamaHybridMetadataIndex := retrieval.NewRRF(metadataIndex, ollamaMetadata)
+		ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", ollamaHybridMetadataIndex)
 		pipelines[ollamaHybridMetadata.Name()] = ollamaHybridMetadata
-		ollamaHybridConsensus := pipeline.New("v3-ollama-hybrid-metadata-consensus", retrieval.NewRRFWithOptions(
+		ollamaHybridConsensusIndex := retrieval.NewRRFWithOptions(
 			retrieval.RRFOptions{MinSourceMatches: 2},
-			retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
-			ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true}),
-		))
+			metadataIndex,
+			ollamaMetadata,
+		)
+		ollamaHybridConsensus := pipeline.New("v3-ollama-hybrid-metadata-consensus", ollamaHybridConsensusIndex)
 		pipelines[ollamaHybridConsensus.Name()] = ollamaHybridConsensus
+		ollamaRouter := pipeline.New("v4-ollama-router", newQueryRouter(
+			metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex,
+		))
+		pipelines[ollamaRouter.Name()] = ollamaRouter
 	}
 	return &Runtime{
 		Documents: documents,
 		Chunks:    chunks,
 		Pipelines: pipelines,
 	}, nil
+}
+
+func newQueryRouter(exact, semantic, consensus retrieval.Retriever) *routing.Router {
+	return routing.NewRouter(routing.HeuristicClassifier{}, map[routing.Intent]retrieval.Retriever{
+		routing.IntentExact:            exact,
+		routing.IntentSemantic:         semantic,
+		routing.IntentAccessSensitive:  routing.NewTenantScopeGate(consensus),
+		routing.IntentUnanswerableRisk: routing.NewAnchorGate(consensus),
+	}, semantic)
 }
 
 func (r *Runtime) Pipeline(name string) (*pipeline.Pipeline, error) {

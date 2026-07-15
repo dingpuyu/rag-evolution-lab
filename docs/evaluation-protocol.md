@@ -39,6 +39,8 @@
 - Duplicate Chunk Rate
 - Metadata Filter Accuracy
 - Unauthorized Retrieval Count
+- Route Distribution
+- Per-route Quality / Refusal Regression
 
 ### Level 3：生成评测
 
@@ -165,6 +167,8 @@ generator_model: "..."
 reranker_model: null
 started_at: "..."
 ```
+
+Query Router 评测还必须满足：分类器输入不得包含 Golden Category；Case 结果保存实际 Route，Trace 保存 Route Reason 和最终 Strategy。结构化 Product / Version 可以约束检索，但不能被当作自然语言意图标签。
 
 ## 7. 回归门禁
 

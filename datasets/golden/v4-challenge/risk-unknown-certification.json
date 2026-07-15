@@ -1,0 +1,18 @@
+{
+  "id": "challenge_risk_001",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "unanswerable",
+  "query": "AcmeCloud 是否取得 GCR-7 全球云韧性认证？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": null, "version": null},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "知识库没有该认证证据"
+  },
+  "notes": "未知外部状态包含结构化锚点，必须拒绝相似但不支持的证据。"
+}

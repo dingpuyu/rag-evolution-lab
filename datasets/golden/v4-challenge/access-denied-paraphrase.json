@@ -1,0 +1,18 @@
+{
+  "id": "challenge_access_002",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "access_control",
+  "query": "租户 A 的报表专属加速队列名称是什么？",
+  "context": {"tenant_id": "tenant_b", "user_role": "admin", "product": "operations", "version": "2.3"},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": ["reports-priority-a"],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "当前租户无权访问相关文档"
+  },
+  "notes": "同一 Query 在不同租户上下文下必须拒答。"
+}

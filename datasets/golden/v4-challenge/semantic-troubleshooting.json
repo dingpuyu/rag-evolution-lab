@@ -1,0 +1,18 @@
+{
+  "id": "challenge_semantic_003",
+  "dataset_version": "0.2.0",
+  "split": "v4-challenge",
+  "category": "semantic_paraphrase",
+  "query": "导出报表提示没权限，排查时先后看哪些地方？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "reports", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["reports-export-troubleshooting-v2.3"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["用户权限", "导出范围", "租户套餐"],
+    "forbidden_facts": ["直接修改数据库"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "自然语言故障排查应使用语义 Hybrid。"
+}

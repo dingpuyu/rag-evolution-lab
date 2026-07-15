@@ -22,6 +22,13 @@ const hybridVariants = [
   { name: "+ Consensus Gate", semantic: "0.750", access: "1.000", mrr: "0.900", violations: "0" },
 ];
 
+const routeCards = [
+  { intent: "EXACT", count: "11", strategy: "Metadata BM25", cue: "codes · headers · numbers" },
+  { intent: "SEMANTIC", count: "4", strategy: "Hybrid Union", cue: "natural-language paraphrase" },
+  { intent: "ACCESS", count: "4", strategy: "Tenant Gate + Consensus", cue: "tenant · privileged operation" },
+  { intent: "RISK", count: "1", strategy: "Anchor Gate + Consensus", cue: "external status verification" },
+];
+
 const cases = {
   version: {
     id: "CASE / version_003",
@@ -71,6 +78,7 @@ export default function Home() {
         <div className="nav-links">
           <a href="#evolution">演进路径</a>
           <a href="#hybrid">Hybrid 实验</a>
+          <a href="#routing">Query Routing</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -81,7 +89,7 @@ export default function Home() {
 
       <section className="hero shell" id="top">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="pulse" /> PHASE 3 · ACTIVE</div>
+          <div className="eyebrow"><span className="pulse" /> PHASE 4 · COMPLETE</div>
           <h1>把 RAG 优化<br />变成<span>可证明的工程实验</span></h1>
           <p className="hero-lead">
             不是只展示一个能回答问题的 Demo。每次演进都从失败案例出发，
@@ -100,12 +108,12 @@ export default function Home() {
             <span className="console-status">PASSED</span>
           </div>
           <div className="console-body">
-            <div className="terminal-line"><span>$</span> raglab eval --pipeline v3-ollama-hybrid-metadata</div>
-            <div className="run-row"><span>dataset</span><strong>development / 20 cases</strong></div>
-            <div className="run-row"><span>fusion</span><strong>BM25 + Qwen3 4B / RRF</strong></div>
+            <div className="terminal-line"><span>$</span> raglab eval --pipeline v4-ollama-router</div>
+            <div className="run-row"><span>dataset</span><strong>development + challenge / 28 cases</strong></div>
+            <div className="run-row"><span>routing</span><strong>4 intents / 3 strategies / 2 gates</strong></div>
             <div className="score-line">
-              <div><small>MRR</small><strong>0.900</strong><em>stable</em></div>
-              <div><small>SEMANTIC</small><strong>1.000</strong><em>+0.250</em></div>
+              <div><small>MRR</small><strong>1.000</strong><em>+0.100</em></div>
+              <div><small>RECALL</small><strong>1.000</strong><em>28 / 28</em></div>
               <div><small>VIOLATIONS</small><strong>0</strong><em>guarded</em></div>
             </div>
             <div className="checks">
@@ -120,7 +128,7 @@ export default function Home() {
       <section className="facts shell" aria-label="Project scale">
         <div><strong>13</strong><span>知识文档</span><small>Synthetic enterprise corpus</small></div>
         <div><strong>38</strong><span>结构化 Chunks</span><small>Stable IDs + heading paths</small></div>
-        <div><strong>20</strong><span>Golden Queries</span><small>8 failure categories</small></div>
+        <div><strong>28</strong><span>Golden Queries</span><small>development + challenge</small></div>
         <div><strong>0</strong><span>越权召回</span><small>Fail-closed ACL regression</small></div>
       </section>
 
@@ -152,12 +160,19 @@ export default function Home() {
             <div className="version-metric"><span>MRR</span><strong>0.900</strong></div>
             <div className="version-state">✓ VALIDATED</div>
           </article>
-          <article className="version-card active">
-            <div className="version-top"><span>V3</span><small>CURRENT</small></div>
+          <article className="version-card complete">
+            <div className="version-top"><span>V3</span><small>FUSED</small></div>
             <h3>Hybrid + RRF</h3>
             <p>并行融合 Keyword 与 Qwen3 Vector；分类收益与拒答退化都进入 Harness。</p>
             <div className="version-metric"><span>DOC RECALL</span><strong>0.900</strong><em>+2.5%</em></div>
-            <div className="version-state">● EXPERIMENTED</div>
+            <div className="version-state">✓ EXPERIMENTED</div>
+          </article>
+          <article className="version-card active">
+            <div className="version-top"><span>V4</span><small>CURRENT</small></div>
+            <h3>Query Router</h3>
+            <p>按 Query 特征和风险选择 BM25、Hybrid Union 或 Consensus，并在安全冲突前置拒绝。</p>
+            <div className="version-metric"><span>MRR</span><strong>1.000</strong><em>28 cases</em></div>
+            <div className="version-state">● VALIDATED</div>
           </article>
         </div>
       </section>
@@ -177,8 +192,29 @@ export default function Home() {
           ))}
         </div>
         <div className="hybrid-notes">
-          <span><b>UNION</b> recall 优先</span><span><b>CONSENSUS</b> precision 优先</span><span><b>NEXT</b> query routing</span>
+          <span><b>UNION</b> recall 优先</span><span><b>CONSENSUS</b> precision 优先</span><span><b>V4</b> route by risk</span>
         </div>
+      </section>
+
+      <section className="routing-lab shell" id="routing" aria-labelledby="routing-title">
+        <div className="routing-title">
+          <span>V4 / QUERY ROUTING</span>
+          <h2 id="routing-title">把策略选择也纳入评测</h2>
+          <p>分类器只读取 Query，不读取 Golden 标签。Route、Reason 和 Strategy 全部写入 Trace。</p>
+        </div>
+        <div className="route-flow">
+          <div className="route-input"><small>INPUT</small><strong>Query + Auth Context</strong><span>observable features only</span></div>
+          <i>→</i>
+          <div className="route-classifier"><small>CLASSIFY</small><strong>Intent + Risk</strong><span>deterministic · testable</span></div>
+          <i>→</i>
+          <div className="route-output"><small>TRACE</small><strong>Route + Reason</strong><span>strategy · result count</span></div>
+        </div>
+        <div className="route-grid">
+          {routeCards.map((route) => (
+            <article key={route.intent}><span>{route.intent}</span><b>{route.count}<small>/20</small></b><strong>{route.strategy}</strong><p>{route.cue}</p></article>
+          ))}
+        </div>
+        <div className="challenge-strip"><span>CHALLENGE SPLIT</span><strong>8 / 8 passed</strong><i /> initial regression <b>0.875</b><i /> tenant scope gate <b>1.000</b><i /> vector calls <b>20 → 9</b></div>
       </section>
 
       <section className="model-benchmark shell" aria-labelledby="model-benchmark-title">
@@ -300,12 +336,12 @@ export default function Home() {
       </section>
 
       <section className="next shell">
-        <div><span>NEXT ITERATION</span><h2>从“固定一种检索策略”<br />走向“按 Query 风险路由”</h2></div>
+        <div><span>NEXT ITERATION</span><h2>从“检索策略正确”<br />走向“上下文精度可控”</h2></div>
         <div className="next-list">
-          <p><b>01</b><span>Query Risk Classification</span><em>ROUTING</em></p>
-          <p><b>02</b><span>Strategy Router</span><em>V4</em></p>
-          <p><b>03</b><span>Answerability Gate</span><em>REFUSAL</em></p>
-          <p><b>04</b><span>Per-route Regression</span><em>HARNESS</em></p>
+          <p><b>01</b><span>Cross-encoder Reranker</span><em>V5</em></p>
+          <p><b>02</b><span>Context Token Budget</span><em>PACKING</em></p>
+          <p><b>03</b><span>Citation Coverage</span><em>GROUNDING</em></p>
+          <p><b>04</b><span>60-query Golden Set</span><em>DATA</em></p>
         </div>
       </section>
 

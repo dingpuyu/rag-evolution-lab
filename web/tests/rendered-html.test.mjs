@@ -31,6 +31,10 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /Qwen3 Hybrid \+ Metadata/);
   assert.match(html, /Consensus Gate/);
   assert.match(html, /SEMANTIC/);
+  assert.match(html, /v4-ollama-router/);
+  assert.match(html, /Tenant Gate \+ Consensus/);
+  assert.match(html, /8 \/ 8 passed/);
+  assert.match(html, /20 → 9/);
   assert.match(html, /Unauthorized Retrievals/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });

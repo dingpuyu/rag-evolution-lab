@@ -7,11 +7,10 @@ datasets/
   corpus/
     acmecloud/
       documents/
-      manifest.yaml
+      manifest.json
   golden/
     development/
-    regression/
-    blind/
+    v4-challenge/
   fixtures/
     unit/
     integration/
@@ -31,4 +30,6 @@ datasets/
 
 ## 当前状态
 
-已完成 Schema 和示例 Case，尚未生成正式语料与完整 Golden Dataset。
+- Development：20 条固定基线 Case，覆盖 8 个失败类别。
+- V4 Challenge：8 条新措辞和边界 Case，用于验证 Query Routing。
+- 当前共 28 条合成 Golden Query；下一目标为 60 条并增加不参与规则迭代的 Blind Split。

@@ -64,4 +64,14 @@ func TestIsMetadataCompatibleChecksProductVersionAndLifecycle(t *testing.T) {
 	}
 }
 
+func TestRouteFromTraceReadsRoutingDecision(t *testing.T) {
+	value := domain.QueryTrace{Events: []domain.TraceEvent{{
+		Name:       "retrieval",
+		Attributes: map[string]any{"route": "access_sensitive", "strategy": "hybrid-rrf"},
+	}}}
+	if got := routeFromTrace(value); got != "access_sensitive" {
+		t.Fatalf("unexpected route: %q", got)
+	}
+}
+
 func stringPointer(value string) *string { return &value }

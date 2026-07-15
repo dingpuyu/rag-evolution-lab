@@ -1,4 +1,4 @@
-.PHONY: fmt test validate ingest eval compare compare-metadata
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing
 
 fmt:
 	gofmt -w cmd internal
@@ -8,6 +8,9 @@ test:
 
 validate:
 	go run ./cmd/raglab validate
+
+validate-v4:
+	go run ./cmd/raglab validate --split v4-challenge
 
 ingest:
 	go run ./cmd/raglab ingest
@@ -20,3 +23,6 @@ compare:
 
 compare-metadata:
 	go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata --split development
+
+compare-routing:
+	go run ./cmd/raglab compare --baseline v3-hybrid-metadata-consensus --candidate v4-router --split development

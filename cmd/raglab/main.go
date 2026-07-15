@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
@@ -35,7 +36,7 @@ func main() {
 
 	switch os.Args[1] {
 	case "validate":
-		runValidate(root, runtime)
+		runValidate(root, runtime, os.Args[2:])
 	case "ingest":
 		fmt.Printf("documents=%d chunks=%d\n", len(runtime.Documents), len(runtime.Chunks))
 	case "query":
@@ -50,8 +51,11 @@ func main() {
 	}
 }
 
-func runValidate(root string, runtime *app.Runtime) {
-	cases, err := dataset.LoadGolden(filepath.Join(root, "datasets", "golden"), "development")
+func runValidate(root string, runtime *app.Runtime, args []string) {
+	flags := flag.NewFlagSet("validate", flag.ExitOnError)
+	split := flags.String("split", "development", "dataset split")
+	_ = flags.Parse(args)
+	cases, err := dataset.LoadGolden(filepath.Join(root, "datasets", "golden"), *split)
 	if err != nil {
 		fatal(err)
 	}
@@ -146,6 +150,22 @@ func printReport(report evaluation.Report) {
 		fmt.Printf("  %-22s cases=%d hit=%.3f mrr=%.3f recall=%.3f\n",
 			category, metrics.Cases, metrics.HitRate, metrics.MRR, metrics.Recall)
 	}
+	if len(report.Routes) > 0 {
+		fmt.Print("  routes")
+		for _, route := range sortedCountKeys(report.Routes) {
+			fmt.Printf(" %s=%d", route, report.Routes[route])
+		}
+		fmt.Println()
+	}
+}
+
+func sortedCountKeys(values map[string]int) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func findProjectRoot() (string, error) {

@@ -1,12 +1,13 @@
 # Five-minute Demo Guide
 
-This guide demonstrates how one controlled RAG change fixes observable failures while preserving security boundaries. All commands run locally without an external model.
+This guide demonstrates how controlled RAG changes fix observable failures while preserving security boundaries. The deterministic V4 path runs locally without an external model.
 
 ## 1. Verify the harness
 
 ```bash
 go test ./...
 go run ./cmd/raglab validate
+go run ./cmd/raglab validate --split v4-challenge
 ```
 
 Expected dataset summary:
@@ -94,9 +95,39 @@ go run ./cmd/raglab query \
 
 The candidate returns zero results and responds with `知识库中没有找到足够证据。` No private fact enters retrieval, context, citation or trace.
 
-## 5. Explain the remaining failure
+## 5. Route by Query risk
 
-The generic unanswerable case still fails because active but weakly related knowledge can pass deterministic metadata filters. This is intentional: Metadata Filter solves candidate validity, not semantic answerability. A later experiment must add score calibration or an answerability gate and prove it does not increase false refusals.
+```bash
+go run ./cmd/raglab eval \
+  --pipeline v4-router \
+  --split development
+
+go run ./cmd/raglab eval \
+  --pipeline v4-router \
+  --split v4-challenge
+```
+
+The report includes a route distribution. Exact identifiers and numbers use Metadata BM25; semantic paraphrases use Hybrid Union; access-sensitive queries use Tenant Scope Gate plus Consensus; external-status verification uses Anchor Gate plus Consensus.
+
+Both current splits report Hit Rate@5, MRR and Recall@5 of 1.000 with zero metadata or authorization violations. This is 28 synthetic cases, not a production generalization claim.
+
+## 6. Reproduce a pre-retrieval tenant refusal
+
+```bash
+go run ./cmd/raglab query \
+  --pipeline v4-router \
+  --query "租户 A 的报表专属加速队列名称是什么？" \
+  --tenant tenant_b \
+  --role admin \
+  --product operations \
+  --version 2.3
+```
+
+V4 classifies the Query as access-sensitive and rejects the explicit Tenant A / authenticated Tenant B conflict before retrieval. Similar public operations content cannot turn the request into an answer.
+
+## 7. Explain the remaining limitation
+
+The rule classifier is deliberately small and explainable. The current 28 cases all pass, but the rules have participated in Challenge iteration. A blind split and at least 60 Golden Queries are required before claiming robust routing generalization.
 
 ## Discussion points
 
@@ -105,3 +136,6 @@ The generic unanswerable case still fails because active but weakly related know
 - Why an explicitly requested deprecated version is allowed.
 - Why a higher Hit Rate does not prove refusal quality.
 - How the same harness will evaluate Hybrid Retrieval and Reranking.
+- Why structured request context must not be mistaken for Query intent.
+- Why tenant conflicts use a deterministic Gate instead of an Embedding threshold.
+- How routing reduces local model calls from 20 to 9 on the Development Split.

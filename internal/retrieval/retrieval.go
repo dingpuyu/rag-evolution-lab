@@ -13,6 +13,12 @@ type Retriever interface {
 	Search(ctx context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error)
 }
 
+// TraceAttributesProvider lets composite retrievers expose a deterministic
+// decision without coupling Pipeline to a concrete routing implementation.
+type TraceAttributesProvider interface {
+	TraceAttributes(request domain.QueryRequest) map[string]any
+}
+
 type Options struct {
 	UseMetadata bool
 }
