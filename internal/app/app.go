@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
@@ -16,7 +17,16 @@ type Runtime struct {
 	Pipelines map[string]*pipeline.Pipeline
 }
 
+type Options struct {
+	OllamaModel string
+	OllamaURL   string
+}
+
 func Build(corpusRoot string) (*Runtime, error) {
+	return BuildWithOptions(context.Background(), corpusRoot, Options{})
+}
+
+func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (*Runtime, error) {
 	documents, err := dataset.LoadCorpus(corpusRoot)
 	if err != nil {
 		return nil, err
@@ -27,14 +37,30 @@ func Build(corpusRoot string) (*Runtime, error) {
 		chunks = append(chunks, chunker.Chunk(document)...)
 	}
 	keyword := pipeline.New("v0-keyword", retrieval.NewBM25(chunks))
-	vector := pipeline.New("v1-vector", retrieval.NewVector(chunks, retrieval.HashEmbedder{Dimensions: 512}))
+	hashIndex, err := retrieval.NewVector(ctx, chunks, retrieval.HashEmbedder{Dimensions: 512})
+	if err != nil {
+		return nil, err
+	}
+	vector := pipeline.New("v1-vector", hashIndex)
+	pipelines := map[string]*pipeline.Pipeline{
+		keyword.Name(): keyword,
+		vector.Name():  vector,
+	}
+	if options.OllamaModel != "" {
+		ollamaIndex, err := retrieval.NewVector(ctx, chunks, retrieval.OllamaEmbedder{
+			BaseURL: options.OllamaURL,
+			Model:   options.OllamaModel,
+		})
+		if err != nil {
+			return nil, err
+		}
+		ollama := pipeline.New("v1-ollama", ollamaIndex)
+		pipelines[ollama.Name()] = ollama
+	}
 	return &Runtime{
 		Documents: documents,
 		Chunks:    chunks,
-		Pipelines: map[string]*pipeline.Pipeline{
-			keyword.Name(): keyword,
-			vector.Name():  vector,
-		},
+		Pipelines: pipelines,
 	}, nil
 }
 

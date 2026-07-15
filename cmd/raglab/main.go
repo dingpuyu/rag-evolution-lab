@@ -23,7 +23,10 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
-	runtime, err := app.Build(filepath.Join(root, "datasets", "corpus", "acmecloud"))
+	runtime, err := app.BuildWithOptions(context.Background(), filepath.Join(root, "datasets", "corpus", "acmecloud"), app.Options{
+		OllamaModel: os.Getenv("RAGLAB_OLLAMA_MODEL"),
+		OllamaURL:   os.Getenv("RAGLAB_OLLAMA_URL"),
+	})
 	if err != nil {
 		fatal(err)
 	}

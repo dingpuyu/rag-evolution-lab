@@ -45,6 +45,7 @@ Phase 1 已完成：
 - 基础 Markdown Chunker，共生成 38 个 Chunk
 - V0 Keyword Baseline
 - V1 Deterministic Vector Baseline
+- 可选 Ollama 本地 Embedding 后端
 - Tenant / Role ACL
 - Query Trace
 - Hit Rate、MRR 和 Document Recall 评测
@@ -52,6 +53,7 @@ Phase 1 已完成：
 - 单元测试与 GitHub Actions CI
 
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
+本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 
 ## 文档导航
 
@@ -84,6 +86,18 @@ go run ./cmd/raglab query --pipeline v0-keyword --query "E1027 是什么错误�
 go run ./cmd/raglab eval --pipeline v1-vector --split development
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector
 ```
+
+### 使用 Ollama 本地 Embedding
+
+默认测试与 CI 仍使用确定性的 Hash Embedder，不依赖本地服务。设置模型环境变量后，CLI 会额外注册 `v1-ollama` Pipeline：
+
+```bash
+ollama pull qwen3-embedding:0.6b
+RAGLAB_OLLAMA_MODEL=qwen3-embedding:0.6b \
+  go run ./cmd/raglab eval --pipeline v1-ollama --split development
+```
+
+Ollama 服务不在默认地址时，可以设置 `RAGLAB_OLLAMA_URL`。项目通过 `/api/embed` 批量构建语料向量，并对返回数量、维度和 HTTP 错误做校验。
 
 也可以使用：
 

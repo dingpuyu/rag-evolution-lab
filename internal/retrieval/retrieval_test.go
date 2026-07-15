@@ -26,7 +26,10 @@ func TestVectorUsesSemanticAliases(t *testing.T) {
 		{ID: "sso#1", DocumentID: "sso", Content: "企业 SSO 单点登录配置", Status: "active", Visibility: "public"},
 		{ID: "upload#1", DocumentID: "upload", Content: "上传文件大小限制", Status: "active", Visibility: "public"},
 	}
-	index := NewVector(chunks, HashEmbedder{Dimensions: 256})
+	index, err := NewVector(context.Background(), chunks, HashEmbedder{Dimensions: 256})
+	if err != nil {
+		t.Fatal(err)
+	}
 	results, err := index.Search(context.Background(), domain.QueryRequest{Query: "员工只登录一次", TopK: 2})
 	if err != nil {
 		t.Fatal(err)
