@@ -18,8 +18,10 @@ type Runtime struct {
 }
 
 type Options struct {
-	OllamaModel string
-	OllamaURL   string
+	OllamaModel       string
+	OllamaURL         string
+	QueryInstruction  string
+	EmbeddingCacheDir string
 }
 
 func Build(corpusRoot string) (*Runtime, error) {
@@ -47,10 +49,15 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		vector.Name():  vector,
 	}
 	if options.OllamaModel != "" {
-		ollamaIndex, err := retrieval.NewVector(ctx, chunks, retrieval.OllamaEmbedder{
-			BaseURL: options.OllamaURL,
-			Model:   options.OllamaModel,
-		})
+		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
+			BaseURL:          options.OllamaURL,
+			Model:            options.OllamaModel,
+			QueryInstruction: options.QueryInstruction,
+		}
+		if options.EmbeddingCacheDir != "" {
+			embedder = retrieval.CachedEmbedder{Inner: embedder, Dir: options.EmbeddingCacheDir}
+		}
+		ollamaIndex, err := retrieval.NewVector(ctx, chunks, embedder)
 		if err != nil {
 			return nil, err
 		}

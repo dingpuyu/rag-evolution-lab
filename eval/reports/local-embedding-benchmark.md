@@ -57,3 +57,14 @@ RAGLAB_OLLAMA_MODEL=nomic-embed-text:latest \
 3. 保存逐 Case 的排名差异，定位语义改写失败是否来自模型、Chunk 内容或 Query 表达。
 4. 增加 Embedding Cache，避免每次 CLI 启动都重建语料向量。
 5. 在 V2 启用 Metadata Filter，在 V3 引入 BM25 + Vector Hybrid Retrieval。
+
+## 工程跟进
+
+初始实验后已经补充以下能力：
+
+- Query 与 Document 使用独立编码入口，检索 Instruction 只添加到 Query。
+- Document Embedding 使用模型名和完整语料内容生成 SHA-256 缓存键。
+- 模型或 Chunk 内容变化时缓存自动失效，非法或损坏缓存自动重建。
+- Query 保持实时编码，不把线上 Query 写入磁盘。
+
+使用 `mxbai-embed-large` 做本机集成验证时，首次完整运行约 3.40 秒，缓存命中后约 1.37 秒，两次评测指标完全一致。该时间包含 Go CLI 启动与 20 次 Query 编码，只用于确认缓存路径有效，不作为正式性能 Benchmark。

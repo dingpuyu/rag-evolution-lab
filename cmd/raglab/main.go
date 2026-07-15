@@ -24,8 +24,10 @@ func main() {
 		fatal(err)
 	}
 	runtime, err := app.BuildWithOptions(context.Background(), filepath.Join(root, "datasets", "corpus", "acmecloud"), app.Options{
-		OllamaModel: os.Getenv("RAGLAB_OLLAMA_MODEL"),
-		OllamaURL:   os.Getenv("RAGLAB_OLLAMA_URL"),
+		OllamaModel:       os.Getenv("RAGLAB_OLLAMA_MODEL"),
+		OllamaURL:         os.Getenv("RAGLAB_OLLAMA_URL"),
+		QueryInstruction:  os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
+		EmbeddingCacheDir: filepath.Join(root, "data", "cache", "embeddings"),
 	})
 	if err != nil {
 		fatal(err)

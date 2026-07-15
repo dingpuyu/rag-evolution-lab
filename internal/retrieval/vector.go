@@ -15,7 +15,8 @@ import (
 )
 
 type Embedder interface {
-	Embed(ctx context.Context, texts []string) ([][]float64, error)
+	EmbedDocuments(ctx context.Context, texts []string) ([][]float64, error)
+	EmbedQuery(ctx context.Context, text string) ([]float64, error)
 	Name() string
 }
 
@@ -25,7 +26,7 @@ type HashEmbedder struct {
 
 func (h HashEmbedder) Name() string { return "semantic-hash-v1" }
 
-func (h HashEmbedder) Embed(_ context.Context, texts []string) ([][]float64, error) {
+func (h HashEmbedder) EmbedDocuments(_ context.Context, texts []string) ([][]float64, error) {
 	vectors := make([][]float64, len(texts))
 	for index, text := range texts {
 		vectors[index] = textutil.HashVector(text, h.Dimensions)
@@ -33,15 +34,35 @@ func (h HashEmbedder) Embed(_ context.Context, texts []string) ([][]float64, err
 	return vectors, nil
 }
 
+func (h HashEmbedder) EmbedQuery(_ context.Context, text string) ([]float64, error) {
+	return textutil.HashVector(text, h.Dimensions), nil
+}
+
 type OllamaEmbedder struct {
-	BaseURL string
-	Model   string
-	Client  *http.Client
+	BaseURL          string
+	Model            string
+	QueryInstruction string
+	Client           *http.Client
 }
 
 func (o OllamaEmbedder) Name() string { return "ollama/" + o.Model }
 
-func (o OllamaEmbedder) Embed(ctx context.Context, texts []string) ([][]float64, error) {
+func (o OllamaEmbedder) EmbedDocuments(ctx context.Context, texts []string) ([][]float64, error) {
+	return o.embed(ctx, texts)
+}
+
+func (o OllamaEmbedder) EmbedQuery(ctx context.Context, text string) ([]float64, error) {
+	if instruction := strings.TrimSpace(o.QueryInstruction); instruction != "" {
+		text = "Instruct: " + instruction + "\nQuery: " + text
+	}
+	vectors, err := o.embed(ctx, []string{text})
+	if err != nil {
+		return nil, err
+	}
+	return vectors[0], nil
+}
+
+func (o OllamaEmbedder) embed(ctx context.Context, texts []string) ([][]float64, error) {
 	if strings.TrimSpace(o.Model) == "" {
 		return nil, fmt.Errorf("ollama model must not be empty")
 	}
@@ -117,9 +138,12 @@ func NewVectorWithOptions(ctx context.Context, chunks []domain.Chunk, embedder E
 	for index, chunk := range chunks {
 		texts[index] = chunk.DocumentTitle + " " + chunk.Content
 	}
-	vectors, err := embedder.Embed(ctx, texts)
+	vectors, err := embedder.EmbedDocuments(ctx, texts)
 	if err != nil {
 		return nil, fmt.Errorf("embed corpus with %s: %w", embedder.Name(), err)
+	}
+	if err := validateEmbeddingBatch(vectors, len(texts)); err != nil {
+		return nil, fmt.Errorf("invalid corpus embeddings from %s: %w", embedder.Name(), err)
 	}
 	index := &Vector{
 		chunks:   append([]domain.Chunk(nil), chunks...),
@@ -133,11 +157,10 @@ func NewVectorWithOptions(ctx context.Context, chunks []domain.Chunk, embedder E
 func (v *Vector) Name() string { return "vector" }
 
 func (v *Vector) Search(ctx context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error) {
-	vectors, err := v.embedder.Embed(ctx, []string{request.Query})
+	queryVector, err := v.embedder.EmbedQuery(ctx, request.Query)
 	if err != nil {
 		return nil, fmt.Errorf("embed query with %s: %w", v.embedder.Name(), err)
 	}
-	queryVector := vectors[0]
 	results := make([]domain.RetrievedChunk, 0, len(v.chunks))
 	for index, chunk := range v.chunks {
 		if !allowed(chunk, request, v.options) {

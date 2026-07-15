@@ -29,7 +29,7 @@ func TestOllamaEmbedderBatchesInputs(t *testing.T) {
 	defer server.Close()
 
 	embedder := OllamaEmbedder{BaseURL: server.URL, Model: "test-embedding", Client: server.Client()}
-	vectors, err := embedder.Embed(context.Background(), []string{"first", "second"})
+	vectors, err := embedder.EmbedDocuments(context.Background(), []string{"first", "second"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,7 +46,7 @@ func TestOllamaEmbedderRejectsInvalidVectorCount(t *testing.T) {
 	defer server.Close()
 
 	embedder := OllamaEmbedder{BaseURL: server.URL, Model: "test-embedding", Client: server.Client()}
-	if _, err := embedder.Embed(context.Background(), []string{"first", "second"}); err == nil {
+	if _, err := embedder.EmbedDocuments(context.Background(), []string{"first", "second"}); err == nil {
 		t.Fatal("expected vector count validation error")
 	}
 }
@@ -58,7 +58,43 @@ func TestOllamaEmbedderSurfacesServerError(t *testing.T) {
 	defer server.Close()
 
 	embedder := OllamaEmbedder{BaseURL: server.URL, Model: "missing", Client: server.Client()}
-	if _, err := embedder.Embed(context.Background(), []string{"query"}); err == nil {
+	if _, err := embedder.EmbedQuery(context.Background(), "query"); err == nil {
 		t.Fatal("expected server error")
+	}
+}
+
+func TestOllamaEmbedderAppliesInstructionOnlyToQuery(t *testing.T) {
+	var inputs [][]string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			Input []string `json:"input"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		inputs = append(inputs, payload.Input)
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"embeddings":[[1,0]]}`))
+	}))
+	defer server.Close()
+
+	embedder := OllamaEmbedder{
+		BaseURL:          server.URL,
+		Model:            "test-embedding",
+		QueryInstruction: "retrieve relevant passages",
+		Client:           server.Client(),
+	}
+	if _, err := embedder.EmbedDocuments(context.Background(), []string{"document"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := embedder.EmbedQuery(context.Background(), "question"); err != nil {
+		t.Fatal(err)
+	}
+	if inputs[0][0] != "document" {
+		t.Fatalf("document should not have query instruction: %q", inputs[0][0])
+	}
+	want := "Instruct: retrieve relevant passages\nQuery: question"
+	if inputs[1][0] != want {
+		t.Fatalf("unexpected instructed query: %q", inputs[1][0])
 	}
 }

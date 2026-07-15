@@ -99,6 +99,18 @@ RAGLAB_OLLAMA_MODEL=qwen3-embedding:0.6b \
 
 Ollama 服务不在默认地址时，可以设置 `RAGLAB_OLLAMA_URL`。项目通过 `/api/embed` 批量构建语料向量，并对返回数量、维度和 HTTP 错误做校验。
 
+真实模型的语料向量会按“模型名称 + 完整 Chunk 内容”生成内容哈希并缓存到 `data/cache/embeddings`。修改模型或语料后缓存自动失效，Query 仍实时编码。
+
+对于支持检索指令的模型，可以只在 Query 侧增加 Instruction，Document 保持原文：
+
+```bash
+RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
+RAGLAB_QUERY_INSTRUCTION="Given a Chinese enterprise knowledge-base query, retrieve relevant passages that answer the query" \
+  go run ./cmd/raglab eval --pipeline v1-ollama --split development
+```
+
+建议先运行一次无 Instruction 基线，再运行上面的实验，通过相同 Golden Dataset 比较变化。
+
 也可以使用：
 
 ```bash
