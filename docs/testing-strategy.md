@@ -141,4 +141,4 @@ TestACL_FailsClosedWithoutTenant
 TestCitation_RejectsChunkOutsideContext
 ```
 
-名称直接表达业务约束，方便面试展示测试为何存在。
+名称直接表达业务约束，方便维护者理解测试为何存在。
