@@ -17,7 +17,7 @@
 - Schema 可以校验示例 Golden Case。
 - 后续编码任务可以从文档直接拆分。
 
-## Phase 1：V0 / V1 基线
+## Phase 1：V0 / V1 基线（已完成）
 
 预计 3～4 天。
 
@@ -38,6 +38,15 @@
 - Keyword 对错误码更稳定。
 - Vector 对语义改写更有优势。
 - Chunk Size 会影响 Recall 和 Context 成本。
+
+### 实际结果
+
+- V0 Keyword：Hit Rate@5 0.850，MRR 0.762。
+- V1 Vector：Hit Rate@5 0.900，MRR 0.779。
+- Keyword 对错误码、Header 等精确标识符排名更稳定。
+- Vector 对语义改写更好，但精确标识符 MRR 明显下降。
+- 两个版本均未解决无答案判定和噪声拒答。
+- ACL 回归中 Unauthorized Retrievals 为 0。
 
 ## Phase 2：V2 / V3 检索优化
 

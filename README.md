@@ -37,16 +37,21 @@
 
 ## 当前状态
 
-当前处于设计阶段，已经完成：
+Phase 1 已完成：
 
-- 场景与知识库结构设计
-- Golden Dataset Schema
-- 评测协议
-- 系统架构
-- 测试策略
-- 演进里程碑
+- Go CLI 与统一 Pipeline 接口
+- 13 篇 AcmeCloud 合成文档
+- 20 条 Development Golden Query
+- 基础 Markdown Chunker，共生成 38 个 Chunk
+- V0 Keyword Baseline
+- V1 Deterministic Vector Baseline
+- Tenant / Role ACL
+- Query Trace
+- Hit Rate、MRR 和 Document Recall 评测
+- PostgreSQL + pgvector Migration
+- 单元测试与 GitHub Actions CI
 
-尚未开始业务实现。
+当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 
 ## 文档导航
 
@@ -69,16 +74,33 @@
 - 部署：Docker Compose
 - 可观测性：结构化 Trace，后续接入 OpenTelemetry / Langfuse
 
-## 预期命令
-
-以下是目标接口，尚未实现：
+## 本地运行
 
 ```bash
-raglab ingest --corpus datasets/corpus
-raglab eval --pipeline v1-vector --split development
-raglab compare --baseline v1-vector --candidate v3-hybrid
-raglab inspect --query-id query_001
+go test ./...
+go run ./cmd/raglab validate
+go run ./cmd/raglab ingest
+go run ./cmd/raglab query --pipeline v0-keyword --query "E1027 是什么错误？"
+go run ./cmd/raglab eval --pipeline v1-vector --split development
+go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector
 ```
+
+也可以使用：
+
+```bash
+make test
+make validate
+make compare
+```
+
+## Phase 1 基线
+
+| Pipeline | Hit Rate@5 | MRR | Document Recall@5 | Unauthorized Retrievals |
+|---|---:|---:|---:|---:|
+| V0 Keyword | 0.850 | 0.762 | 0.850 | 0 |
+| V1 Vector | 0.900 | 0.779 | 0.875 | 0 |
+
+这些结果不是目标上限。第一阶段刻意保留了语义改写、精确标识符排名、过期知识、无答案和噪声拒答等失败，用于驱动后续版本。
 
 ## License
 
