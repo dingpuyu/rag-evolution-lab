@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/document.schema.json",
+  "title": "Knowledge Document Metadata",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "doc_id",
+    "title",
+    "doc_type",
+    "product",
+    "version",
+    "status",
+    "effective_at",
+    "language",
+    "visibility",
+    "allowed_tenants",
+    "allowed_roles",
+    "source",
+    "quality",
+    "path"
+  ],
+  "properties": {
+    "doc_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9_.-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "doc_type": {
+      "enum": [
+        "product_manual",
+        "api_documentation",
+        "faq",
+        "troubleshooting",
+        "release_note",
+        "permission_policy",
+        "billing_policy",
+        "support_ticket"
+      ]
+    },
+    "product": {"type": "string", "minLength": 1},
+    "version": {"type": "string", "minLength": 1},
+    "status": {"enum": ["draft", "active", "deprecated", "archived"]},
+    "effective_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "language": {"enum": ["zh-CN", "en-US", "mixed"]},
+    "visibility": {"enum": ["public", "tenant", "internal"]},
+    "allowed_tenants": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "allowed_roles": {
+      "type": "array",
+      "items": {"type": "string"},
+      "uniqueItems": true
+    },
+    "source": {"enum": ["synthetic"]},
+    "quality": {"enum": ["authoritative", "reviewed", "unverified"]},
+    "path": {"type": "string", "minLength": 1}
+  }
+}

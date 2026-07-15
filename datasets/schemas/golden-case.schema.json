@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/golden-case.schema.json",
+  "title": "RAG Golden Case",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "dataset_version",
+    "split",
+    "category",
+    "query",
+    "context",
+    "expected"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]+$"
+    },
+    "dataset_version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "split": {
+      "enum": ["development", "regression", "blind"]
+    },
+    "category": {
+      "enum": [
+        "exact_match",
+        "semantic_paraphrase",
+        "version_filter",
+        "multi_hop",
+        "table_numeric",
+        "conflict_resolution",
+        "unanswerable",
+        "access_control",
+        "prompt_injection"
+      ]
+    },
+    "query": {
+      "type": "string",
+      "minLength": 1
+    },
+    "context": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_id", "user_role"],
+      "properties": {
+        "tenant_id": {"type": "string", "minLength": 1},
+        "user_role": {"type": "string", "minLength": 1},
+        "product": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]}
+      }
+    },
+    "expected": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "answerable",
+        "relevant_doc_ids",
+        "relevant_chunk_ids",
+        "required_facts",
+        "forbidden_facts"
+      ],
+      "properties": {
+        "answerable": {"type": "boolean"},
+        "relevant_doc_ids": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "relevant_chunk_ids": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "required_facts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "forbidden_facts": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "minimum_citations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_refusal_reason": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "notes": {
+      "type": "string"
+    }
+  }
+}

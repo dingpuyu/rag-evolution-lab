@@ -1,0 +1,34 @@
+{
+  "id": "version_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "version_filter",
+  "query": "AcmeCloud 2.3 应该怎样配置 SSO？",
+  "context": {
+    "tenant_id": "tenant_a",
+    "user_role": "admin",
+    "product": "identity",
+    "version": "2.3"
+  },
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "identity-sso-guide-v2.3"
+    ],
+    "relevant_chunk_ids": [
+      "identity-sso-guide-v2.3#prerequisites",
+      "identity-sso-guide-v2.3#callback"
+    ],
+    "required_facts": [
+      "需要企业版套餐",
+      "回调地址必须使用 HTTPS"
+    ],
+    "forbidden_facts": [
+      "使用 2.1 版本的安全设置入口",
+      "使用 2.4-beta 的新控制台入口"
+    ],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "用于验证版本过滤和新旧知识冲突。"
+}

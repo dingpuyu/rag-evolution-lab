@@ -1,0 +1,40 @@
+name: v5-rerank
+description: Routed hybrid retrieval with reranking and token-budgeted context packing.
+query_processor:
+  metadata_filter: true
+  classify: true
+  rewrite: true
+  preserve_entities: true
+  multi_query:
+    enabled: true
+    max_queries: 3
+retrieval:
+  router:
+    enabled: true
+    fallback: hybrid
+  keyword:
+    enabled: true
+    top_k: 30
+  vector:
+    enabled: true
+    top_k: 30
+    distance: cosine
+  fusion:
+    enabled: true
+    type: rrf
+    k: 60
+    deduplicate: true
+rerank:
+  enabled: true
+  candidate_top_n: 30
+  output_top_k: 8
+  fallback_to_fusion: true
+context:
+  top_k: 6
+  token_budget: 4000
+  parent_expansion: true
+  merge_adjacent: true
+  deduplicate: true
+generation:
+  citations_required: true
+  refuse_without_context: true
