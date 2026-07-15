@@ -102,8 +102,10 @@ go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata
 默认测试与 CI 仍使用确定性的 Hash Embedder，不依赖本地服务。设置模型环境变量后，CLI 会额外注册 `v1-ollama` Pipeline：
 
 ```bash
-ollama pull qwen3-embedding:0.6b
-RAGLAB_OLLAMA_MODEL=qwen3-embedding:0.6b \
+# Modelfile 中写入：FROM /absolute/path/Qwen3-Embedding-4B-Q4_K_M.gguf
+ollama create qwen3-embedding:4b-local -f Modelfile
+
+RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
   go run ./cmd/raglab eval --pipeline v1-ollama --split development
 ```
 
@@ -120,6 +122,8 @@ RAGLAB_QUERY_INSTRUCTION="Given a Chinese enterprise knowledge-base query, retri
 ```
 
 建议先运行一次无 Instruction 基线，再运行上面的实验，通过相同 Golden Dataset 比较变化。
+
+当前 Qwen3 4B Q4_K_M 实测为 Hit Rate@5 `0.900`、MRR `0.850`、Document Recall@5 `0.875`。两种 Query Instruction 改变了部分候选排序，但没有改变总体质量指标，说明 Instruction 也必须经过目标数据集评测。
 
 也可以使用：
 

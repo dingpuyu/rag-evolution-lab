@@ -26,6 +26,8 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /0\.762/);
   assert.match(html, /0\.900/);
   assert.match(html, /Metadata Filter/);
+  assert.match(html, /Qwen3-Embedding-4B/);
+  assert.match(html, /0\.850/);
   assert.match(html, /Unauthorized Retrievals/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });

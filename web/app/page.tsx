@@ -8,6 +8,14 @@ const metrics = [
   { label: "Doc Recall@5", before: 0.85, after: 0.9, delta: "+5.0%" },
 ];
 
+const localModels = [
+  { name: "Semantic Hash", detail: "deterministic · offline", hit: "0.900", mrr: "0.779", recall: "0.875" },
+  { name: "mxbai-embed-large", detail: "Ollama · local", hit: "0.750", mrr: "0.692", recall: "0.700" },
+  { name: "nomic-embed-text", detail: "Ollama · local", hit: "0.700", mrr: "0.675", recall: "0.650" },
+  { name: "Qwen3-Embedding-4B", detail: "Q4_K_M · 2560d", hit: "0.900", mrr: "0.850", recall: "0.875", best: true },
+  { name: "Qwen3 + Instruction", detail: "query-side only", hit: "0.900", mrr: "0.850", recall: "0.875" },
+];
+
 const cases = {
   version: {
     id: "CASE / version_003",
@@ -144,6 +152,24 @@ export default function Home() {
             <div className="version-metric"><span>TARGET</span><strong>Hybrid</strong></div>
             <div className="version-state">○ PLANNED</div>
           </article>
+        </div>
+      </section>
+
+      <section className="model-benchmark shell" aria-labelledby="model-benchmark-title">
+        <div className="benchmark-copy">
+          <span>LOCAL EMBEDDING BENCHMARK</span>
+          <h2 id="model-benchmark-title">模型更强，不等于每个配置都更好</h2>
+          <p>同一语料与 Golden Dataset 下，Qwen3 4B 修复了中文语义改写短板；Query Instruction 改变了排序，却没有提升总分。</p>
+          <div className="model-specs"><b>4.0B</b><span>Q4_K_M</span><span>2560 dimensions</span><span>Ollama / local</span></div>
+        </div>
+        <div className="benchmark-table">
+          <div className="benchmark-row benchmark-head"><span>MODEL</span><span>HIT@5</span><span>MRR</span><span>RECALL</span></div>
+          {localModels.map((model) => (
+            <div className={`benchmark-row${model.best ? " best" : ""}`} key={model.name}>
+              <span><strong>{model.name}</strong><small>{model.detail}</small></span>
+              <b>{model.hit}</b><b>{model.mrr}</b><b>{model.recall}</b>
+            </div>
+          ))}
         </div>
       </section>
 
