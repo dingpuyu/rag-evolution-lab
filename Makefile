@@ -1,4 +1,4 @@
-.PHONY: fmt test validate ingest eval compare
+.PHONY: fmt test validate ingest eval compare compare-metadata
 
 fmt:
 	gofmt -w cmd internal
@@ -17,3 +17,6 @@ eval:
 
 compare:
 	go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector --split development
+
+compare-metadata:
+	go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata --split development

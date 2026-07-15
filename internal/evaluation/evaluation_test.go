@@ -44,3 +44,24 @@ func TestIsAuthorizedRejectsCrossTenantChunk(t *testing.T) {
 		t.Fatal("cross-tenant chunk must be unauthorized")
 	}
 }
+
+func TestIsMetadataCompatibleChecksProductVersionAndLifecycle(t *testing.T) {
+	product := "identity"
+	version := "2.3"
+	matching := domain.Chunk{Product: "identity", Version: "2.3", Status: "active"}
+	if !isMetadataCompatible(matching, domain.GoldenContext{Product: &product, Version: &version}) {
+		t.Fatal("matching product and version should be compatible")
+	}
+	wrongVersion := domain.Chunk{Product: "identity", Version: "2.1", Status: "deprecated"}
+	if isMetadataCompatible(wrongVersion, domain.GoldenContext{Product: &product, Version: &version}) {
+		t.Fatal("wrong version should be a violation")
+	}
+	if isMetadataCompatible(wrongVersion, domain.GoldenContext{Product: &product}) {
+		t.Fatal("deprecated chunk should be a violation when no version is requested")
+	}
+	if !isMetadataCompatible(wrongVersion, domain.GoldenContext{Product: &product, Version: stringPointer("2.1")}) {
+		t.Fatal("explicit deprecated version should remain compatible")
+	}
+}
+
+func stringPointer(value string) *string { return &value }

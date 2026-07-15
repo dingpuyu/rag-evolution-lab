@@ -33,6 +33,7 @@ type Report struct {
 	MRR                    float64                    `json:"mrr"`
 	Recall                 float64                    `json:"document_recall_at_k"`
 	UnauthorizedRetrievals int                        `json:"unauthorized_retrievals"`
+	MetadataViolations     int                        `json:"metadata_violations"`
 	ByCategory             map[string]CategoryMetrics `json:"by_category"`
 	Results                []CaseResult               `json:"results"`
 }
@@ -75,6 +76,9 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 			if !isAuthorized(retrieved.Chunk, golden.Context) {
 				report.UnauthorizedRetrievals++
 			}
+			if !isMetadataCompatible(retrieved.Chunk, golden.Context) {
+				report.MetadataViolations++
+			}
 		}
 		report.Results = append(report.Results, result)
 		value := categorySums[golden.Category]
@@ -106,6 +110,16 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 		}
 	}
 	return report, nil
+}
+
+func isMetadataCompatible(chunk domain.Chunk, context domain.GoldenContext) bool {
+	if context.Product != nil && chunk.Product != *context.Product {
+		return false
+	}
+	if context.Version != nil {
+		return chunk.Version == *context.Version
+	}
+	return chunk.Status == "active"
 }
 
 func isAuthorized(chunk domain.Chunk, context domain.GoldenContext) bool {

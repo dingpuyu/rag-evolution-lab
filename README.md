@@ -52,14 +52,23 @@ Phase 1 已完成：
 - PostgreSQL + pgvector Migration
 - 单元测试与 GitHub Actions CI
 
+Phase 2 已开始：
+
+- `v2-metadata` 确定性 Product / Version / Lifecycle Filter
+- `metadata_violations` 评测指标
+- 显式旧版本查询与默认 Active-only 规则
+- V0 与 V2 单变量对比报告
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
+Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
 
 ## 文档导航
 
 - [系统架构](docs/architecture.md)
 - [知识库与数据集设计](docs/dataset-design.md)
 - [评测协议](docs/evaluation-protocol.md)
+- [五分钟 Demo Guide](docs/demo-guide.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)
@@ -85,6 +94,7 @@ go run ./cmd/raglab ingest
 go run ./cmd/raglab query --pipeline v0-keyword --query "E1027 是什么错误？"
 go run ./cmd/raglab eval --pipeline v1-vector --split development
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector
+go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata
 ```
 
 ### 使用 Ollama 本地 Embedding
@@ -117,6 +127,7 @@ RAGLAB_QUERY_INSTRUCTION="Given a Chinese enterprise knowledge-base query, retri
 make test
 make validate
 make compare
+make compare-metadata
 ```
 
 ## Phase 1 基线
@@ -126,8 +137,17 @@ make compare
 | V0 Keyword | 0.850 | 0.762 | 0.850 | 0 |
 | V1 Vector | 0.900 | 0.779 | 0.875 | 0 |
 
-这些结果不是目标上限。第一阶段刻意保留了语义改写、精确标识符排名、过期知识、无答案和噪声拒答等失败，用于驱动后续版本。
+## Phase 2 Metadata Filter
+
+| Pipeline | Hit Rate@5 | MRR | Document Recall@5 | Metadata Violations |
+|---|---:|---:|---:|---:|
+| V0 Keyword | 0.850 | 0.762 | 0.850 | 41 |
+| V2 Metadata | 0.900 | 0.900 | 0.900 | 0 |
+
+这个实验保持 BM25、语料、切块和评测集不变，只增加检索前的 Product、Version 和 Lifecycle 约束。它说明 ACL 安全不等于知识有效：V0 虽然没有跨租户泄漏，Top-K 中仍有 41 次 Metadata 污染。
+
+这些结果不是目标上限。项目仍刻意保留语义改写、精确标识符、无答案和噪声拒答等失败，用于驱动后续版本。
 
 ## License
 
-本项目暂不指定开源许可证。在决定公开仓库前补充。
+本项目暂未指定开源许可证。

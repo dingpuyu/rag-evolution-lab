@@ -138,8 +138,9 @@ func evaluate(root string, runtime *app.Runtime, pipelineName, split string) eva
 }
 
 func printReport(report evaluation.Report) {
-	fmt.Printf("pipeline=%s split=%s cases=%d hit_rate@5=%.3f mrr=%.3f doc_recall@5=%.3f unauthorized=%d\n",
-		report.Pipeline, report.Split, report.Cases, report.HitRate, report.MRR, report.Recall, report.UnauthorizedRetrievals)
+	fmt.Printf("pipeline=%s split=%s cases=%d hit_rate@5=%.3f mrr=%.3f doc_recall@5=%.3f unauthorized=%d metadata_violations=%d\n",
+		report.Pipeline, report.Split, report.Cases, report.HitRate, report.MRR, report.Recall,
+		report.UnauthorizedRetrievals, report.MetadataViolations)
 	for _, category := range evaluation.SortedCategories(report) {
 		metrics := report.ByCategory[category]
 		fmt.Printf("  %-22s cases=%d hit=%.3f mrr=%.3f recall=%.3f\n",

@@ -84,6 +84,16 @@ Top-K 中命中的相关 Chunk 数 / 全部标注相关 Chunk 数
 
 使用首个相关结果排名的倒数，衡量正确证据是否足够靠前。
 
+### Metadata Violations
+
+统计 Top-K 中不满足结构化 Query Context 的 Chunk 数量：
+
+- `product` 不匹配；
+- 显式 `version` 不匹配；
+- 未指定版本时召回非 `active` 文档。
+
+该指标与 Unauthorized Retrieval Count 分开统计，因为“有权限访问”不代表“知识对当前问题有效”。
+
 ### Citation Precision
 
 ```text

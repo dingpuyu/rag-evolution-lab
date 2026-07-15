@@ -1,0 +1,21 @@
+name: v2-metadata
+description: Keyword retrieval with deterministic product, version and lifecycle filters.
+query_processor:
+  metadata_filter: true
+  rewrite: false
+retrieval:
+  keyword:
+    enabled: true
+    top_k: 5
+  vector:
+    enabled: false
+  fusion:
+    enabled: false
+rerank:
+  enabled: false
+context:
+  top_k: 5
+  parent_expansion: false
+generation:
+  citations_required: true
+  refuse_without_context: true

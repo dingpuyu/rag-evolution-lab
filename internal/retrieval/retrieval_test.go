@@ -101,3 +101,33 @@ func TestMetadataFilterIsOptInForBaselineComparability(t *testing.T) {
 		t.Fatalf("metadata filter should keep requested version, got %#v", structured)
 	}
 }
+
+func TestMetadataFilterAllowsExplicitDeprecatedVersion(t *testing.T) {
+	chunks := []domain.Chunk{
+		{ID: "old#1", DocumentID: "old", Content: "SSO 安全设置入口", Product: "identity", Version: "2.1", Status: "deprecated", Visibility: "public"},
+		{ID: "new#1", DocumentID: "new", Content: "SSO 身份中心入口", Product: "identity", Version: "2.3", Status: "active", Visibility: "public"},
+	}
+	request := domain.QueryRequest{Query: "SSO 入口", Product: "identity", Version: "2.1", TopK: 5}
+	results, err := NewBM25WithOptions(chunks, Options{UseMetadata: true}).Search(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Chunk.DocumentID != "old" {
+		t.Fatalf("explicit old version should remain retrievable, got %#v", results)
+	}
+}
+
+func TestMetadataFilterRejectsDifferentProduct(t *testing.T) {
+	chunks := []domain.Chunk{
+		{ID: "identity#1", DocumentID: "identity", Content: "配置入口", Product: "identity", Version: "2.3", Status: "active", Visibility: "public"},
+		{ID: "storage#1", DocumentID: "storage", Content: "配置入口", Product: "storage", Version: "2.3", Status: "active", Visibility: "public"},
+	}
+	request := domain.QueryRequest{Query: "配置入口", Product: "identity", Version: "2.3", TopK: 5}
+	results, err := NewBM25WithOptions(chunks, Options{UseMetadata: true}).Search(context.Background(), request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) != 1 || results[0].Chunk.DocumentID != "identity" {
+		t.Fatalf("product filter returned unexpected chunks: %#v", results)
+	}
+}

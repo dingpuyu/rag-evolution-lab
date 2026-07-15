@@ -47,7 +47,12 @@ func NewBM25WithOptions(chunks []domain.Chunk, options Options) *BM25 {
 	return index
 }
 
-func (b *BM25) Name() string { return "keyword" }
+func (b *BM25) Name() string {
+	if b.options.UseMetadata {
+		return "keyword+metadata"
+	}
+	return "keyword"
+}
 
 func (b *BM25) Search(_ context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error) {
 	queryTerms := textutil.TermFrequency(textutil.Tokens(request.Query))

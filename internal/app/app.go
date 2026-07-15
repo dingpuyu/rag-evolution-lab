@@ -39,14 +39,16 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		chunks = append(chunks, chunker.Chunk(document)...)
 	}
 	keyword := pipeline.New("v0-keyword", retrieval.NewBM25(chunks))
+	metadata := pipeline.New("v2-metadata", retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}))
 	hashIndex, err := retrieval.NewVector(ctx, chunks, retrieval.HashEmbedder{Dimensions: 512})
 	if err != nil {
 		return nil, err
 	}
 	vector := pipeline.New("v1-vector", hashIndex)
 	pipelines := map[string]*pipeline.Pipeline{
-		keyword.Name(): keyword,
-		vector.Name():  vector,
+		keyword.Name():  keyword,
+		vector.Name():   vector,
+		metadata.Name(): metadata,
 	}
 	if options.OllamaModel != "" {
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{

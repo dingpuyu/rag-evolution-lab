@@ -54,10 +54,11 @@
 
 ### 任务
 
-- Header-aware Chunking
+- [x] Metadata Filter
+- [x] Metadata Violations 评测指标
+- [x] Header-aware Chunking
 - 表格和代码块处理
 - Parent / Child Chunk
-- Metadata Filter
 - Hybrid Retrieval
 - RRF
 - 去重
