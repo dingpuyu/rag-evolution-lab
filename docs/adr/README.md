@@ -7,6 +7,7 @@
 - [ADR-0001：使用 Go 作为在线服务主语言](0001-go-main-language.md)
 - [ADR-0002：使用 PostgreSQL 同时承担全文与向量检索](0002-postgres-first.md)
 - [ADR-0003：Pipeline 版本使用配置组合而不是代码复制](0003-configured-pipelines.md)
+- [ADR-0004：Hybrid Retrieval 使用 Reciprocal Rank Fusion](0004-use-rrf-for-hybrid-fusion.md)
 
 ## 状态
 

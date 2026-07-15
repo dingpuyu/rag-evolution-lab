@@ -52,16 +52,26 @@ Phase 1 已完成：
 - PostgreSQL + pgvector Migration
 - 单元测试与 GitHub Actions CI
 
-Phase 2 已开始：
+Phase 2 Metadata 实验已完成：
 
 - `v2-metadata` 确定性 Product / Version / Lifecycle Filter
 - `metadata_violations` 评测指标
 - 显式旧版本查询与默认 Active-only 规则
 - V0 与 V2 单变量对比报告
 
+Phase 3 已完成首轮 Hybrid Retrieval 实验：
+
+- BM25 与 Vector 并行 Candidate Retrieval
+- Reciprocal Rank Fusion（RRF k=60）
+- 候选池扩展、稳定 Chunk ID 去重
+- Hybrid + Metadata 组合
+- Union / Consensus 两种证据策略对照
+- Qwen3-Embedding-4B 本地真实模型评测
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
+Hybrid Retrieval 的分类权衡见 [Phase 3 Hybrid Retrieval Report](eval/reports/phase3-hybrid-retrieval.md)。
 
 ## 文档导航
 
@@ -95,6 +105,7 @@ go run ./cmd/raglab query --pipeline v0-keyword --query "E1027 是什么错误�
 go run ./cmd/raglab eval --pipeline v1-vector --split development
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector
 go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata
+go run ./cmd/raglab compare --baseline v2-metadata --candidate v3-hybrid-metadata
 ```
 
 ### 使用 Ollama 本地 Embedding

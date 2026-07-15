@@ -16,6 +16,12 @@ const localModels = [
   { name: "Qwen3 + Instruction", detail: "query-side only", hit: "0.900", mrr: "0.850", recall: "0.875" },
 ];
 
+const hybridVariants = [
+  { name: "V2 Metadata BM25", semantic: "0.750", access: "1.000", mrr: "0.900", violations: "0" },
+  { name: "Qwen3 Hybrid + Metadata", semantic: "1.000", access: "0.500", mrr: "0.900", violations: "0", bestRecall: true },
+  { name: "+ Consensus Gate", semantic: "0.750", access: "1.000", mrr: "0.900", violations: "0" },
+];
+
 const cases = {
   version: {
     id: "CASE / version_003",
@@ -64,6 +70,7 @@ export default function Home() {
         </a>
         <div className="nav-links">
           <a href="#evolution">演进路径</a>
+          <a href="#hybrid">Hybrid 实验</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -74,7 +81,7 @@ export default function Home() {
 
       <section className="hero shell" id="top">
         <div className="hero-copy">
-          <div className="eyebrow"><span className="pulse" /> PHASE 2 · ACTIVE</div>
+          <div className="eyebrow"><span className="pulse" /> PHASE 3 · ACTIVE</div>
           <h1>把 RAG 优化<br />变成<span>可证明的工程实验</span></h1>
           <p className="hero-lead">
             不是只展示一个能回答问题的 Demo。每次演进都从失败案例出发，
@@ -93,13 +100,13 @@ export default function Home() {
             <span className="console-status">PASSED</span>
           </div>
           <div className="console-body">
-            <div className="terminal-line"><span>$</span> raglab compare --baseline v0 --candidate v2</div>
+            <div className="terminal-line"><span>$</span> raglab eval --pipeline v3-ollama-hybrid-metadata</div>
             <div className="run-row"><span>dataset</span><strong>development / 20 cases</strong></div>
-            <div className="run-row"><span>candidate</span><strong>v2-metadata</strong></div>
+            <div className="run-row"><span>fusion</span><strong>BM25 + Qwen3 4B / RRF</strong></div>
             <div className="score-line">
-              <div><small>MRR</small><strong>0.900</strong><em>+0.138</em></div>
-              <div><small>HIT@5</small><strong>0.900</strong><em>+0.050</em></div>
-              <div><small>VIOLATIONS</small><strong>0</strong><em>−41</em></div>
+              <div><small>MRR</small><strong>0.900</strong><em>stable</em></div>
+              <div><small>SEMANTIC</small><strong>1.000</strong><em>+0.250</em></div>
+              <div><small>VIOLATIONS</small><strong>0</strong><em>guarded</em></div>
             </div>
             <div className="checks">
               <span><b>✓</b> unit tests</span>
@@ -138,20 +145,39 @@ export default function Home() {
             <div className="version-metric"><span>MRR</span><strong>0.779</strong></div>
             <div className="version-state">✓ BENCHMARKED</div>
           </article>
-          <article className="version-card active">
-            <div className="version-top"><span>V2</span><small>CURRENT</small></div>
+          <article className="version-card complete">
+            <div className="version-top"><span>V2</span><small>FILTERED</small></div>
             <h3>Metadata Filter</h3>
             <p>在评分前过滤产品、版本和生命周期，同时保留显式历史版本查询。</p>
-            <div className="version-metric"><span>MRR</span><strong>0.900</strong><em>+18.1%</em></div>
-            <div className="version-state">● ACTIVE</div>
+            <div className="version-metric"><span>MRR</span><strong>0.900</strong></div>
+            <div className="version-state">✓ VALIDATED</div>
           </article>
-          <article className="version-card future">
-            <div className="version-top"><span>V3</span><small>NEXT</small></div>
+          <article className="version-card active">
+            <div className="version-top"><span>V3</span><small>CURRENT</small></div>
             <h3>Hybrid + RRF</h3>
-            <p>融合 Keyword 与 Vector 候选，兼顾精确标识符和语义召回。</p>
-            <div className="version-metric"><span>TARGET</span><strong>Hybrid</strong></div>
-            <div className="version-state">○ PLANNED</div>
+            <p>并行融合 Keyword 与 Qwen3 Vector；分类收益与拒答退化都进入 Harness。</p>
+            <div className="version-metric"><span>DOC RECALL</span><strong>0.900</strong><em>+2.5%</em></div>
+            <div className="version-state">● EXPERIMENTED</div>
           </article>
+        </div>
+      </section>
+
+      <section className="hybrid-experiment shell" id="hybrid" aria-labelledby="hybrid-title">
+        <div className="hybrid-heading">
+          <span>V3 / FAILURE-DRIVEN FUSION</span>
+          <h2 id="hybrid-title">总分一样，系统行为可能完全不同</h2>
+          <p>RRF 并集找回了全部语义改写，却让一个应拒答的权限 Case 返回无关公共证据；Consensus 修复拒答，又牺牲了语义召回。</p>
+        </div>
+        <div className="hybrid-table">
+          <div className="hybrid-row hybrid-head"><span>STRATEGY</span><span>SEMANTIC HIT</span><span>ACCESS HIT</span><span>MRR</span><span>POLLUTION</span></div>
+          {hybridVariants.map((variant) => (
+            <div className={`hybrid-row${variant.bestRecall ? " highlight" : ""}`} key={variant.name}>
+              <strong>{variant.name}</strong><b>{variant.semantic}</b><b>{variant.access}</b><b>{variant.mrr}</b><b>{variant.violations}</b>
+            </div>
+          ))}
+        </div>
+        <div className="hybrid-notes">
+          <span><b>UNION</b> recall 优先</span><span><b>CONSENSUS</b> precision 优先</span><span><b>NEXT</b> query routing</span>
         </div>
       </section>
 
@@ -232,7 +258,7 @@ export default function Home() {
         <div className="section-heading">
           <div><span className="section-index">03</span><p>SYSTEM DESIGN</p></div>
           <h2>可替换、可追踪的 Pipeline</h2>
-          <p>组件用小接口解耦，外部模型失败不会破坏离线测试和基线复现。</p>
+          <p>组件用小接口解耦，异构分数通过 RRF 排名融合，外部模型不影响离线基线复现。</p>
         </div>
         <div className="pipeline-map">
           <div className="pipe-node input"><small>INPUT</small><strong>Query + Context</strong><span>tenant · role · product · version</span></div>
@@ -274,12 +300,12 @@ export default function Home() {
       </section>
 
       <section className="next shell">
-        <div><span>NEXT ITERATION</span><h2>从“检索到相关内容”<br />走向“知道何时不该回答”</h2></div>
+        <div><span>NEXT ITERATION</span><h2>从“固定一种检索策略”<br />走向“按 Query 风险路由”</h2></div>
         <div className="next-list">
-          <p><b>01</b><span>表格与代码块原子切分</span><em>STRUCTURE</em></p>
-          <p><b>02</b><span>Parent / Child Chunk</span><em>CONTEXT</em></p>
+          <p><b>01</b><span>Query Risk Classification</span><em>ROUTING</em></p>
+          <p><b>02</b><span>Strategy Router</span><em>V4</em></p>
           <p><b>03</b><span>Answerability Gate</span><em>REFUSAL</em></p>
-          <p><b>04</b><span>Hybrid Retrieval + RRF</span><em>V3</em></p>
+          <p><b>04</b><span>Per-route Regression</span><em>HARNESS</em></p>
         </div>
       </section>
 

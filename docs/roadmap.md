@@ -59,9 +59,9 @@
 - [x] Header-aware Chunking
 - 表格和代码块处理
 - Parent / Child Chunk
-- Hybrid Retrieval
-- RRF
-- 去重
+- [x] Hybrid Retrieval
+- [x] RRF
+- [x] 去重
 - 扩展到 60 条 Query
 
 ### 需要证明
@@ -69,6 +69,13 @@
 - 版本过滤降低旧知识污染。
 - Hybrid 同时改善精确词和语义问题。
 - 召回提高可能伴随 Top-3 Precision 下降。
+
+### Hybrid 实际结果
+
+- Qwen3 Hybrid 的 Document Recall 从 0.875 提升到 0.900，但 MRR 从 0.850 降到 0.842。
+- Hybrid + Metadata 保持 0 次 Metadata Violations，并将语义改写 Hit@5 从 0.750 提升到 1.000。
+- 同一版本的 access-control Hit@5 从 1.000 降到 0.500，证明候选并集会损伤保守拒答。
+- Consensus Gate 修复拒答，但语义改写回落到 0.750；该权衡将由 V4 Query Routing 继续处理。
 
 ## Phase 3：V4 / V5 高级 RAG
 

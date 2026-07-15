@@ -45,10 +45,23 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		return nil, err
 	}
 	vector := pipeline.New("v1-vector", hashIndex)
+	hybrid := pipeline.New("v3-hybrid", retrieval.NewRRF(retrieval.NewBM25(chunks), hashIndex))
+	hybridMetadata := pipeline.New("v3-hybrid-metadata", retrieval.NewRRF(
+		retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
+		hashIndex.WithOptions(retrieval.Options{UseMetadata: true}),
+	))
+	hybridConsensus := pipeline.New("v3-hybrid-metadata-consensus", retrieval.NewRRFWithOptions(
+		retrieval.RRFOptions{MinSourceMatches: 2},
+		retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
+		hashIndex.WithOptions(retrieval.Options{UseMetadata: true}),
+	))
 	pipelines := map[string]*pipeline.Pipeline{
-		keyword.Name():  keyword,
-		vector.Name():   vector,
-		metadata.Name(): metadata,
+		keyword.Name():         keyword,
+		vector.Name():          vector,
+		metadata.Name():        metadata,
+		hybrid.Name():          hybrid,
+		hybridMetadata.Name():  hybridMetadata,
+		hybridConsensus.Name(): hybridConsensus,
 	}
 	if options.OllamaModel != "" {
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
@@ -65,6 +78,19 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		}
 		ollama := pipeline.New("v1-ollama", ollamaIndex)
 		pipelines[ollama.Name()] = ollama
+		ollamaHybrid := pipeline.New("v3-ollama-hybrid", retrieval.NewRRF(retrieval.NewBM25(chunks), ollamaIndex))
+		pipelines[ollamaHybrid.Name()] = ollamaHybrid
+		ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", retrieval.NewRRF(
+			retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
+			ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true}),
+		))
+		pipelines[ollamaHybridMetadata.Name()] = ollamaHybridMetadata
+		ollamaHybridConsensus := pipeline.New("v3-ollama-hybrid-metadata-consensus", retrieval.NewRRFWithOptions(
+			retrieval.RRFOptions{MinSourceMatches: 2},
+			retrieval.NewBM25WithOptions(chunks, retrieval.Options{UseMetadata: true}),
+			ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true}),
+		))
+		pipelines[ollamaHybridConsensus.Name()] = ollamaHybridConsensus
 	}
 	return &Runtime{
 		Documents: documents,

@@ -156,6 +156,15 @@ func NewVectorWithOptions(ctx context.Context, chunks []domain.Chunk, embedder E
 
 func (v *Vector) Name() string { return "vector" }
 
+// WithOptions reuses the immutable corpus embeddings while changing only the
+// query-time filters. This avoids encoding the same corpus twice when building
+// comparable filtered and unfiltered pipelines.
+func (v *Vector) WithOptions(options Options) *Vector {
+	clone := *v
+	clone.options = options
+	return &clone
+}
+
 func (v *Vector) Search(ctx context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error) {
 	queryVector, err := v.embedder.EmbedQuery(ctx, request.Query)
 	if err != nil {

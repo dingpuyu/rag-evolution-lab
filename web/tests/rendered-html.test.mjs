@@ -28,6 +28,9 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /Metadata Filter/);
   assert.match(html, /Qwen3-Embedding-4B/);
   assert.match(html, /0\.850/);
+  assert.match(html, /Qwen3 Hybrid \+ Metadata/);
+  assert.match(html, /Consensus Gate/);
+  assert.match(html, /SEMANTIC/);
   assert.match(html, /Unauthorized Retrievals/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
