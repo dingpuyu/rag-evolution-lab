@@ -1,0 +1,18 @@
+{
+  "id": "numeric_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "企业版 API 配额最高能申请到每分钟多少次？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "api-gateway", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["api-rate-limits-v2.3"],
+    "relevant_chunk_ids": ["api-rate-limits-v2.3#c001"],
+    "required_facts": ["每分钟 3,000 次"],
+    "forbidden_facts": ["每分钟 600 次是上限"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证数字与单位。"
+}

@@ -16,8 +16,8 @@
       "identity-sso-guide-v2.3"
     ],
     "relevant_chunk_ids": [
-      "identity-sso-guide-v2.3#prerequisites",
-      "identity-sso-guide-v2.3#callback"
+      "identity-sso-guide-v2.3#c002",
+      "identity-sso-guide-v2.3#c003"
     ],
     "required_facts": [
       "需要企业版套餐",

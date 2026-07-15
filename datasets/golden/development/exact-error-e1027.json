@@ -1,0 +1,18 @@
+{
+  "id": "exact_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "E1027 是什么错误？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "api-gateway", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["api-error-codes-v2.3"],
+    "relevant_chunk_ids": ["api-error-codes-v2.3#c001"],
+    "required_facts": ["超过 API 请求配额", "HTTP 429"],
+    "forbidden_facts": ["API Key 无效"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证精确错误码召回。"
+}

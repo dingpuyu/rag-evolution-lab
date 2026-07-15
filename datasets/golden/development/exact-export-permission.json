@@ -1,0 +1,18 @@
+{
+  "id": "exact_002",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "report.export.all 权限用于什么操作？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "reports", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["reports-permissions-v2.3"],
+    "relevant_chunk_ids": ["reports-permissions-v2.3#c002"],
+    "required_facts": ["跨租户导出", "需要单独审批"],
+    "forbidden_facts": ["管理员默认拥有"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证带点号的精确权限名。"
+}

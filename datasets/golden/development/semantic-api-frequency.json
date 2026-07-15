@@ -1,0 +1,18 @@
+{
+  "id": "semantic_002",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "接口调用太频繁被拒绝后应该怎么等？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "api-gateway", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["api-rate-limits-v2.3"],
+    "relevant_chunk_ids": ["api-rate-limits-v2.3#c003"],
+    "required_facts": ["指数退避", "1、2、4、8 秒"],
+    "forbidden_facts": ["立即连续重试"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "语义表达替代限流和 HTTP 429。"
+}

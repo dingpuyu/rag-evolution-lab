@@ -1,0 +1,18 @@
+{
+  "id": "multihop_002",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "multi_hop",
+  "query": "出现 E1027 后应该根据哪些响应头重试？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "api-gateway", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["api-error-codes-v2.3", "api-rate-limits-v2.3"],
+    "relevant_chunk_ids": ["api-error-codes-v2.3#c001", "api-rate-limits-v2.3#c002", "api-rate-limits-v2.3#c003"],
+    "required_facts": ["X-RateLimit-Reset", "指数退避"],
+    "forbidden_facts": ["立即连续重试"],
+    "minimum_citations": 2,
+    "expected_refusal_reason": null
+  },
+  "notes": "错误码与处理方式分散在两份文档。"
+}

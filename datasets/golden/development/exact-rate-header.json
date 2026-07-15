@@ -1,0 +1,18 @@
+{
+  "id": "exact_003",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "X-RateLimit-Reset 表示什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "api-gateway", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["api-rate-limits-v2.3"],
+    "relevant_chunk_ids": ["api-rate-limits-v2.3#c002"],
+    "required_facts": ["下一次配额重置", "Unix 时间戳"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证英文 Header 精确召回。"
+}

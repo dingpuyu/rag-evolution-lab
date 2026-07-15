@@ -1,0 +1,18 @@
+{
+  "id": "numeric_002",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "Multipart API 单个对象最大多大？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "storage", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["file-upload-limits-v2.3"],
+    "relevant_chunk_ids": ["file-upload-limits-v2.3#c001"],
+    "required_facts": ["50 GB"],
+    "forbidden_facts": ["2 GB"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "区分 Web 与 Multipart 限制。"
+}

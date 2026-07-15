@@ -1,0 +1,18 @@
+{
+  "id": "exact_004",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "E3018 在什么情况下出现？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "storage", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["file-upload-limits-v2.3"],
+    "relevant_chunk_ids": ["file-upload-limits-v2.3#c003"],
+    "required_facts": ["恶意内容扫描失败"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "错误码只出现在正文末尾。"
+}

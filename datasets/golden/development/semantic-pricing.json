@@ -1,0 +1,18 @@
+{
+  "id": "semantic_004",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "这个产品有哪些收费档位？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "billing", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["billing-plans-v2.3"],
+    "relevant_chunk_ids": ["billing-plans-v2.3#c001"],
+    "required_facts": ["基础版", "专业版", "企业版"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "使用收费档位替代套餐与计费。"
+}

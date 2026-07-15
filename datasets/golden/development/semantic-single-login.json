@@ -1,0 +1,18 @@
+{
+  "id": "semantic_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "怎么让公司员工只登录一次就能进入系统？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "identity", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["identity-sso-guide-v2.3"],
+    "relevant_chunk_ids": ["identity-sso-guide-v2.3#c001"],
+    "required_facts": ["SSO", "身份中心"],
+    "forbidden_facts": ["安全设置"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "用户没有使用 SSO 或单点登录术语。"
+}

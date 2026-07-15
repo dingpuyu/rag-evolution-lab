@@ -1,0 +1,18 @@
+{
+  "id": "semantic_003",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "能不能把备份副本放到另一个地区？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "storage", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["storage-backup-v2.3"],
+    "relevant_chunk_ids": ["storage-backup-v2.3#c002"],
+    "required_facts": ["跨区域复制", "企业版"],
+    "forbidden_facts": ["所有套餐都支持"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "用自然表达替代跨区域备份术语。"
+}

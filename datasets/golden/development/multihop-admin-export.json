@@ -1,0 +1,18 @@
+{
+  "id": "multihop_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "multi_hop",
+  "query": "管理员为什么仍然不能跨租户导出报表？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "reports", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["reports-permissions-v2.3", "reports-export-troubleshooting-v2.3"],
+    "relevant_chunk_ids": ["reports-permissions-v2.3#c002", "reports-export-troubleshooting-v2.3#c003"],
+    "required_facts": ["report.export.all", "管理员默认不拥有", "套餐必须支持"],
+    "forbidden_facts": ["平台一定发生故障"],
+    "minimum_citations": 2,
+    "expected_refusal_reason": null
+  },
+  "notes": "答案需要权限策略和故障手册共同支持。"
+}

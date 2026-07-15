@@ -1,0 +1,18 @@
+{
+  "id": "numeric_003",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "专业版备份保留多少天？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "storage", "version": "2.3"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["storage-backup-v2.3"],
+    "relevant_chunk_ids": ["storage-backup-v2.3#c003"],
+    "required_facts": ["7 天"],
+    "forbidden_facts": ["30 天"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "同一段落存在两个套餐数字。"
+}

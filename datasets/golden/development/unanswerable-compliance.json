@@ -1,0 +1,18 @@
+{
+  "id": "unanswerable_001",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "unanswerable",
+  "query": "AcmeCloud 是否已经通过火星数据主权认证 MDSC-9？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": null, "version": "2.3"},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": ["已经通过 MDSC-9"],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "知识库没有相关认证信息"
+  },
+  "notes": "验证无答案问题。"
+}

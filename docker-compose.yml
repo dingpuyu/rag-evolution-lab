@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: raglab
+      POSTGRES_USER: raglab
+      POSTGRES_PASSWORD: raglab
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raglab -d raglab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
