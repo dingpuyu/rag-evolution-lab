@@ -180,7 +180,7 @@ RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
 
 ### Milvus 向量数据库实验
 
-项目提供固定版本的 Milvus Standalone 本地部署、Qwen3 真实向量写入、HNSW/COSINE 检索、Tenant/Product/Status 标量过滤和交互式查看页面：
+项目提供固定版本的 Milvus Standalone 本地部署、Qwen3 真实向量写入、HNSW/COSINE 检索、Tenant/Role/Product/Status 标量过滤，并把原有内存 Vector Retriever 替换为完整 RAG Pipeline 中的 Milvus Retriever：
 
 ```bash
 make milvus-up
@@ -190,7 +190,13 @@ make serve-lab
 make web-dev
 ```
 
-网页的 `Milvus Lab` 会显示 Collection 行数、向量维度、索引类型、Load State、过滤表达式、Top-K Chunk 和 Embedding/Search 分阶段耗时。架构、Schema、面试知识点和百万级演进方向见 [Milvus 本地向量数据库实验](docs/milvus-local-lab.md)。
+```bash
+make query-milvus
+make eval-milvus
+make compare-milvus
+```
+
+网页的 `Milvus Lab` 会显示 Collection 行数、向量维度、索引类型、Load State、过滤表达式、Top-K Chunk 和 Embedding/Search 分阶段耗时。`v1/v3/v4/v5-milvus` 复用同一套 Routing、Rerank、Context Packing、Citation 和 Evaluation Harness。架构、Schema、面试知识点和百万级演进方向见 [Milvus Retriever 升级](docs/milvus-retriever-upgrade.md) 与 [Milvus 本地实验](docs/milvus-local-lab.md)。
 
 也可以使用：
 

@@ -7,6 +7,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
+	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/pipeline"
 	"github.com/dingpuyu/rag-evolution-lab/internal/rerank"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
@@ -24,6 +25,11 @@ type Options struct {
 	OllamaURL         string
 	QueryInstruction  string
 	EmbeddingCacheDir string
+	MilvusURL         string
+	MilvusToken       string
+	MilvusCollection  string
+	MilvusSearchEF    int
+	SkipOllamaMemory  bool
 }
 
 func Build(corpusRoot string) (*Runtime, error) {
@@ -86,45 +92,80 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		if options.EmbeddingCacheDir != "" {
 			embedder = retrieval.CachedEmbedder{Inner: embedder, Dir: options.EmbeddingCacheDir}
 		}
-		ollamaIndex, err := retrieval.NewVector(ctx, chunks, embedder)
-		if err != nil {
-			return nil, err
+		if !options.SkipOllamaMemory {
+			if err := registerOllamaMemoryPipelines(ctx, chunks, keywordIndex, metadataIndex, embedder, pipelines); err != nil {
+				return nil, err
+			}
 		}
-		ollama := pipeline.New("v1-ollama", ollamaIndex)
-		pipelines[ollama.Name()] = ollama
-		ollamaMetadata := ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true})
-		ollamaHybridIndex := retrieval.NewRRF(keywordIndex, ollamaIndex)
-		ollamaHybrid := pipeline.New("v3-ollama-hybrid", ollamaHybridIndex)
-		pipelines[ollamaHybrid.Name()] = ollamaHybrid
-		ollamaHybridMetadataIndex := retrieval.NewRRF(metadataIndex, ollamaMetadata)
-		ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", ollamaHybridMetadataIndex)
-		pipelines[ollamaHybridMetadata.Name()] = ollamaHybridMetadata
-		ollamaHybridConsensusIndex := retrieval.NewRRFWithOptions(
-			retrieval.RRFOptions{MinSourceMatches: 2},
-			metadataIndex,
-			ollamaMetadata,
-		)
-		ollamaHybridConsensus := pipeline.New("v3-ollama-hybrid-metadata-consensus", ollamaHybridConsensusIndex)
-		pipelines[ollamaHybridConsensus.Name()] = ollamaHybridConsensus
-		ollamaRouter := pipeline.New("v4-ollama-router", newQueryRouter(
-			metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex,
-		))
-		pipelines[ollamaRouter.Name()] = ollamaRouter
-		ollamaRerank := pipeline.NewWithOptions("v5-ollama-rerank", newQueryRouter(
-			metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex,
-		), pipeline.Options{
-			Reranker:           rerank.Heuristic{},
-			CandidateTopN:      20,
-			ContextMaxChunks:   6,
-			ContextTokenBudget: 4000,
-		})
-		pipelines[ollamaRerank.Name()] = ollamaRerank
+		if options.MilvusURL != "" {
+			if err := registerMilvusPipelines(keywordIndex, metadataIndex, embedder, options, pipelines); err != nil {
+				return nil, err
+			}
+		}
+	} else if options.MilvusURL != "" {
+		return nil, fmt.Errorf("Milvus retrieval requires OllamaModel for query embeddings")
 	}
 	return &Runtime{
 		Documents: documents,
 		Chunks:    chunks,
 		Pipelines: pipelines,
 	}, nil
+}
+
+func registerOllamaMemoryPipelines(ctx context.Context, chunks []domain.Chunk, keywordIndex, metadataIndex retrieval.Retriever, embedder retrieval.Embedder, pipelines map[string]*pipeline.Pipeline) error {
+	ollamaIndex, err := retrieval.NewVector(ctx, chunks, embedder)
+	if err != nil {
+		return err
+	}
+	ollama := pipeline.New("v1-ollama", ollamaIndex)
+	pipelines[ollama.Name()] = ollama
+	ollamaMetadata := ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true})
+	ollamaHybridIndex := retrieval.NewRRF(keywordIndex, ollamaIndex)
+	ollamaHybrid := pipeline.New("v3-ollama-hybrid", ollamaHybridIndex)
+	pipelines[ollamaHybrid.Name()] = ollamaHybrid
+	ollamaHybridMetadataIndex := retrieval.NewRRF(metadataIndex, ollamaMetadata)
+	ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", ollamaHybridMetadataIndex)
+	pipelines[ollamaHybridMetadata.Name()] = ollamaHybridMetadata
+	ollamaHybridConsensusIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{MinSourceMatches: 2}, metadataIndex, ollamaMetadata)
+	ollamaHybridConsensus := pipeline.New("v3-ollama-hybrid-metadata-consensus", ollamaHybridConsensusIndex)
+	pipelines[ollamaHybridConsensus.Name()] = ollamaHybridConsensus
+	ollamaRouter := pipeline.New("v4-ollama-router", newQueryRouter(metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex))
+	pipelines[ollamaRouter.Name()] = ollamaRouter
+	ollamaRerank := pipeline.NewWithOptions("v5-ollama-rerank", newQueryRouter(metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex), productionPipelineOptions())
+	pipelines[ollamaRerank.Name()] = ollamaRerank
+	return nil
+}
+
+func registerMilvusPipelines(keywordIndex, metadataIndex retrieval.Retriever, embedder retrieval.Embedder, options Options, pipelines map[string]*pipeline.Pipeline) error {
+	client := milvus.NewClient(milvus.Config{BaseURL: options.MilvusURL, Token: options.MilvusToken})
+	vectorIndex, err := milvus.NewRetriever(client, embedder, options.MilvusCollection, milvus.RetrieverOptions{SearchEF: options.MilvusSearchEF})
+	if err != nil {
+		return err
+	}
+	metadataVectorIndex, err := milvus.NewRetriever(client, embedder, options.MilvusCollection, milvus.RetrieverOptions{UseMetadata: true, SearchEF: options.MilvusSearchEF})
+	if err != nil {
+		return err
+	}
+	v1 := pipeline.New("v1-milvus", vectorIndex)
+	pipelines[v1.Name()] = v1
+	hybridIndex := retrieval.NewRRF(keywordIndex, vectorIndex)
+	v3 := pipeline.New("v3-milvus-hybrid", hybridIndex)
+	pipelines[v3.Name()] = v3
+	hybridMetadataIndex := retrieval.NewRRF(metadataIndex, metadataVectorIndex)
+	v3Metadata := pipeline.New("v3-milvus-hybrid-metadata", hybridMetadataIndex)
+	pipelines[v3Metadata.Name()] = v3Metadata
+	hybridConsensusIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{MinSourceMatches: 2}, metadataIndex, metadataVectorIndex)
+	v3Consensus := pipeline.New("v3-milvus-hybrid-metadata-consensus", hybridConsensusIndex)
+	pipelines[v3Consensus.Name()] = v3Consensus
+	v4 := pipeline.New("v4-milvus-router", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex))
+	pipelines[v4.Name()] = v4
+	v5 := pipeline.NewWithOptions("v5-milvus-rerank", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex), productionPipelineOptions())
+	pipelines[v5.Name()] = v5
+	return nil
+}
+
+func productionPipelineOptions() pipeline.Options {
+	return pipeline.Options{Reranker: rerank.Heuristic{}, CandidateTopN: 20, ContextMaxChunks: 6, ContextTokenBudget: 4000}
 }
 
 func newQueryRouter(exact, semantic, consensus retrieval.Retriever) *routing.Router {

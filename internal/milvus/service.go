@@ -51,6 +51,7 @@ type SeedResult struct {
 type Query struct {
 	Text    string `json:"query"`
 	Tenant  string `json:"tenant_id"`
+	Role    string `json:"user_role"`
 	Product string `json:"product"`
 	Status  string `json:"status"`
 	TopK    int    `json:"top_k"`
@@ -176,7 +177,9 @@ func (s *Service) Seed(ctx context.Context, chunks []domain.Chunk) (SeedResult, 
 		records[index] = Record{
 			ChunkID: chunk.ID, DocumentID: chunk.DocumentID, Title: chunk.DocumentTitle,
 			Content: chunk.Content, TenantID: tenant, Product: chunk.Product, Version: chunk.Version,
-			Status: chunk.Status, Visibility: chunk.Visibility, Embedding: vectors[index],
+			AllowedTenants: append([]string(nil), chunk.AllowedTenants...),
+			AllowedRoles:   append([]string(nil), chunk.AllowedRoles...),
+			Status:         chunk.Status, Visibility: chunk.Visibility, Embedding: vectors[index],
 		}
 	}
 	rows, err := s.client.Upsert(ctx, s.collection, records)
@@ -221,11 +224,11 @@ func (s *Service) Search(ctx context.Context, query Query) (SearchResult, error)
 }
 
 func buildFilter(query Query) string {
-	filters := []string{"(tenant_id == \"public\""}
-	if tenant := strings.TrimSpace(query.Tenant); tenant != "" && tenant != "public" {
-		filters[0] += " or tenant_id == \"" + escapeFilter(tenant) + "\""
+	access := `visibility == "public"`
+	if tenant, role := strings.TrimSpace(query.Tenant), strings.TrimSpace(query.Role); tenant != "" && tenant != "public" && role != "" {
+		access = "(" + access + ` or (array_contains(allowed_tenants, "` + escapeFilter(tenant) + `") and array_contains(allowed_roles, "` + escapeFilter(role) + `")))`
 	}
-	filters[0] += ")"
+	filters := []string{access}
 	if product := strings.TrimSpace(query.Product); product != "" {
 		filters = append(filters, "product == \""+escapeFilter(product)+"\"")
 	}

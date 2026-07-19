@@ -44,11 +44,17 @@ func (r *Router) TraceAttributes(request domain.QueryRequest) map[string]any {
 	if err != nil {
 		return map[string]any{"route_error": err.Error()}
 	}
-	return map[string]any{
+	attributes := map[string]any{
 		"route":        string(decision.Intent),
 		"route_reason": decision.Reason,
 		"strategy":     target.Name(),
 	}
+	if provider, ok := target.(retrieval.TraceAttributesProvider); ok {
+		for key, value := range provider.TraceAttributes(request) {
+			attributes[key] = value
+		}
+	}
+	return attributes
 }
 
 func (r *Router) resolve(request domain.QueryRequest) (Decision, retrieval.Retriever, error) {

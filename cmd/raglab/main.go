@@ -46,11 +46,27 @@ func main() {
 	if err != nil {
 		fatal(err)
 	}
+	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
+	milvusURL := strings.TrimSpace(os.Getenv("RAGLAB_MILVUS_URL"))
+	ollamaModel := strings.TrimSpace(os.Getenv("RAGLAB_OLLAMA_MODEL"))
+	if vectorBackend == "milvus" || vectorBackend == "both" {
+		if milvusURL == "" {
+			milvusURL = milvus.DefaultURL
+		}
+		if ollamaModel == "" {
+			ollamaModel = "qwen3-embedding:4b-local"
+		}
+	}
 	runtime, err := app.BuildWithOptions(context.Background(), filepath.Join(root, "datasets", "corpus", "acmecloud"), app.Options{
-		OllamaModel:       os.Getenv("RAGLAB_OLLAMA_MODEL"),
+		OllamaModel:       ollamaModel,
 		OllamaURL:         os.Getenv("RAGLAB_OLLAMA_URL"),
 		QueryInstruction:  os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
 		EmbeddingCacheDir: filepath.Join(root, "data", "cache", "embeddings"),
+		MilvusURL:         milvusURL,
+		MilvusToken:       os.Getenv("RAGLAB_MILVUS_TOKEN"),
+		MilvusCollection:  os.Getenv("RAGLAB_MILVUS_COLLECTION"),
+		MilvusSearchEF:    64,
+		SkipOllamaMemory:  vectorBackend == "milvus",
 	})
 	if err != nil {
 		fatal(err)

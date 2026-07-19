@@ -35,6 +35,20 @@ func TestCreateCollectionUsesExplicitHNSWCosineSchema(t *testing.T) {
 	}
 	schema := payload["schema"].(map[string]any)
 	fields := schema["fields"].([]any)
+	fieldByName := make(map[string]map[string]any, len(fields))
+	for _, raw := range fields {
+		field := raw.(map[string]any)
+		fieldByName[field["fieldName"].(string)] = field
+	}
+	for _, name := range []string{"allowed_tenants", "allowed_roles"} {
+		field := fieldByName[name]
+		if field["dataType"] != "Array" || field["elementDataType"] != "VarChar" {
+			t.Fatalf("unexpected ACL field %s: %#v", name, field)
+		}
+		if field["nullable"] != true {
+			t.Fatalf("ACL field %s must allow public rows to omit empty arrays: %#v", name, field)
+		}
+	}
 	vector := fields[len(fields)-1].(map[string]any)
 	params := vector["elementTypeParams"].(map[string]any)
 	if params["dim"] != "2560" {

@@ -124,6 +124,7 @@ export default function Home() {
   const [milvusStatus, setMilvusStatus] = useState<MilvusStatus | null>(null);
   const [vectorQuery, setVectorQuery] = useState("当前版本如何配置企业单点登录？");
   const [vectorTenant, setVectorTenant] = useState("tenant_a");
+  const [vectorRole, setVectorRole] = useState("admin");
   const [vectorProduct, setVectorProduct] = useState("");
   const [vectorTopK, setVectorTopK] = useState(5);
   const [vectorResult, setVectorResult] = useState<MilvusSearchResult | null>(null);
@@ -174,7 +175,7 @@ export default function Home() {
         fetch(`${base}/api/v1/milvus/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query: vectorQuery, tenant_id: vectorTenant, product: vectorProduct, status: "active", top_k: vectorTopK }),
+          body: JSON.stringify({ query: vectorQuery, tenant_id: vectorTenant, user_role: vectorRole, product: vectorProduct, status: "active", top_k: vectorTopK }),
         }),
       ]);
       const statusBody = await statusResponse.json();
@@ -403,8 +404,14 @@ export default function Home() {
           <div><small>01 / QUERY</small><strong>自然语言问题</strong><span>{vectorQuery.slice(0, 24)}…</span></div><i>→</i>
           <div><small>02 / EMBED</small><strong>Qwen3 Embedding</strong><span>{milvusStatus?.dimensions || 2560} dimensions</span></div><i>→</i>
           <div className="active"><small>03 / ANN INDEX</small><strong>HNSW · COSINE</strong><span>M=16 · ef=64</span></div><i>→</i>
-          <div><small>04 / FILTER</small><strong>Scalar Predicate</strong><span>tenant · product · status</span></div><i>→</i>
+          <div><small>04 / FILTER</small><strong>Scalar Predicate</strong><span>tenant · role · product · status</span></div><i>→</i>
           <div><small>05 / OUTPUT</small><strong>Top-{vectorTopK} Chunks</strong><span>score + metadata + content</span></div>
+        </div>
+        <div className="milvus-proof-strip">
+          <div><small>REPLACED</small><strong>O(N) in-memory scan</strong><span>→ Milvus Retriever Adapter</span></div>
+          <div><small>REUSED</small><strong>RRF · Router · Rerank</strong><span>Context · Citation · Trace</span></div>
+          <div><small>REGRESSION</small><strong>28 / 28 passed</strong><span>quality delta 0 · ACL violations 0</span></div>
+          <div><small>PIPELINES</small><strong>v1 · v3 · v4 · v5</strong><span>same interface, real backend</span></div>
         </div>
         <div className="milvus-status-grid">
           <div><span>SERVICE</span><strong className={milvusStatus?.connected ? "online" : "muted"}>{milvusStatus?.connected ? "CONNECTED" : "NOT CHECKED"}</strong></div>
@@ -419,12 +426,13 @@ export default function Home() {
             <label><span>QUERY</span><textarea value={vectorQuery} onChange={(event) => setVectorQuery(event.target.value)} /></label>
             <div className="milvus-filters">
               <label><span>TENANT</span><select value={vectorTenant} onChange={(event) => setVectorTenant(event.target.value)}><option value="public">public only</option><option value="tenant_a">tenant_a + public</option></select></label>
+              <label><span>ROLE</span><select value={vectorRole} onChange={(event) => setVectorRole(event.target.value)}><option value="admin">admin</option><option value="viewer">viewer</option></select></label>
               <label><span>PRODUCT</span><select value={vectorProduct} onChange={(event) => setVectorProduct(event.target.value)}><option value="">all products</option><option value="identity">identity</option><option value="reports">reports</option><option value="storage">storage</option><option value="operations">operations</option><option value="api-gateway">api-gateway</option></select></label>
               <label><span>TOP-K</span><input type="number" min="1" max="20" value={vectorTopK} onChange={(event) => setVectorTopK(Number(event.target.value))} /></label>
             </div>
             <button className="vector-search-button" onClick={searchMilvus} disabled={milvusLoading}>{milvusLoading ? "EMBEDDING + SEARCHING…" : "执行真实向量检索 →"}</button>
             {milvusError && <div className="embedding-error">检索失败：{milvusError}<small>先执行 make milvus-up、make milvus-seed、make serve-lab</small></div>}
-            <div className="milvus-lesson"><b>面试验证点</b><p>为什么要在 ANN 搜索前过滤？HNSW 的 M、efConstruction、ef 分别影响什么？COSINE 与 L2 如何选？索引构建和数据更新如何权衡？</p></div>
+            <div className="milvus-lesson"><b>面试验证点</b><p>为什么要在 ANN 搜索前过滤？缺少 Role 为什么必须 fail closed？HNSW 的 M、efConstruction、ef 分别影响什么？如何用同一 Harness 证明替换 Retriever 没有质量退化？</p></div>
           </div>
           <div className="milvus-results">
             {vectorResult ? <>
@@ -509,7 +517,7 @@ export default function Home() {
           <i>→</i>
           <div className="pipe-stack">
             <div className="pipe-node"><small>RETRIEVER</small><strong>BM25</strong></div>
-            <div className="pipe-node"><small>RETRIEVER</small><strong>Vector</strong></div>
+            <div className="pipe-node"><small>RETRIEVER</small><strong>Milvus HNSW</strong></div>
           </div>
           <i>→</i>
           <div className="pipe-node"><small>CONTEXT</small><strong>Rank + Pack</strong><span>Top-K · citation map</span></div>

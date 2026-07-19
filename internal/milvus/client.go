@@ -82,16 +82,18 @@ func (value *flexibleInt64) UnmarshalJSON(data []byte) error {
 }
 
 type Record struct {
-	ChunkID    string    `json:"chunk_id"`
-	DocumentID string    `json:"document_id"`
-	Title      string    `json:"title"`
-	Content    string    `json:"content"`
-	TenantID   string    `json:"tenant_id"`
-	Product    string    `json:"product"`
-	Version    string    `json:"version"`
-	Status     string    `json:"status"`
-	Visibility string    `json:"visibility"`
-	Embedding  []float64 `json:"embedding"`
+	ChunkID        string    `json:"chunk_id"`
+	DocumentID     string    `json:"document_id"`
+	Title          string    `json:"title"`
+	Content        string    `json:"content"`
+	TenantID       string    `json:"tenant_id"`
+	AllowedTenants []string  `json:"allowed_tenants,omitempty"`
+	AllowedRoles   []string  `json:"allowed_roles,omitempty"`
+	Product        string    `json:"product"`
+	Version        string    `json:"version"`
+	Status         string    `json:"status"`
+	Visibility     string    `json:"visibility"`
+	Embedding      []float64 `json:"embedding"`
 }
 
 type SearchRequest struct {
@@ -99,19 +101,46 @@ type SearchRequest struct {
 	Vector     []float64
 	Filter     string
 	Limit      int
+	EF         int
 }
 
 type SearchHit struct {
-	ChunkID    string  `json:"chunk_id"`
-	DocumentID string  `json:"document_id"`
-	Title      string  `json:"title"`
-	Content    string  `json:"content"`
-	TenantID   string  `json:"tenant_id"`
-	Product    string  `json:"product"`
-	Version    string  `json:"version"`
-	Status     string  `json:"status"`
-	Visibility string  `json:"visibility"`
-	Distance   float64 `json:"distance"`
+	ChunkID        string      `json:"chunk_id"`
+	DocumentID     string      `json:"document_id"`
+	Title          string      `json:"title"`
+	Content        string      `json:"content"`
+	TenantID       string      `json:"tenant_id"`
+	AllowedTenants stringArray `json:"allowed_tenants"`
+	AllowedRoles   stringArray `json:"allowed_roles"`
+	Product        string      `json:"product"`
+	Version        string      `json:"version"`
+	Status         string      `json:"status"`
+	Visibility     string      `json:"visibility"`
+	Distance       float64     `json:"distance"`
+}
+
+// stringArray accepts both the intuitive JSON array used by mocks and the
+// typed FieldData envelope returned by the Milvus v2 REST gateway.
+type stringArray []string
+
+func (value *stringArray) UnmarshalJSON(data []byte) error {
+	var direct []string
+	if err := json.Unmarshal(data, &direct); err == nil {
+		*value = direct
+		return nil
+	}
+	var wrapped struct {
+		Data struct {
+			StringData struct {
+				Data []string `json:"data"`
+			} `json:"StringData"`
+		} `json:"Data"`
+	}
+	if err := json.Unmarshal(data, &wrapped); err != nil {
+		return fmt.Errorf("decode Milvus VarChar array: %w", err)
+	}
+	*value = wrapped.Data.StringData.Data
+	return nil
 }
 
 func NewClient(config Config) *Client {
@@ -176,6 +205,8 @@ func (c *Client) CreateCollection(ctx context.Context, collection string, dimens
 				{"fieldName": "title", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "512"}},
 				{"fieldName": "content", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "8192"}},
 				{"fieldName": "tenant_id", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
+				{"fieldName": "allowed_tenants", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "16", "max_length": "128"}},
+				{"fieldName": "allowed_roles", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "16", "max_length": "128"}},
 				{"fieldName": "product", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
 				{"fieldName": "version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
 				{"fieldName": "status", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
@@ -216,15 +247,19 @@ func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, 
 	if limit <= 0 || limit > 50 {
 		limit = 5
 	}
+	ef := input.EF
+	if ef <= 0 {
+		ef = 64
+	}
 	payload := map[string]any{
 		"collectionName": input.Collection,
 		"data":           [][]float64{input.Vector},
 		"annsField":      "embedding",
 		"limit":          limit,
-		"outputFields":   []string{"chunk_id", "document_id", "title", "content", "tenant_id", "product", "version", "status", "visibility"},
+		"outputFields":   []string{"chunk_id", "document_id", "title", "content", "tenant_id", "allowed_tenants", "allowed_roles", "product", "version", "status", "visibility"},
 		"searchParams": map[string]any{
 			"metricType": "COSINE",
-			"params":     map[string]any{"ef": 64},
+			"params":     map[string]any{"ef": ef},
 		},
 	}
 	if strings.TrimSpace(input.Filter) != "" {

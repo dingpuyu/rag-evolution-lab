@@ -18,7 +18,8 @@
 |---|---|---|
 | `chunk_id` | VarChar / Primary Key | 稳定 Chunk ID，支持幂等 Upsert |
 | `document_id`、`title`、`content` | VarChar | 搜索结果展示与溯源 |
-| `tenant_id`、`product`、`version`、`status`、`visibility` | VarChar | Pre-filter 标量过滤 |
+| `tenant_id`、`product`、`version`、`status`、`visibility` | VarChar | 展示与 Pre-filter 标量过滤 |
+| `allowed_tenants`、`allowed_roles` | Nullable Array&lt;VarChar&gt; | ANN 前执行 fail-closed ACL；公共文档省略空数组 |
 | `embedding` | FloatVector(2560) | Qwen3-Embedding-4B 向量 |
 
 向量索引显式设置为 `HNSW(M=16, efConstruction=200)` 和 `COSINE`；查询时使用 `ef=64`。这些参数是实验基线，不是未经压测即可照搬的生产参数。
@@ -85,7 +86,7 @@ make web-dev
 
 - 刷新状态：查看 Collection、行数、维度、索引和 Load State；
 - 输入自然语言问题：由 Qwen3 实时生成 Query Embedding；
-- 选择 Tenant、Product 和 Top-K：构造 Milvus 标量 Predicate；
+- 选择 Tenant、Role、Product 和 Top-K：构造 Milvus 标量 Predicate；
 - 查看每个 Hit 的 COSINE 分数、Chunk 内容、业务元数据和耗时。
 
 也可以直接调用接口：
@@ -98,6 +99,7 @@ curl -X POST http://127.0.0.1:8080/api/v1/milvus/search \
   -d '{
     "query":"当前版本如何配置企业单点登录？",
     "tenant_id":"tenant_a",
+    "user_role":"admin",
     "product":"identity",
     "status":"active",
     "top_k":5
@@ -137,7 +139,7 @@ Milvus 把向量字段、业务标量字段、ANN 索引、加载状态和一致
 
 ### Pre-filter 与权限边界
 
-当前过滤表达式把公开数据与目标 Tenant 数据合并，并默认只检索 `active` 文档。生产系统不能把前端传入的 Tenant 当作可信身份；Tenant、Role 和可见范围必须来自服务端认证上下文，且权限过滤要在向量评分前执行并进入回归测试。
+当前过滤表达式只允许公开数据，或同时命中 `allowed_tenants` 与 `allowed_roles` 的内部数据，并默认只检索 `active` 文档。缺少 Tenant 或 Role 时 fail closed，仅返回公开内容。生产系统不能把前端传入的身份字段当作可信信息；这些字段必须来自服务端认证上下文，且权限过滤要在向量评分前执行并进入回归测试。
 
 ### 从 38 条到百万级
 

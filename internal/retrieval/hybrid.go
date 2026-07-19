@@ -51,6 +51,21 @@ func NewRRFWithOptions(options RRFOptions, retrievers ...Retriever) *RRF {
 
 func (r *RRF) Name() string { return "hybrid-rrf" }
 
+func (r *RRF) TraceAttributes(request domain.QueryRequest) map[string]any {
+	sources := make([]string, 0, len(r.retrievers))
+	attributes := map[string]any{"fusion": "rrf", "min_source_matches": r.minSourceMatches}
+	for _, target := range r.retrievers {
+		sources = append(sources, target.Name())
+		if provider, ok := target.(TraceAttributesProvider); ok {
+			for key, value := range provider.TraceAttributes(request) {
+				attributes[key] = value
+			}
+		}
+	}
+	attributes["retrieval_sources"] = sources
+	return attributes
+}
+
 func (r *RRF) Search(ctx context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error) {
 	if len(r.retrievers) == 0 {
 		return nil, fmt.Errorf("hybrid retrieval requires at least one retriever")
