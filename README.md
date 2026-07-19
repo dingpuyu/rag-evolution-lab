@@ -101,6 +101,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [评测协议](docs/evaluation-protocol.md)
 - [五分钟 Demo Guide](docs/demo-guide.md)
 - [Embedding 文字相似度实验 API](docs/embedding-similarity-api.md)
+- [Milvus 本地向量数据库实验](docs/milvus-local-lab.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)
@@ -132,6 +133,10 @@ go run ./cmd/raglab eval --pipeline v4-router --split development
 go run ./cmd/raglab eval --pipeline v4-router --split v4-challenge
 go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
 go run ./cmd/raglab serve-embedding --backend hash
+make milvus-up
+make milvus-seed
+make serve-lab
+make web-dev
 ```
 
 ### 使用 Ollama 本地 Embedding
@@ -172,6 +177,20 @@ RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
 ```
 
 接口地址为 `POST /api/v1/embeddings/similarity`，返回向量维度、向量预览、L2 Norm、Cosine、Dot Product、Euclidean Distance 和耗时。完整说明与网页使用方式见 [Embedding API 文档](docs/embedding-similarity-api.md)。
+
+### Milvus 向量数据库实验
+
+项目提供固定版本的 Milvus Standalone 本地部署、Qwen3 真实向量写入、HNSW/COSINE 检索、Tenant/Product/Status 标量过滤和交互式查看页面：
+
+```bash
+make milvus-up
+make milvus-status
+make milvus-seed
+make serve-lab
+make web-dev
+```
+
+网页的 `Milvus Lab` 会显示 Collection 行数、向量维度、索引类型、Load State、过滤表达式、Top-K Chunk 和 Embedding/Search 分阶段耗时。架构、Schema、面试知识点和百万级演进方向见 [Milvus 本地向量数据库实验](docs/milvus-local-lab.md)。
 
 也可以使用：
 

@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strings"
 	"syscall"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/httpapi"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
+	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 )
 
@@ -29,6 +32,14 @@ func main() {
 	}
 	if os.Args[1] == "serve-embedding" {
 		runEmbeddingServer(os.Args[2:])
+		return
+	}
+	if os.Args[1] == "milvus-seed" {
+		runMilvusSeed(os.Args[2:])
+		return
+	}
+	if os.Args[1] == "serve-lab" {
+		runLabServer(os.Args[2:])
 		return
 	}
 	root, err := findProjectRoot()
@@ -126,6 +137,100 @@ func runEmbeddingServer(args []string) {
 			fatal(fmt.Errorf("shutdown embedding API: %w", err))
 		}
 	}
+}
+
+func runMilvusSeed(args []string) {
+	flags := flag.NewFlagSet("milvus-seed", flag.ExitOnError)
+	model := flags.String("model", environmentOr("RAGLAB_OLLAMA_MODEL", "qwen3-embedding:4b-local"), "Ollama embedding model")
+	ollamaURL := flags.String("ollama-url", os.Getenv("RAGLAB_OLLAMA_URL"), "Ollama base URL")
+	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
+	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
+	_ = flags.Parse(args)
+
+	root, err := findProjectRoot()
+	if err != nil {
+		fatal(err)
+	}
+	documents, err := dataset.LoadCorpus(filepath.Join(root, "datasets", "corpus", "acmecloud"))
+	if err != nil {
+		fatal(err)
+	}
+	chunker := ingest.Chunker{MaxRunes: 700}
+	var chunks []domain.Chunk
+	for _, document := range documents {
+		chunks = append(chunks, chunker.Chunk(document)...)
+	}
+	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model}
+	service, err := milvus.NewService(milvus.NewClient(milvus.Config{BaseURL: *milvusURL}), embedder, *collection)
+	if err != nil {
+		fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+	result, err := service.Seed(ctx, chunks)
+	if err != nil {
+		fatal(err)
+	}
+	writeJSON(result)
+}
+
+func runLabServer(args []string) {
+	flags := flag.NewFlagSet("serve-lab", flag.ExitOnError)
+	address := flags.String("addr", "127.0.0.1:8080", "HTTP listen address")
+	model := flags.String("model", environmentOr("RAGLAB_OLLAMA_MODEL", "qwen3-embedding:4b-local"), "Ollama embedding model")
+	ollamaURL := flags.String("ollama-url", os.Getenv("RAGLAB_OLLAMA_URL"), "Ollama base URL")
+	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "query-side retrieval instruction")
+	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
+	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
+	_ = flags.Parse(args)
+
+	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
+	embeddingService, err := embeddinglab.New(embedder)
+	if err != nil {
+		fatal(err)
+	}
+	milvusService, err := milvus.NewService(milvus.NewClient(milvus.Config{BaseURL: *milvusURL}), embedder, *collection)
+	if err != nil {
+		fatal(err)
+	}
+	handler, err := httpapi.NewLabHandler(embeddingService, milvusService)
+	if err != nil {
+		fatal(err)
+	}
+	server := &http.Server{
+		Addr: *address, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout: 15 * time.Second, WriteTimeout: 2 * time.Minute, IdleTimeout: time.Minute,
+	}
+	runHTTPServer(server, fmt.Sprintf("lab_api=http://%s embedder=%s milvus=%s collection=%s", *address, embedder.Name(), *milvusURL, *collection))
+}
+
+func runHTTPServer(server *http.Server, readyMessage string) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	serverErrors := make(chan error, 1)
+	go func() {
+		fmt.Println(readyMessage)
+		serverErrors <- server.ListenAndServe()
+	}()
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			fatal(err)
+		}
+	case <-ctx.Done():
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			fatal(fmt.Errorf("shutdown HTTP API: %w", err))
+		}
+	}
+}
+
+func environmentOr(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
 }
 
 func runValidate(root string, runtime *app.Runtime, args []string) {
@@ -280,5 +385,5 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|serve-embedding> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|serve-embedding|milvus-seed|serve-lab> [flags]")
 }

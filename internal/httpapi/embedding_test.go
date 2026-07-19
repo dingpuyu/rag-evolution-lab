@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
+	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 )
 
@@ -22,6 +23,51 @@ func newTestHandler(t *testing.T) http.Handler {
 		t.Fatal(err)
 	}
 	return handler
+}
+
+func TestLabHandlerExposesMilvusStatusAndSearch(t *testing.T) {
+	milvusServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "application/json")
+		switch request.URL.Path {
+		case "/v2/vectordb/collections/describe":
+			_, _ = writer.Write([]byte(`{"code":0,"data":{"collectionID":42,"collectionName":"chunks","load":"LoadStateLoaded","fields":[{"name":"embedding","type":"FloatVector","params":[{"key":"dim","value":"8"}]}],"indexes":[{"fieldName":"embedding","indexName":"embedding_hnsw","metricType":"COSINE"}]}}`))
+		case "/v2/vectordb/collections/get_stats":
+			_, _ = writer.Write([]byte(`{"code":0,"data":{"rowCount":"38"}}`))
+		case "/v2/vectordb/indexes/describe":
+			_, _ = writer.Write([]byte(`{"code":0,"data":[{"fieldName":"embedding","indexName":"embedding_hnsw","indexType":"HNSW","metricType":"COSINE"}]}`))
+		case "/v2/vectordb/entities/search":
+			_, _ = writer.Write([]byte(`{"code":0,"data":[{"chunk_id":"identity#c001","title":"SSO Guide","distance":0.93}]}`))
+		default:
+			http.NotFound(writer, request)
+		}
+	}))
+	defer milvusServer.Close()
+
+	embedder := retrieval.HashEmbedder{Dimensions: 8}
+	embeddingService, err := embeddinglab.New(embedder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vectorService, err := milvus.NewService(milvus.NewClient(milvus.Config{BaseURL: milvusServer.URL}), embedder, "chunks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewLabHandler(embeddingService, vectorService)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	statusResponse := httptest.NewRecorder()
+	handler.ServeHTTP(statusResponse, httptest.NewRequest(http.MethodGet, "/api/v1/milvus/status", nil))
+	if statusResponse.Code != http.StatusOK || !strings.Contains(statusResponse.Body.String(), `"row_count":38`) || !strings.Contains(statusResponse.Body.String(), `"index_type":"HNSW"`) {
+		t.Fatalf("unexpected status response %d: %s", statusResponse.Code, statusResponse.Body.String())
+	}
+
+	searchResponse := httptest.NewRecorder()
+	handler.ServeHTTP(searchResponse, httptest.NewRequest(http.MethodPost, "/api/v1/milvus/search", strings.NewReader(`{"query":"配置单点登录","tenant_id":"tenant_a","top_k":3}`)))
+	if searchResponse.Code != http.StatusOK || !strings.Contains(searchResponse.Body.String(), `"chunk_id":"identity#c001"`) {
+		t.Fatalf("unexpected search response %d: %s", searchResponse.Code, searchResponse.Body.String())
+	}
 }
 
 func TestSimilarityEndpoint(t *testing.T) {

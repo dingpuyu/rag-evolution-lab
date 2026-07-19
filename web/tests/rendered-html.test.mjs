@@ -35,6 +35,9 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /Tenant Gate \+ Consensus/);
   assert.match(html, /8 \/ 8 passed/);
   assert.match(html, /20 → 9/);
+  assert.match(html, /从 Query Embedding 到 Milvus Top-K/);
+  assert.match(html, /HNSW · COSINE/);
+  assert.match(html, /Scalar Predicate/);
   assert.match(html, /Unauthorized Retrievals/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });

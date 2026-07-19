@@ -17,6 +17,7 @@ __pycache__/
 .pytest_cache/
 
 data/postgres/
+deploy/milvus/volumes/
 data/cache/
 data/artifacts/
 eval/reports/generated/

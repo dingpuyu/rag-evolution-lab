@@ -1,4 +1,6 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding milvus-up milvus-down milvus-status milvus-seed serve-lab web-dev
+
+DOCKER_COMPOSE ?= docker-compose
 
 fmt:
 	gofmt -w cmd internal
@@ -32,3 +34,23 @@ compare-rerank:
 
 serve-embedding:
 	go run ./cmd/raglab serve-embedding --backend auto
+
+milvus-up:
+	$(DOCKER_COMPOSE) -f deploy/milvus/docker-compose.yml up -d
+
+milvus-down:
+	$(DOCKER_COMPOSE) -f deploy/milvus/docker-compose.yml down
+
+milvus-status:
+	$(DOCKER_COMPOSE) -f deploy/milvus/docker-compose.yml ps
+	@curl --fail --silent http://127.0.0.1:9091/healthz
+	@echo
+
+milvus-seed:
+	go run ./cmd/raglab milvus-seed --model $${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+
+serve-lab:
+	go run ./cmd/raglab serve-lab --model $${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+
+web-dev:
+	npm --prefix web run dev

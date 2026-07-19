@@ -13,6 +13,43 @@ type SimilarityResult = {
   metrics: { cosine_similarity: number; dot_product: number; euclidean_distance: number };
 };
 
+type MilvusStatus = {
+  connected: boolean;
+  collection: string;
+  collection_id: string;
+  row_count: number;
+  dimensions: number;
+  metric: string;
+  index_type: string;
+  index_name: string;
+  load_state: string;
+  embedder: string;
+};
+
+type MilvusSearchResult = {
+  query: string;
+  collection: string;
+  embedder: string;
+  dimensions: number;
+  metric: string;
+  filter: string;
+  embedding_latency_ms: number;
+  search_latency_ms: number;
+  total_latency_ms: number;
+  hits: Array<{
+    chunk_id: string;
+    document_id: string;
+    title: string;
+    content: string;
+    tenant_id: string;
+    product: string;
+    version: string;
+    status: string;
+    visibility: string;
+    distance: number;
+  }>;
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
@@ -84,6 +121,14 @@ export default function Home() {
   const [similarity, setSimilarity] = useState<SimilarityResult | null>(null);
   const [embeddingError, setEmbeddingError] = useState("");
   const [embeddingLoading, setEmbeddingLoading] = useState(false);
+  const [milvusStatus, setMilvusStatus] = useState<MilvusStatus | null>(null);
+  const [vectorQuery, setVectorQuery] = useState("当前版本如何配置企业单点登录？");
+  const [vectorTenant, setVectorTenant] = useState("tenant_a");
+  const [vectorProduct, setVectorProduct] = useState("");
+  const [vectorTopK, setVectorTopK] = useState(5);
+  const [vectorResult, setVectorResult] = useState<MilvusSearchResult | null>(null);
+  const [milvusError, setMilvusError] = useState("");
+  const [milvusLoading, setMilvusLoading] = useState(false);
   const current = cases[activeCase];
 
   async function compareEmbeddings() {
@@ -106,6 +151,46 @@ export default function Home() {
     }
   }
 
+  async function refreshMilvus() {
+    setMilvusError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/status`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setMilvusStatus(body);
+    } catch (error) {
+      setMilvusStatus(null);
+      setMilvusError(error instanceof Error ? error.message : "无法连接 Milvus API");
+    }
+  }
+
+  async function searchMilvus() {
+    setMilvusLoading(true);
+    setMilvusError("");
+    try {
+      const base = apiBase.replace(/\/$/, "");
+      const [statusResponse, searchResponse] = await Promise.all([
+        fetch(`${base}/api/v1/milvus/status`),
+        fetch(`${base}/api/v1/milvus/search`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: vectorQuery, tenant_id: vectorTenant, product: vectorProduct, status: "active", top_k: vectorTopK }),
+        }),
+      ]);
+      const statusBody = await statusResponse.json();
+      const searchBody = await searchResponse.json();
+      if (!statusResponse.ok) throw new Error(statusBody?.error?.message || `HTTP ${statusResponse.status}`);
+      if (!searchResponse.ok) throw new Error(searchBody?.error?.message || `HTTP ${searchResponse.status}`);
+      setMilvusStatus(statusBody);
+      setVectorResult(searchBody);
+    } catch (error) {
+      setVectorResult(null);
+      setMilvusError(error instanceof Error ? error.message : "Milvus 向量检索失败");
+    } finally {
+      setMilvusLoading(false);
+    }
+  }
+
   function formatVector(vector: number[]) {
     return vector.map((value) => value.toFixed(5)).join(", ");
   }
@@ -122,6 +207,7 @@ export default function Home() {
           <a href="#hybrid">Hybrid 实验</a>
           <a href="#routing">Query Routing</a>
           <a href="#embedding-lab">Embedding 实验</a>
+          <a href="#milvus-lab">Milvus Lab</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -303,6 +389,54 @@ export default function Home() {
               <div className="vector-preview"><span>VECTOR B · first {similarity.vector_b.preview.length}</span><code>[{formatVector(similarity.vector_b.preview)}]</code><small>L2 norm {similarity.vector_b.l2_norm.toFixed(6)} · range {similarity.vector_b.minimum.toFixed(5)}…{similarity.vector_b.maximum.toFixed(5)}</small></div>
               <p className="embedding-explanation">{similarity.explanation}</p>
             </> : <div className="embedding-placeholder"><span>01</span><p>输入两段文字</p><i /><span>02</span><p>Embedding → N 维浮点向量</p><i /><span>03</span><p>cos(A,B) = A·B / ‖A‖‖B‖</p></div>}
+          </div>
+        </div>
+      </section>
+
+      <section className="milvus-lab shell" id="milvus-lab" aria-labelledby="milvus-lab-title">
+        <div className="milvus-heading">
+          <div><span>LIVE VECTOR DATABASE</span><h2 id="milvus-lab-title">从 Query Embedding 到 Milvus Top-K</h2></div>
+          <p>真实链路：Qwen3 将 Query 编码成 2560 维向量，Milvus 使用 HNSW + COSINE 做近似最近邻搜索，并在向量评分前执行元数据过滤。</p>
+          <button className="status-button" onClick={refreshMilvus}>刷新服务状态</button>
+        </div>
+        <div className="milvus-pipeline" aria-label="Milvus vector search pipeline">
+          <div><small>01 / QUERY</small><strong>自然语言问题</strong><span>{vectorQuery.slice(0, 24)}…</span></div><i>→</i>
+          <div><small>02 / EMBED</small><strong>Qwen3 Embedding</strong><span>{milvusStatus?.dimensions || 2560} dimensions</span></div><i>→</i>
+          <div className="active"><small>03 / ANN INDEX</small><strong>HNSW · COSINE</strong><span>M=16 · ef=64</span></div><i>→</i>
+          <div><small>04 / FILTER</small><strong>Scalar Predicate</strong><span>tenant · product · status</span></div><i>→</i>
+          <div><small>05 / OUTPUT</small><strong>Top-{vectorTopK} Chunks</strong><span>score + metadata + content</span></div>
+        </div>
+        <div className="milvus-status-grid">
+          <div><span>SERVICE</span><strong className={milvusStatus?.connected ? "online" : "muted"}>{milvusStatus?.connected ? "CONNECTED" : "NOT CHECKED"}</strong></div>
+          <div><span>COLLECTION</span><strong>{milvusStatus?.collection || "raglab_chunks_qwen3"}</strong></div>
+          <div><span>ROWS</span><strong>{milvusStatus?.row_count ?? "—"}</strong></div>
+          <div><span>VECTOR</span><strong>{milvusStatus ? `${milvusStatus.dimensions}d` : "2560d"}</strong></div>
+          <div><span>INDEX</span><strong>{milvusStatus ? `${milvusStatus.index_type} / ${milvusStatus.metric}` : "HNSW / COSINE"}</strong></div>
+          <div><span>LOAD STATE</span><strong>{milvusStatus?.load_state || "—"}</strong></div>
+        </div>
+        <div className="milvus-workbench">
+          <div className="milvus-query-panel">
+            <label><span>QUERY</span><textarea value={vectorQuery} onChange={(event) => setVectorQuery(event.target.value)} /></label>
+            <div className="milvus-filters">
+              <label><span>TENANT</span><select value={vectorTenant} onChange={(event) => setVectorTenant(event.target.value)}><option value="public">public only</option><option value="tenant_a">tenant_a + public</option></select></label>
+              <label><span>PRODUCT</span><select value={vectorProduct} onChange={(event) => setVectorProduct(event.target.value)}><option value="">all products</option><option value="identity">identity</option><option value="reports">reports</option><option value="storage">storage</option><option value="operations">operations</option><option value="api-gateway">api-gateway</option></select></label>
+              <label><span>TOP-K</span><input type="number" min="1" max="20" value={vectorTopK} onChange={(event) => setVectorTopK(Number(event.target.value))} /></label>
+            </div>
+            <button className="vector-search-button" onClick={searchMilvus} disabled={milvusLoading}>{milvusLoading ? "EMBEDDING + SEARCHING…" : "执行真实向量检索 →"}</button>
+            {milvusError && <div className="embedding-error">检索失败：{milvusError}<small>先执行 make milvus-up、make milvus-seed、make serve-lab</small></div>}
+            <div className="milvus-lesson"><b>面试验证点</b><p>为什么要在 ANN 搜索前过滤？HNSW 的 M、efConstruction、ef 分别影响什么？COSINE 与 L2 如何选？索引构建和数据更新如何权衡？</p></div>
+          </div>
+          <div className="milvus-results">
+            {vectorResult ? <>
+              <div className="result-summary"><span>{vectorResult.hits.length} HITS</span><b>{vectorResult.total_latency_ms.toFixed(2)} ms total</b><em>embed {vectorResult.embedding_latency_ms.toFixed(2)} · search {vectorResult.search_latency_ms.toFixed(2)}</em></div>
+              <code className="filter-code">{vectorResult.filter}</code>
+              <div className="hit-list">
+                {vectorResult.hits.map((hit, index) => <article key={hit.chunk_id}>
+                  <div className="hit-rank"><span>#{index + 1}</span><strong>{hit.distance.toFixed(6)}</strong><small>COSINE</small></div>
+                  <div className="hit-body"><div><strong>{hit.title}</strong><span>{hit.product} · v{hit.version} · {hit.tenant_id}</span></div><p>{hit.content}</p><code>{hit.chunk_id}</code></div>
+                </article>)}
+              </div>
+            </> : <div className="milvus-placeholder"><span>VECTOR DATABASE CAPABILITIES</span><strong>建库 · 建索引 · Upsert · ANN Search · Scalar Filter</strong><p>点击“执行真实向量检索”后，这里会展示 Milvus 返回的原始相似度、Chunk 内容、元数据和分阶段耗时。</p></div>}
           </div>
         </div>
       </section>
