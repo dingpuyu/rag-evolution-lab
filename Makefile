@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding
 
 fmt:
 	gofmt -w cmd internal
@@ -29,3 +29,6 @@ compare-routing:
 
 compare-rerank:
 	go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
+
+serve-embedding:
+	go run ./cmd/raglab serve-embedding --backend auto

@@ -5,20 +5,31 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"sort"
+	"syscall"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
+	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
+	"github.com/dingpuyu/rag-evolution-lab/internal/httpapi"
+	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 )
 
 func main() {
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(2)
+	}
+	if os.Args[1] == "serve-embedding" {
+		runEmbeddingServer(os.Args[2:])
+		return
 	}
 	root, err := findProjectRoot()
 	if err != nil {
@@ -48,6 +59,72 @@ func main() {
 	default:
 		usage()
 		os.Exit(2)
+	}
+}
+
+func runEmbeddingServer(args []string) {
+	flags := flag.NewFlagSet("serve-embedding", flag.ExitOnError)
+	address := flags.String("addr", "127.0.0.1:8080", "HTTP listen address")
+	backend := flags.String("backend", "auto", "embedding backend: auto, hash, or ollama")
+	dimensions := flags.Int("dimensions", 512, "hash embedding dimensions")
+	model := flags.String("model", os.Getenv("RAGLAB_OLLAMA_MODEL"), "Ollama embedding model")
+	ollamaURL := flags.String("ollama-url", os.Getenv("RAGLAB_OLLAMA_URL"), "Ollama base URL")
+	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "instruction used only in query_document mode")
+	_ = flags.Parse(args)
+
+	var embedder retrieval.Embedder
+	switch *backend {
+	case "auto":
+		if *model == "" {
+			embedder = retrieval.HashEmbedder{Dimensions: *dimensions}
+		} else {
+			embedder = retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
+		}
+	case "hash":
+		embedder = retrieval.HashEmbedder{Dimensions: *dimensions}
+	case "ollama":
+		if *model == "" {
+			fatal(fmt.Errorf("--model or RAGLAB_OLLAMA_MODEL is required for ollama backend"))
+		}
+		embedder = retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
+	default:
+		fatal(fmt.Errorf("unknown embedding backend %q", *backend))
+	}
+	service, err := embeddinglab.New(embedder)
+	if err != nil {
+		fatal(err)
+	}
+	handler, err := httpapi.NewEmbeddingHandler(service)
+	if err != nil {
+		fatal(err)
+	}
+	server := &http.Server{
+		Addr:              *address,
+		Handler:           handler,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      2 * time.Minute,
+		IdleTimeout:       time.Minute,
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	serverErrors := make(chan error, 1)
+	go func() {
+		fmt.Printf("embedding_api=http://%s embedder=%s\n", *address, embedder.Name())
+		serverErrors <- server.ListenAndServe()
+	}()
+	select {
+	case err := <-serverErrors:
+		if err != nil && err != http.ErrServerClosed {
+			fatal(err)
+		}
+	case <-ctx.Done():
+		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := server.Shutdown(shutdownContext); err != nil {
+			fatal(fmt.Errorf("shutdown embedding API: %w", err))
+		}
 	}
 }
 
@@ -203,5 +280,5 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|serve-embedding> [flags]")
 }

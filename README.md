@@ -100,6 +100,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [知识库与数据集设计](docs/dataset-design.md)
 - [评测协议](docs/evaluation-protocol.md)
 - [五分钟 Demo Guide](docs/demo-guide.md)
+- [Embedding 文字相似度实验 API](docs/embedding-similarity-api.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)
@@ -130,6 +131,7 @@ go run ./cmd/raglab compare --baseline v2-metadata --candidate v3-hybrid-metadat
 go run ./cmd/raglab eval --pipeline v4-router --split development
 go run ./cmd/raglab eval --pipeline v4-router --split v4-challenge
 go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
+go run ./cmd/raglab serve-embedding --backend hash
 ```
 
 ### 使用 Ollama 本地 Embedding
@@ -159,6 +161,17 @@ RAGLAB_QUERY_INSTRUCTION="Given a Chinese enterprise knowledge-base query, retri
 建议先运行一次无 Instruction 基线，再运行上面的实验，通过相同 Golden Dataset 比较变化。
 
 当前 Qwen3 4B Q4_K_M 实测为 Hit Rate@5 `0.900`、MRR `0.850`、Document Recall@5 `0.875`。两种 Query Instruction 改变了部分候选排序，但没有改变总体质量指标，说明 Instruction 也必须经过目标数据集评测。
+
+### Embedding 文字相似度接口
+
+本机已经创建 `qwen3-embedding:4b-local` 时，可以启动真实模型实验接口：
+
+```bash
+RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
+  go run ./cmd/raglab serve-embedding --backend ollama
+```
+
+接口地址为 `POST /api/v1/embeddings/similarity`，返回向量维度、向量预览、L2 Norm、Cosine、Dot Product、Euclidean Distance 和耗时。完整说明与网页使用方式见 [Embedding API 文档](docs/embedding-similarity-api.md)。
 
 也可以使用：
 

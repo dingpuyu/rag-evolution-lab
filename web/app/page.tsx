@@ -2,6 +2,17 @@
 
 import { useState } from "react";
 
+type SimilarityResult = {
+  embedder: string;
+  mode: string;
+  dimensions: number;
+  latency_ms: number;
+  explanation: string;
+  vector_a: { preview: number[]; l2_norm: number; minimum: number; maximum: number };
+  vector_b: { preview: number[]; l2_norm: number; minimum: number; maximum: number };
+  metrics: { cosine_similarity: number; dot_product: number; euclidean_distance: number };
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
@@ -66,7 +77,38 @@ const cases = {
 
 export default function Home() {
   const [activeCase, setActiveCase] = useState<keyof typeof cases>("version");
+  const [textA, setTextA] = useState("企业员工如何配置单点登录？");
+  const [textB, setTextB] = useState("管理员可以在身份中心开启 SSO 企业登录。");
+  const [embeddingMode, setEmbeddingMode] = useState("symmetric");
+  const [apiBase, setAPIBase] = useState("http://127.0.0.1:8080");
+  const [similarity, setSimilarity] = useState<SimilarityResult | null>(null);
+  const [embeddingError, setEmbeddingError] = useState("");
+  const [embeddingLoading, setEmbeddingLoading] = useState(false);
   const current = cases[activeCase];
+
+  async function compareEmbeddings() {
+    setEmbeddingLoading(true);
+    setEmbeddingError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/embeddings/similarity`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text_a: textA, text_b: textB, mode: embeddingMode, preview_dimensions: 12 }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setSimilarity(body);
+    } catch (error) {
+      setSimilarity(null);
+      setEmbeddingError(error instanceof Error ? error.message : "无法连接 Embedding API");
+    } finally {
+      setEmbeddingLoading(false);
+    }
+  }
+
+  function formatVector(vector: number[]) {
+    return vector.map((value) => value.toFixed(5)).join(", ");
+  }
 
   return (
     <main>
@@ -79,6 +121,7 @@ export default function Home() {
           <a href="#evolution">演进路径</a>
           <a href="#hybrid">Hybrid 实验</a>
           <a href="#routing">Query Routing</a>
+          <a href="#embedding-lab">Embedding 实验</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -232,6 +275,35 @@ export default function Home() {
               <b>{model.hit}</b><b>{model.mrr}</b><b>{model.recall}</b>
             </div>
           ))}
+        </div>
+      </section>
+
+      <section className="embedding-lab shell" id="embedding-lab" aria-labelledby="embedding-lab-title">
+        <div className="embedding-lab-heading">
+          <div><span>LIVE EMBEDDING LAB</span><h2 id="embedding-lab-title">两段文字是怎样变成向量的？</h2></div>
+          <p>调用本地 Go API，批量生成向量，再计算 cosine、dot product 和 Euclidean distance。默认 Hash 后端可离线运行，设置 Ollama 后切换到 Qwen3。</p>
+        </div>
+        <div className="embedding-workbench">
+          <div className="embedding-inputs">
+            <label><span>TEXT A / QUERY</span><textarea value={textA} onChange={(event) => setTextA(event.target.value)} /></label>
+            <label><span>TEXT B / DOCUMENT</span><textarea value={textB} onChange={(event) => setTextB(event.target.value)} /></label>
+            <div className="embedding-controls">
+              <label><span>MODE</span><select value={embeddingMode} onChange={(event) => setEmbeddingMode(event.target.value)}><option value="symmetric">symmetric</option><option value="query_document">query_document</option></select></label>
+              <label className="api-input"><span>API</span><input value={apiBase} onChange={(event) => setAPIBase(event.target.value)} /></label>
+              <button onClick={compareEmbeddings} disabled={embeddingLoading}>{embeddingLoading ? "ENCODING…" : "生成向量并比较 →"}</button>
+            </div>
+            {embeddingError && <div className="embedding-error">连接失败：{embeddingError}<small>先运行：go run ./cmd/raglab serve-embedding</small></div>}
+          </div>
+          <div className="embedding-output">
+            {similarity ? <>
+              <div className="embedding-summary"><span>{similarity.embedder}</span><b>{similarity.dimensions} dimensions</b><em>{similarity.latency_ms.toFixed(2)} ms</em></div>
+              <div className="similarity-score"><small>COSINE SIMILARITY</small><strong>{similarity.metrics.cosine_similarity.toFixed(6)}</strong><div><i style={{ width: `${Math.max(0, Math.min(1, similarity.metrics.cosine_similarity)) * 100}%` }} /></div></div>
+              <div className="distance-grid"><div><span>DOT PRODUCT</span><b>{similarity.metrics.dot_product.toFixed(6)}</b></div><div><span>EUCLIDEAN</span><b>{similarity.metrics.euclidean_distance.toFixed(6)}</b></div></div>
+              <div className="vector-preview"><span>VECTOR A · first {similarity.vector_a.preview.length}</span><code>[{formatVector(similarity.vector_a.preview)}]</code><small>L2 norm {similarity.vector_a.l2_norm.toFixed(6)} · range {similarity.vector_a.minimum.toFixed(5)}…{similarity.vector_a.maximum.toFixed(5)}</small></div>
+              <div className="vector-preview"><span>VECTOR B · first {similarity.vector_b.preview.length}</span><code>[{formatVector(similarity.vector_b.preview)}]</code><small>L2 norm {similarity.vector_b.l2_norm.toFixed(6)} · range {similarity.vector_b.minimum.toFixed(5)}…{similarity.vector_b.maximum.toFixed(5)}</small></div>
+              <p className="embedding-explanation">{similarity.explanation}</p>
+            </> : <div className="embedding-placeholder"><span>01</span><p>输入两段文字</p><i /><span>02</span><p>Embedding → N 维浮点向量</p><i /><span>03</span><p>cos(A,B) = A·B / ‖A‖‖B‖</p></div>}
+          </div>
         </div>
       </section>
 
