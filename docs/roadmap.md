@@ -87,9 +87,9 @@
 - Query Rewrite
 - [x] Retrieval Router
 - Multi-query 实验
-- Reranker
-- Context Packing
-- Citation Verification
+- [x] Reranker 工程接口与确定性基线
+- [x] Context Packing 基线
+- [x] Citation Verification 硬门禁
 - 80 条完整 Golden Query
 
 ### 需要证明
@@ -105,6 +105,15 @@
 - 路由将 Development 上的 Vector Query 调用从 20 次降到 9 次。
 - Challenge 首轮暴露租户同义表达误路由，并推动 Tenant Scope Gate 在检索前 Fail Closed。
 - 当前 28 条均为小型合成数据，Blind Split 和 60 条规模扩充仍未完成。
+
+### V5 首轮实际结果
+
+- 已注册 `v5-rerank`，将 Router 候选池扩展至 20，再执行确定性 Rerank。
+- 已将 Retrieval 与最终 Context 分离，支持 Chunk 数和估算 Token 双预算。
+- 引用只能指向最终 Context，评测增加 Citation Violations 硬门禁。
+- 增加 Precision@5、NDCG@5、Answerability Accuracy、P50/P95。
+- Development 的 Hit/MRR/Recall/Precision 不变，NDCG 从 1.000 降至 0.996，P95 增加。
+- 因现有数据存在天花板效应，V5 尚不能宣称质量优化完成；详见 Phase 5 报告。
 
 ## Phase 4：V6 / V7 进阶能力
 

@@ -8,6 +8,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/pipeline"
+	"github.com/dingpuyu/rag-evolution-lab/internal/rerank"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/routing"
 )
@@ -60,6 +61,12 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 	hybridMetadata := pipeline.New("v3-hybrid-metadata", hybridMetadataIndex)
 	hybridConsensus := pipeline.New("v3-hybrid-metadata-consensus", hybridConsensusIndex)
 	router := pipeline.New("v4-router", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex))
+	rerankPipeline := pipeline.NewWithOptions("v5-rerank", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex), pipeline.Options{
+		Reranker:           rerank.Heuristic{},
+		CandidateTopN:      20,
+		ContextMaxChunks:   6,
+		ContextTokenBudget: 4000,
+	})
 	pipelines := map[string]*pipeline.Pipeline{
 		keyword.Name():         keyword,
 		vector.Name():          vector,
@@ -68,6 +75,7 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		hybridMetadata.Name():  hybridMetadata,
 		hybridConsensus.Name(): hybridConsensus,
 		router.Name():          router,
+		rerankPipeline.Name():  rerankPipeline,
 	}
 	if options.OllamaModel != "" {
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
@@ -102,6 +110,15 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 			metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex,
 		))
 		pipelines[ollamaRouter.Name()] = ollamaRouter
+		ollamaRerank := pipeline.NewWithOptions("v5-ollama-rerank", newQueryRouter(
+			metadataIndex, ollamaHybridMetadataIndex, ollamaHybridConsensusIndex,
+		), pipeline.Options{
+			Reranker:           rerank.Heuristic{},
+			CandidateTopN:      20,
+			ContextMaxChunks:   6,
+			ContextTokenBudget: 4000,
+		})
+		pipelines[ollamaRerank.Name()] = ollamaRerank
 	}
 	return &Runtime{
 		Documents: documents,

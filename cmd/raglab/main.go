@@ -118,10 +118,13 @@ func runCompare(root string, runtime *app.Runtime, args []string) {
 	candidateReport := evaluate(root, runtime, *candidate, *split)
 	printReport(baseReport)
 	printReport(candidateReport)
-	fmt.Printf("delta hit_rate=%+.3f mrr=%+.3f recall=%+.3f\n",
+	fmt.Printf("delta hit_rate=%+.3f mrr=%+.3f recall=%+.3f precision=%+.3f ndcg=%+.3f p95_ms=%+.3f\n",
 		candidateReport.HitRate-baseReport.HitRate,
 		candidateReport.MRR-baseReport.MRR,
 		candidateReport.Recall-baseReport.Recall,
+		candidateReport.Precision-baseReport.Precision,
+		candidateReport.NDCG-baseReport.NDCG,
+		candidateReport.LatencyP95MS-baseReport.LatencyP95MS,
 	)
 }
 
@@ -142,13 +145,14 @@ func evaluate(root string, runtime *app.Runtime, pipelineName, split string) eva
 }
 
 func printReport(report evaluation.Report) {
-	fmt.Printf("pipeline=%s split=%s cases=%d hit_rate@5=%.3f mrr=%.3f doc_recall@5=%.3f unauthorized=%d metadata_violations=%d\n",
-		report.Pipeline, report.Split, report.Cases, report.HitRate, report.MRR, report.Recall,
-		report.UnauthorizedRetrievals, report.MetadataViolations)
+	fmt.Printf("pipeline=%s split=%s cases=%d hit_rate@5=%.3f mrr=%.3f doc_recall@5=%.3f precision@5=%.3f ndcg@5=%.3f answerability=%.3f p50_ms=%.3f p95_ms=%.3f unauthorized=%d metadata_violations=%d citation_violations=%d\n",
+		report.Pipeline, report.Split, report.Cases, report.HitRate, report.MRR, report.Recall, report.Precision, report.NDCG,
+		report.AnswerabilityAccuracy, report.LatencyP50MS, report.LatencyP95MS,
+		report.UnauthorizedRetrievals, report.MetadataViolations, report.CitationViolations)
 	for _, category := range evaluation.SortedCategories(report) {
 		metrics := report.ByCategory[category]
-		fmt.Printf("  %-22s cases=%d hit=%.3f mrr=%.3f recall=%.3f\n",
-			category, metrics.Cases, metrics.HitRate, metrics.MRR, metrics.Recall)
+		fmt.Printf("  %-22s cases=%d hit=%.3f mrr=%.3f recall=%.3f precision=%.3f ndcg=%.3f\n",
+			category, metrics.Cases, metrics.HitRate, metrics.MRR, metrics.Recall, metrics.Precision, metrics.NDCG)
 	}
 	if len(report.Routes) > 0 {
 		fmt.Print("  routes")

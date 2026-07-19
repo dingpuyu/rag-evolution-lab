@@ -77,11 +77,22 @@ Phase 4 Query Routing 已完成：
 - 8 条独立 V4 Challenge Query
 - Development 与 Challenge 共 28 条 Case 全部通过
 
+Phase 5 已完成首轮工程基线实验：
+
+- 可替换 `Reranker` 接口与确定性 Heuristic Baseline
+- Candidate Retrieval 与 Final Context 分离
+- Token Budget Context Packing
+- Citation 必须绑定最终 Context 的确定性门禁
+- Precision@5、NDCG@5、Answerability、P50/P95 指标
+- 首轮实验发现多跳 NDCG 从 1.000 轻微降至 0.996，未将 V5 标记为效果优化完成
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
 Hybrid Retrieval 的分类权衡见 [Phase 3 Hybrid Retrieval Report](eval/reports/phase3-hybrid-retrieval.md)。
 Query Routing 与 Challenge Split 结果见 [Phase 4 Query Routing Report](eval/reports/phase4-query-routing.md)。
+Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/reports/phase5-rerank-context.md)。
+面试知识点与项目证据的对应关系见 [RAG 核心知识点验证矩阵](docs/interview-validation-matrix.md)。
 
 ## 文档导航
 
@@ -118,6 +129,7 @@ go run ./cmd/raglab compare --baseline v0-keyword --candidate v2-metadata
 go run ./cmd/raglab compare --baseline v2-metadata --candidate v3-hybrid-metadata
 go run ./cmd/raglab eval --pipeline v4-router --split development
 go run ./cmd/raglab eval --pipeline v4-router --split v4-challenge
+go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
 ```
 
 ### 使用 Ollama 本地 Embedding
@@ -156,6 +168,7 @@ make validate
 make compare
 make compare-metadata
 make compare-routing
+make compare-rerank
 ```
 
 ## Phase 1 基线

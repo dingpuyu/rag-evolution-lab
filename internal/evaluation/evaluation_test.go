@@ -18,21 +18,46 @@ func TestScoreCaseComputesReciprocalRankAndRecall(t *testing.T) {
 		{Chunk: domain.Chunk{DocumentID: "a"}},
 		{Chunk: domain.Chunk{DocumentID: "b"}},
 	}
-	score := scoreCase(golden, results)
-	if !score.Hit || score.ReciprocalRank != 0.5 || score.DocumentRecall != 1 {
+	score := scoreCase(golden, results, 3)
+	if !score.Hit || score.ReciprocalRank != 0.5 || score.DocumentRecall != 1 || score.Precision != 2.0/3.0 {
 		t.Fatalf("unexpected score: %#v", score)
+	}
+	if score.NDCG <= 0 || score.NDCG >= 1 {
+		t.Fatalf("expected discounted ranking below ideal, got %#v", score)
 	}
 }
 
 func TestScoreCaseTreatsEmptyExpectedAsSuccessfulOnlyWithNoResults(t *testing.T) {
 	golden := domain.GoldenCase{Expected: domain.GoldenExpected{RelevantDocumentIDs: nil}}
-	empty := scoreCase(golden, nil)
+	empty := scoreCase(golden, nil, 5)
 	if !empty.Hit || empty.DocumentRecall != 1 || empty.ReciprocalRank != 1 {
 		t.Fatalf("empty retrieval should satisfy unanswerable case: %#v", empty)
 	}
-	unexpected := scoreCase(golden, []domain.RetrievedChunk{{Chunk: domain.Chunk{DocumentID: "noise"}}})
+	unexpected := scoreCase(golden, []domain.RetrievedChunk{{Chunk: domain.Chunk{DocumentID: "noise"}}}, 5)
 	if unexpected.Hit {
 		t.Fatalf("unanswerable case should fail with retrieved noise: %#v", unexpected)
+	}
+}
+
+func TestScoreCaseCountsDuplicateDocumentOnce(t *testing.T) {
+	golden := domain.GoldenCase{Expected: domain.GoldenExpected{RelevantDocumentIDs: []string{"a"}}}
+	results := []domain.RetrievedChunk{
+		{Chunk: domain.Chunk{DocumentID: "a"}},
+		{Chunk: domain.Chunk{DocumentID: "a"}},
+	}
+	score := scoreCase(golden, results, 2)
+	if score.Precision != 0.5 || score.DocumentRecall != 1 || score.NDCG != 1 {
+		t.Fatalf("duplicate document inflated metrics: %#v", score)
+	}
+}
+
+func TestPercentileUsesNearestRank(t *testing.T) {
+	values := []float64{5, 1, 4, 2, 3}
+	if got := percentile(values, 0.50); got != 3 {
+		t.Fatalf("unexpected p50: %v", got)
+	}
+	if got := percentile(values, 0.95); got != 5 {
+		t.Fatalf("unexpected p95: %v", got)
 	}
 }
 

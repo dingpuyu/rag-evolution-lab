@@ -66,6 +66,7 @@ type QueryResponse struct {
 	Answerable bool             `json:"answerable"`
 	Citations  []Citation       `json:"citations"`
 	Retrieval  []RetrievedChunk `json:"-"`
+	Context    []RetrievedChunk `json:"-"`
 	Trace      QueryTrace       `json:"trace"`
 }
 

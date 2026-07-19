@@ -15,6 +15,7 @@ func TestBuildRegistersHybridExperimentPipelines(t *testing.T) {
 		"v3-hybrid-metadata",
 		"v3-hybrid-metadata-consensus",
 		"v4-router",
+		"v5-rerank",
 	} {
 		if _, err := runtime.Pipeline(name); err != nil {
 			t.Errorf("expected pipeline %q to be registered: %v", name, err)
