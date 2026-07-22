@@ -87,9 +87,9 @@ Recall为1.000说明当前Harness的计算和对照链路正确，但不说明HN
 
 ## 7. 下一轮改进
 
-- 增加跨主题近邻与相似Tenant文档，让`ef`的Recall差异显现；
-- Query扩大到1,000以上，并加入Warm-up与多轮重复；
-- 增加Batch失败重试、Checkpoint和断点续传；
+以下事项已经在[100K Hard-v2验证](scale-benchmark-100k.md)中完成：跨主题近邻、Warm-up、300 Query、Batch重试、Checkpoint、断点续写与索引就绪门禁。保留中的后续工作为：
+
 - 实现增量Upsert、Delete和Collection Alias切换；
 - 采集测试期间CPU、内存、磁盘和Segment指标；
-- 通过配置扩展到100K，再决定是否进入1M。
+- Query扩大到1,000以上并执行更长时间稳态压测；
+- 评估真实Embedding数据分布，再决定是否进入1M。

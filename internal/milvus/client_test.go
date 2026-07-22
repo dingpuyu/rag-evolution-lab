@@ -145,3 +145,18 @@ func TestCollectionStatsAcceptsStringAndNumber(t *testing.T) {
 		}
 	}
 }
+
+func TestDescribeIndexAcceptsStringAndNumberRowProgress(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_, _ = writer.Write([]byte(`{"code":0,"data":[{"indexName":"embedding_hnsw","indexState":"Finished","indexedRows":"100000","pendingRows":0,"totalRows":"100000"}]}`))
+	}))
+	defer server.Close()
+
+	indexes, err := NewClient(Config{BaseURL: server.URL}).DescribeIndex(context.Background(), "chunks", "embedding_hnsw")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(indexes) != 1 || indexes[0].IndexedRowCount() != 100000 || indexes[0].PendingRowCount() != 0 || indexes[0].TotalRowCount() != 100000 {
+		t.Fatalf("unexpected index progress: %#v", indexes)
+	}
+}

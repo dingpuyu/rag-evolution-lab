@@ -57,13 +57,20 @@ type KeyValue struct {
 }
 
 type IndexDetail struct {
-	FieldName   string     `json:"fieldName"`
-	IndexName   string     `json:"indexName"`
-	IndexType   string     `json:"indexType"`
-	MetricType  string     `json:"metricType"`
-	IndexState  string     `json:"indexState"`
-	IndexParams []KeyValue `json:"indexParams"`
+	FieldName   string        `json:"fieldName"`
+	IndexName   string        `json:"indexName"`
+	IndexType   string        `json:"indexType"`
+	MetricType  string        `json:"metricType"`
+	IndexState  string        `json:"indexState"`
+	IndexedRows flexibleInt64 `json:"indexedRows"`
+	PendingRows flexibleInt64 `json:"pendingRows"`
+	TotalRows   flexibleInt64 `json:"totalRows"`
+	IndexParams []KeyValue    `json:"indexParams"`
 }
+
+func (detail IndexDetail) IndexedRowCount() int64 { return int64(detail.IndexedRows) }
+func (detail IndexDetail) PendingRowCount() int64 { return int64(detail.PendingRows) }
+func (detail IndexDetail) TotalRowCount() int64   { return int64(detail.TotalRows) }
 
 type CollectionStats struct {
 	RowCount flexibleInt64 `json:"rowCount"`

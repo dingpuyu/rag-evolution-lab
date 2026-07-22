@@ -125,6 +125,11 @@
 - [x] FLAT Ground Truth 与 HNSW Recall 对照
 - [x] 10K Batch Upsert 与行数对账
 - [x] Filter / ACL 并发 Benchmark 基线
+- [x] 100K Hard-v2 双索引规模验证
+- [x] Warm-up 与 300 Query 重复性验证
+- [x] Batch 重试、原子 Checkpoint 和断点续写
+- [x] Row Count 与索引完成状态双重门禁
+- [x] Exact Recall 与 Topic 业务指标分层评测
 
 - Query Decomposition
 - Iterative Retrieval
@@ -141,6 +146,16 @@
 - 100条Query、并发8、三类过滤场景、`ef=32/64/128`均无请求错误。
 - 合成主题簇上的HNSW Recall@10为1.000，ACL Unauthorized Retrievals为0。
 - 当前数据分布较容易且每组仅100条Query，不能据此宣称真实业务Recall或稳定峰值QPS；下一步加入跨主题Hard Negative并扩大压测样本。
+
+### 100K规模验证结果
+
+- Hard-v2 使用相邻主题簇、Chunk 噪声与 Query 扰动，消除了 Easy-v1 的 Recall 天花板。
+- FLAT 与 HNSW 各 100,000 行，唯一数据写入耗时 717.34s，吞吐 139.40 rows/s。
+- `ef=64` 下三类场景 Topic Hit@10 均为 1.000，300 条 ACL Query 越权数为 0。
+- `public_active` Exact Recall@10 为 0.6490，但 Topic Hit 为 1.000、Topic Precision 为 0.9923，证明必须区分精确邻居重合与业务相关性。
+- 同参数第二轮的 12 组质量指标逐项一致；QPS 和延迟只作为本机相对结果。
+- 完成态断点恢复约 24ms，无重复写入；索引必须 Finished 且 pendingRows 为 0 才允许压测。
+- 完整过程、失败修复和边界见 [100K规模验证](scale-benchmark-100k.md)。
 
 ### 需要证明
 

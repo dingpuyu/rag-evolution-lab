@@ -9,12 +9,18 @@ import (
 )
 
 type DatasetConfig struct {
-	Chunks     int   `json:"chunks"`
-	Dimensions int   `json:"dimensions"`
-	Topics     int   `json:"topics"`
-	Tenants    int   `json:"tenants"`
-	Seed       int64 `json:"seed"`
+	Chunks     int    `json:"chunks"`
+	Dimensions int    `json:"dimensions"`
+	Topics     int    `json:"topics"`
+	Tenants    int    `json:"tenants"`
+	Seed       int64  `json:"seed"`
+	Profile    string `json:"profile"`
 }
+
+const (
+	ProfileEasyV1 = "easy-v1"
+	ProfileHardV2 = "hard-v2"
+)
 
 type Generator struct {
 	config    DatasetConfig
@@ -28,10 +34,32 @@ func NewGenerator(config DatasetConfig) (*Generator, error) {
 	if config.Chunks < config.Topics {
 		return nil, fmt.Errorf("chunks must be greater than or equal to topics")
 	}
+	if config.Profile == "" {
+		config.Profile = ProfileEasyV1
+	}
+	if config.Profile != ProfileEasyV1 && config.Profile != ProfileHardV2 {
+		return nil, fmt.Errorf("unknown dataset profile %q", config.Profile)
+	}
 	centroids := make([][]float64, config.Topics)
-	for topic := range centroids {
-		random := rand.New(rand.NewSource(config.Seed + int64(topic)*1_000_003))
-		centroids[topic] = randomUnitVector(random, config.Dimensions)
+	if config.Profile == ProfileEasyV1 {
+		for topic := range centroids {
+			random := rand.New(rand.NewSource(config.Seed + int64(topic)*1_000_003))
+			centroids[topic] = randomUnitVector(random, config.Dimensions)
+		}
+	} else {
+		const topicsPerCluster = 10
+		clusters := (config.Topics + topicsPerCluster - 1) / topicsPerCluster
+		clusterCenters := make([][]float64, clusters)
+		for cluster := range clusterCenters {
+			random := rand.New(rand.NewSource(config.Seed + int64(cluster)*2_000_003))
+			clusterCenters[cluster] = randomUnitVector(random, config.Dimensions)
+		}
+		for topic := range centroids {
+			centroid := append([]float64(nil), clusterCenters[topic/topicsPerCluster]...)
+			random := rand.New(rand.NewSource(config.Seed + int64(topic)*1_000_003 + 31))
+			addNoise(centroid, random, 0.28)
+			centroids[topic] = centroid
+		}
 	}
 	return &Generator{config: config, centroids: centroids}, nil
 }
@@ -40,6 +68,24 @@ func (g *Generator) Config() DatasetConfig { return g.config }
 
 func (g *Generator) QueryVector(topic int) []float64 {
 	return append([]float64(nil), g.centroids[topic%g.config.Topics]...)
+}
+
+// BenchmarkQueryVector returns deterministic paraphrase-like variants instead
+// of repeating the exact topic centroid when queries outnumber topics.
+func (g *Generator) BenchmarkQueryVector(queryIndex int) []float64 {
+	topic := queryIndex % g.config.Topics
+	variant := queryIndex / g.config.Topics
+	vector := g.QueryVector(topic)
+	if variant == 0 && g.config.Profile != ProfileHardV2 {
+		return vector
+	}
+	random := rand.New(rand.NewSource(g.config.Seed + int64(topic)*97_409 + int64(variant+1)*65_537 + 101))
+	magnitude := 0.04
+	if g.config.Profile == ProfileHardV2 {
+		magnitude = 0.09
+	}
+	addNoise(vector, random, magnitude)
+	return vector
 }
 
 func (g *Generator) Tenant(topic int) string {
@@ -102,11 +148,23 @@ func (g *Generator) chunkVector(index, topic, ordinal int) []float64 {
 		return vector // Deliberately closest and private: an ACL hard negative.
 	}
 	random := rand.New(rand.NewSource(g.config.Seed + int64(index)*7_919 + 17))
+	if g.config.Profile == ProfileHardV2 {
+		addNoise(vector, random, 0.22)
+	} else {
+		for dimension := range vector {
+			vector[dimension] += random.NormFloat64() * 0.025
+		}
+		normalize(vector)
+	}
+	return vector
+}
+
+func addNoise(vector []float64, random *rand.Rand, l2Magnitude float64) {
+	standardDeviation := l2Magnitude / math.Sqrt(float64(len(vector)))
 	for dimension := range vector {
-		vector[dimension] += random.NormFloat64() * 0.025
+		vector[dimension] += random.NormFloat64() * standardDeviation
 	}
 	normalize(vector)
-	return vector
 }
 
 func randomUnitVector(random *rand.Rand, dimensions int) []float64 {

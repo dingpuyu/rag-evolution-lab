@@ -20,6 +20,7 @@ data/postgres/
 deploy/milvus/volumes/
 data/cache/
 data/artifacts/
+data/checkpoints/
 eval/reports/generated/
 
 *.log

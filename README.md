@@ -96,6 +96,16 @@ Phase 5 已完成首轮工程基线实验：
 - Tenant/Role ACL Hard Negative，Unauthorized Retrievals 为 0
 - 首轮报告见 [10K Scale Benchmark](eval/reports/scale-10k-latest.md)
 
+100K Milvus Scale Harness 已完成 Hard-v2 验证：
+
+- 100,000 个 1024 维 Chunk，1,000 个相邻语义主题，FLAT/HNSW 各 100,000 行
+- 原子 Checkpoint、指数退避重试、断点续写与完成态幂等恢复
+- Row Count + Index Finished + Indexed/Pending Rows 索引就绪门禁
+- Warm-up、300 Query、`ef=16/32/64/128`、三种 Filter 场景
+- Exact Recall@10 与 Topic Hit/Precision 双层质量解释
+- 同参数重复压测的 12 组质量指标逐项一致，ACL 越权为 0
+- 完整分析见 [100K Scale Benchmark](docs/scale-benchmark-100k.md)
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
@@ -113,6 +123,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [Embedding 文字相似度实验 API](docs/embedding-similarity-api.md)
 - [Milvus 本地向量数据库实验](docs/milvus-local-lab.md)
 - [10K Milvus 规模验证设计与结果](docs/scale-benchmark-10k.md)
+- [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)
@@ -148,6 +159,7 @@ make milvus-up
 make milvus-seed
 make serve-lab
 make web-dev
+make scale-100k
 ```
 
 ### 使用 Ollama 本地 Embedding

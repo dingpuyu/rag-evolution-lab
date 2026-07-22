@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus scale-10k scale-bench serve-lab web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus scale-10k scale-100k scale-bench serve-lab web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -59,7 +59,10 @@ compare-milvus:
 	RAGLAB_VECTOR_BACKEND=both go run ./cmd/raglab compare --baseline v5-ollama-rerank --candidate v5-milvus-rerank --split $${SPLIT:-development}
 
 scale-10k:
-	go run ./cmd/ragbench all --chunks 10000 --dimensions 1024 --topics 100 --tenants 100 --batch-size 100 --queries 100 --top-k 10 --concurrency 8 --ef 32,64,128
+	go run ./cmd/ragbench all --chunks 10000 --dimensions 1024 --topics 100 --tenants 100 --profile easy-v1 --batch-size 100 --queries 100 --warmup 20 --top-k 10 --concurrency 8 --ef 32,64,128
+
+scale-100k:
+	go run ./cmd/ragbench all --chunks 100000 --dimensions 1024 --topics 1000 --tenants 100 --profile hard-v2 --batch-size 200 --queries 300 --warmup 50 --top-k 10 --concurrency 8 --hnsw-m 8 --ef-build 160 --ef 16,32,64,128 --collection-prefix raglab_bench_100k --collection-version v2 --timeout 90m
 
 scale-bench:
 	go run ./cmd/ragbench run --chunks 10000 --dimensions 1024 --topics 100 --tenants 100 --queries $${QUERIES:-100} --top-k $${TOP_K:-10} --concurrency $${CONCURRENCY:-8} --ef $${EF:-32,64,128}
