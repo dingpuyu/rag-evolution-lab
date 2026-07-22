@@ -1,0 +1,140 @@
+{
+  "seed": {
+    "dataset": {
+      "chunks": 10000,
+      "dimensions": 1024,
+      "topics": 100,
+      "tenants": 100,
+      "seed": 20260723
+    },
+    "collections": {
+      "flat": "raglab_bench_10k_flat_v1",
+      "hnsw": "raglab_bench_10k_hnsw_v1"
+    },
+    "batch_size": 100,
+    "rows": 10000,
+    "duration_ms": 127550.121,
+    "rows_per_second": 78.40055231789188
+  },
+  "benchmark": {
+    "generated_at": "2026-07-22T16:48:05.135491Z",
+    "dataset": {
+      "chunks": 10000,
+      "dimensions": 1024,
+      "topics": 100,
+      "tenants": 100,
+      "seed": 20260723
+    },
+    "collections": {
+      "flat": "raglab_bench_10k_flat_v1",
+      "hnsw": "raglab_bench_10k_hnsw_v1"
+    },
+    "top_k": 10,
+    "concurrency": 8,
+    "runs": [
+      {
+        "scenario": "active_all",
+        "ef": 32,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 903.6348685478291,
+        "p50_ms": 7.034,
+        "p95_ms": 18.773,
+        "p99_ms": 24.427,
+        "errors": 0
+      },
+      {
+        "scenario": "active_all",
+        "ef": 64,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 814.474296384411,
+        "p50_ms": 8.857,
+        "p95_ms": 18.084,
+        "p99_ms": 21.807,
+        "errors": 0
+      },
+      {
+        "scenario": "active_all",
+        "ef": 128,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 941.3459128525487,
+        "p50_ms": 7.333,
+        "p95_ms": 14.739,
+        "p99_ms": 21.482,
+        "errors": 0
+      },
+      {
+        "scenario": "public_active",
+        "ef": 32,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 761.6581297484623,
+        "p50_ms": 8.766,
+        "p95_ms": 20.729,
+        "p99_ms": 23.716,
+        "errors": 0
+      },
+      {
+        "scenario": "public_active",
+        "ef": 64,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 661.7214020553066,
+        "p50_ms": 10.778,
+        "p95_ms": 19.156,
+        "p99_ms": 23.15,
+        "errors": 0
+      },
+      {
+        "scenario": "public_active",
+        "ef": 128,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 820.5417103136735,
+        "p50_ms": 9.09,
+        "p95_ms": 14.833,
+        "p99_ms": 18.4,
+        "errors": 0
+      },
+      {
+        "scenario": "tenant_admin_active",
+        "ef": 32,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 1312.2742535610168,
+        "p50_ms": 5.599,
+        "p95_ms": 9.434,
+        "p99_ms": 10.464,
+        "errors": 0
+      },
+      {
+        "scenario": "tenant_admin_active",
+        "ef": 64,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 1268.497596647371,
+        "p50_ms": 5.977,
+        "p95_ms": 9.322,
+        "p99_ms": 10.202,
+        "errors": 0
+      },
+      {
+        "scenario": "tenant_admin_active",
+        "ef": 128,
+        "queries": 100,
+        "recall_at_k": 0.9999999999999999,
+        "qps": 1135.433032869367,
+        "p50_ms": 6.132,
+        "p95_ms": 11.55,
+        "p99_ms": 14.038,
+        "errors": 0
+      }
+    ],
+    "acl": {
+      "queries": 100,
+      "unauthorized_retrievals": 0
+    }
+  }
+}

@@ -121,6 +121,11 @@
 
 ### 任务
 
+- [x] 10K 确定性规模数据生成器
+- [x] FLAT Ground Truth 与 HNSW Recall 对照
+- [x] 10K Batch Upsert 与行数对账
+- [x] Filter / ACL 并发 Benchmark 基线
+
 - Query Decomposition
 - Iterative Retrieval
 - Evidence State
@@ -129,6 +134,13 @@
 - 多租户 ACL
 - Prompt Injection 测试
 - 缓存、超时与降级
+
+### 10K规模基线结果
+
+- 两个Collection各写入10,000行、1024维向量，唯一数据吞吐78.40 rows/s。
+- 100条Query、并发8、三类过滤场景、`ef=32/64/128`均无请求错误。
+- 合成主题簇上的HNSW Recall@10为1.000，ACL Unauthorized Retrievals为0。
+- 当前数据分布较容易且每组仅100条Query，不能据此宣称真实业务Recall或稳定峰值QPS；下一步加入跨主题Hard Negative并扩大压测样本。
 
 ### 需要证明
 

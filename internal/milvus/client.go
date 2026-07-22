@@ -102,6 +102,7 @@ type SearchRequest struct {
 	Filter     string
 	Limit      int
 	EF         int
+	Exact      bool
 }
 
 type SearchHit struct {
@@ -193,6 +194,43 @@ func (c *Client) DropCollection(ctx context.Context, collection string) error {
 }
 
 func (c *Client) CreateCollection(ctx context.Context, collection string, dimensions int) error {
+	return c.CreateCollectionWithOptions(ctx, collection, CollectionOptions{
+		Dimensions: dimensions, IndexType: "HNSW", MetricType: "COSINE", M: 16, EFConstruction: 200,
+	})
+}
+
+type CollectionOptions struct {
+	Dimensions     int
+	IndexType      string
+	MetricType     string
+	M              int
+	EFConstruction int
+}
+
+func (c *Client) CreateCollectionWithOptions(ctx context.Context, collection string, options CollectionOptions) error {
+	if options.Dimensions <= 0 {
+		return fmt.Errorf("vector dimensions must be positive")
+	}
+	indexType := strings.ToUpper(strings.TrimSpace(options.IndexType))
+	if indexType == "" {
+		indexType = "HNSW"
+	}
+	metricType := strings.ToUpper(strings.TrimSpace(options.MetricType))
+	if metricType == "" {
+		metricType = "COSINE"
+	}
+	indexParameters := map[string]any{}
+	if indexType == "HNSW" {
+		m := options.M
+		if m <= 0 {
+			m = 16
+		}
+		efConstruction := options.EFConstruction
+		if efConstruction <= 0 {
+			efConstruction = 200
+		}
+		indexParameters = map[string]any{"M": m, "efConstruction": efConstruction}
+	}
 	payload := map[string]any{
 		"collectionName":   collection,
 		"consistencyLevel": "Strong",
@@ -211,16 +249,16 @@ func (c *Client) CreateCollection(ctx context.Context, collection string, dimens
 				{"fieldName": "version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
 				{"fieldName": "status", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
 				{"fieldName": "visibility", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
-				{"fieldName": "embedding", "dataType": "FloatVector", "elementTypeParams": map[string]string{"dim": fmt.Sprint(dimensions)}},
+				{"fieldName": "embedding", "dataType": "FloatVector", "elementTypeParams": map[string]string{"dim": fmt.Sprint(options.Dimensions)}},
 			},
 		},
 		"indexParams": []map[string]any{
 			{
 				"fieldName":  "embedding",
-				"indexName":  "embedding_hnsw",
-				"indexType":  "HNSW",
-				"metricType": "COSINE",
-				"params":     map[string]any{"M": 16, "efConstruction": 200},
+				"indexName":  "embedding_" + strings.ToLower(indexType),
+				"indexType":  indexType,
+				"metricType": metricType,
+				"params":     indexParameters,
 			},
 		},
 	}
@@ -251,6 +289,10 @@ func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, 
 	if ef <= 0 {
 		ef = 64
 	}
+	searchParameters := map[string]any{}
+	if !input.Exact {
+		searchParameters["ef"] = ef
+	}
 	payload := map[string]any{
 		"collectionName": input.Collection,
 		"data":           [][]float64{input.Vector},
@@ -259,7 +301,7 @@ func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, 
 		"outputFields":   []string{"chunk_id", "document_id", "title", "content", "tenant_id", "allowed_tenants", "allowed_roles", "product", "version", "status", "visibility"},
 		"searchParams": map[string]any{
 			"metricType": "COSINE",
-			"params":     map[string]any{"ef": ef},
+			"params":     searchParameters,
 		},
 	}
 	if strings.TrimSpace(input.Filter) != "" {

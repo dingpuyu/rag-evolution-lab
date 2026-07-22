@@ -56,6 +56,28 @@ func TestCreateCollectionUsesExplicitHNSWCosineSchema(t *testing.T) {
 	}
 }
 
+func TestCreateCollectionSupportsFlatGroundTruthIndex(t *testing.T) {
+	var payload map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{"code": 0, "data": map[string]any{}})
+	}))
+	defer server.Close()
+	client := NewClient(Config{BaseURL: server.URL})
+	if err := client.CreateCollectionWithOptions(context.Background(), "exact", CollectionOptions{Dimensions: 1024, IndexType: "FLAT"}); err != nil {
+		t.Fatal(err)
+	}
+	index := payload["indexParams"].([]any)[0].(map[string]any)
+	if index["indexType"] != "FLAT" || index["metricType"] != "COSINE" {
+		t.Fatalf("unexpected flat index: %#v", index)
+	}
+	if len(index["params"].(map[string]any)) != 0 {
+		t.Fatalf("FLAT index should not receive HNSW params: %#v", index)
+	}
+}
+
 func TestSearchSendsFilterAndDecodesHits(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		var payload map[string]any
