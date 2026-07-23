@@ -23,6 +23,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
+	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 )
 
 func main() {
@@ -198,6 +199,8 @@ func runLabServer(args []string) {
 	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "query-side retrieval instruction")
 	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
 	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
+	scalePrefix := flags.String("scale-prefix", "raglab_bench_100k", "100K scale collection prefix")
+	scaleVersion := flags.String("scale-version", "v2", "100K scale collection version")
 	_ = flags.Parse(args)
 
 	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
@@ -205,11 +208,25 @@ func runLabServer(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	milvusService, err := milvus.NewService(milvus.NewClient(milvus.Config{BaseURL: *milvusURL}), embedder, *collection)
+	milvusClient := milvus.NewClient(milvus.Config{BaseURL: *milvusURL})
+	milvusService, err := milvus.NewService(milvusClient, embedder, *collection)
 	if err != nil {
 		fatal(err)
 	}
-	handler, err := httpapi.NewLabHandler(embeddingService, milvusService)
+	scaleGenerator, err := scalebench.NewGenerator(scalebench.DatasetConfig{
+		Chunks: 100_000, Dimensions: 1024, Topics: 1_000, Tenants: 100,
+		Seed: 20260723, Profile: scalebench.ProfileHardV2,
+	})
+	if err != nil {
+		fatal(err)
+	}
+	scaleService, err := scalebench.NewDemoService(milvusClient, scaleGenerator, scalebench.Collections{
+		Flat: *scalePrefix + "_flat_" + *scaleVersion, HNSW: *scalePrefix + "_hnsw_" + *scaleVersion,
+	})
+	if err != nil {
+		fatal(err)
+	}
+	handler, err := httpapi.NewLabHandler(embeddingService, milvusService, scaleService)
 	if err != nil {
 		fatal(err)
 	}

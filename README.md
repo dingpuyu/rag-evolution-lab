@@ -124,6 +124,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [Milvus 本地向量数据库实验](docs/milvus-local-lab.md)
 - [10K Milvus 规模验证设计与结果](docs/scale-benchmark-10k.md)
 - [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
+- [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)
@@ -220,6 +221,8 @@ make compare-milvus
 ```
 
 网页的 `Milvus Lab` 会显示 Collection 行数、向量维度、索引类型、Load State、过滤表达式、Top-K Chunk 和 Embedding/Search 分阶段耗时。`v1/v3/v4/v5-milvus` 复用同一套 Routing、Rerank、Context Packing、Citation 和 Evaluation Harness。架构、Schema、面试知识点和百万级演进方向见 [Milvus Retriever 升级](docs/milvus-retriever-upgrade.md) 与 [Milvus 本地实验](docs/milvus-local-lab.md)。
+
+同一页面还提供 `100K Lab`：直接连接100K FLAT/HNSW双Collection，可切换Topic、Filter、Top-K和`ef`，现场比较Exact Recall、Topic Precision、Ground Truth与查询延迟。启动与讲解方式见 [Milvus 100K 网页实验室](docs/milvus-100k-web-lab.md)。
 
 也可以使用：
 

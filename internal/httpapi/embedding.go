@@ -10,6 +10,7 @@ import (
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
+	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 )
 
 const maxRequestBytes = 64 << 10
@@ -28,7 +29,7 @@ func NewEmbeddingHandler(service *embeddinglab.Service) (http.Handler, error) {
 	return localDevelopmentCORS(mux), nil
 }
 
-func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service) (http.Handler, error) {
+func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleServices ...*scalebench.DemoService) (http.Handler, error) {
 	if embeddingService == nil {
 		return nil, fmt.Errorf("embedding service must not be nil")
 	}
@@ -40,6 +41,11 @@ func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	vectorAPI := &MilvusAPI{service: milvusService}
 	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
 	mux.HandleFunc("POST /api/v1/milvus/search", vectorAPI.search)
+	if len(scaleServices) > 0 && scaleServices[0] != nil {
+		scaleAPI := &ScaleAPI{service: scaleServices[0]}
+		mux.HandleFunc("GET /api/v1/milvus/scale/status", scaleAPI.status)
+		mux.HandleFunc("POST /api/v1/milvus/scale/search", scaleAPI.search)
+	}
 	return localDevelopmentCORS(mux), nil
 }
 
@@ -51,6 +57,10 @@ func registerEmbeddingRoutes(mux *http.ServeMux, api *EmbeddingAPI) {
 
 type MilvusAPI struct {
 	service *milvus.Service
+}
+
+type ScaleAPI struct {
+	service *scalebench.DemoService
 }
 
 func (a *MilvusAPI) status(writer http.ResponseWriter, request *http.Request) {
@@ -78,6 +88,36 @@ func (a *MilvusAPI) search(writer http.ResponseWriter, request *http.Request) {
 	result, err := a.service.Search(request.Context(), input)
 	if err != nil {
 		writeError(writer, http.StatusUnprocessableEntity, "vector_search_failed", err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, result)
+}
+
+func (a *ScaleAPI) status(writer http.ResponseWriter, request *http.Request) {
+	status, err := a.service.Status(request.Context())
+	if err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "scale_milvus_unavailable", err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, status)
+}
+
+func (a *ScaleAPI) search(writer http.ResponseWriter, request *http.Request) {
+	request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	var input scalebench.DemoQuery
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+	if err := ensureEOF(decoder); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+	result, err := a.service.Search(request.Context(), input)
+	if err != nil {
+		writeError(writer, http.StatusUnprocessableEntity, "scale_search_failed", err.Error())
 		return
 	}
 	writeJSON(writer, http.StatusOK, result)

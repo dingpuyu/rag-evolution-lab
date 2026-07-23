@@ -39,6 +39,10 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /HNSW · COSINE/);
   assert.match(html, /Scalar Predicate/);
   assert.match(html, /Unauthorized Retrievals/);
+  assert.match(html, /亲手观察 HNSW 的“近似”意味着什么/);
+  assert.match(html, /FLAT GROUND TRUTH/i);
+  assert.match(html, /100,000/);
+  assert.match(html, /SEARCH EF/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 

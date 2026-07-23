@@ -50,6 +50,56 @@ type MilvusSearchResult = {
   }>;
 };
 
+type ScaleIndexStatus = {
+  collection: string;
+  rows: number;
+  index_name: string;
+  index_type: string;
+  metric: string;
+  state: string;
+  indexed_rows: number;
+  pending_rows: number;
+  parameters: Record<string, string>;
+};
+
+type ScaleStatus = {
+  connected: boolean;
+  dataset: { chunks: number; dimensions: number; topics: number; tenants: number; profile: string };
+  flat: ScaleIndexStatus;
+  hnsw: ScaleIndexStatus;
+  checked_at: string;
+};
+
+type ScaleSearchResult = {
+  topic: number;
+  scenario: string;
+  tenant: string;
+  top_k: number;
+  ef: number;
+  filter: string;
+  query_vector_preview: number[];
+  query_l2_norm: number;
+  exact_recall_at_k: number;
+  topic_hit_at_k: number;
+  topic_precision_at_k: number;
+  flat_latency_ms: number;
+  hnsw_latency_ms: number;
+  total_latency_ms: number;
+  exact_top_k: string[];
+  hits: Array<{
+    rank: number;
+    chunk_id: string;
+    title: string;
+    content: string;
+    tenant_id: string;
+    status: string;
+    visibility: string;
+    distance: number;
+    in_exact_top_k: boolean;
+    expected_topic: boolean;
+  }>;
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
@@ -130,6 +180,15 @@ export default function Home() {
   const [vectorResult, setVectorResult] = useState<MilvusSearchResult | null>(null);
   const [milvusError, setMilvusError] = useState("");
   const [milvusLoading, setMilvusLoading] = useState(false);
+  const [scaleStatus, setScaleStatus] = useState<ScaleStatus | null>(null);
+  const [scaleResult, setScaleResult] = useState<ScaleSearchResult | null>(null);
+  const [scaleTopic, setScaleTopic] = useState(137);
+  const [scaleScenario, setScaleScenario] = useState("public_active");
+  const [scaleTopK, setScaleTopK] = useState(10);
+  const [scaleEF, setScaleEF] = useState(64);
+  const [scaleError, setScaleError] = useState("");
+  const [scaleLoading, setScaleLoading] = useState(false);
+  const [scaleStatusLoading, setScaleStatusLoading] = useState(false);
   const current = cases[activeCase];
 
   async function compareEmbeddings() {
@@ -192,6 +251,43 @@ export default function Home() {
     }
   }
 
+  async function refreshScaleStatus() {
+    setScaleStatusLoading(true);
+    setScaleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/scale/status`);
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setScaleStatus(body);
+    } catch (error) {
+      setScaleStatus(null);
+      setScaleError(error instanceof Error ? error.message : "无法连接 100K Milvus API");
+    } finally {
+      setScaleStatusLoading(false);
+    }
+  }
+
+  async function searchScale() {
+    setScaleLoading(true);
+    setScaleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/scale/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic: scaleTopic, scenario: scaleScenario, top_k: scaleTopK, ef: scaleEF }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setScaleResult(body);
+      if (!scaleStatus) void refreshScaleStatus();
+    } catch (error) {
+      setScaleResult(null);
+      setScaleError(error instanceof Error ? error.message : "100K 向量检索失败");
+    } finally {
+      setScaleLoading(false);
+    }
+  }
+
   function formatVector(vector: number[]) {
     return vector.map((value) => value.toFixed(5)).join(", ");
   }
@@ -209,6 +305,7 @@ export default function Home() {
           <a href="#routing">Query Routing</a>
           <a href="#embedding-lab">Embedding 实验</a>
           <a href="#milvus-lab">Milvus Lab</a>
+          <a href="#scale-lab">100K Lab</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -445,6 +542,127 @@ export default function Home() {
                 </article>)}
               </div>
             </> : <div className="milvus-placeholder"><span>VECTOR DATABASE CAPABILITIES</span><strong>建库 · 建索引 · Upsert · ANN Search · Scalar Filter</strong><p>点击“执行真实向量检索”后，这里会展示 Milvus 返回的原始相似度、Chunk 内容、元数据和分阶段耗时。</p></div>}
+          </div>
+        </div>
+      </section>
+
+      <section className="scale-lab shell" id="scale-lab" aria-labelledby="scale-lab-title">
+        <div className="scale-heading">
+          <div>
+            <span>100K SCALE HARNESS · LIVE</span>
+            <h2 id="scale-lab-title">亲手观察 HNSW 的“近似”意味着什么</h2>
+          </div>
+          <p>同一个查询分别访问 FLAT 精确索引与 HNSW 近似索引。调整 ef 和过滤范围，观察精确邻居重合、业务主题命中与延迟之间的真实取舍。</p>
+          <button className="scale-status-button" onClick={refreshScaleStatus} disabled={scaleStatusLoading}>
+            {scaleStatusLoading ? "CHECKING…" : "检查 100K 索引"}
+          </button>
+        </div>
+
+        <div className="scale-health">
+          <div><small>DATASET</small><strong>{scaleStatus ? scaleStatus.dataset.chunks.toLocaleString() : "100,000"}</strong><span>chunks · {scaleStatus?.dataset.profile || "hard-v2"}</span></div>
+          <div><small>DIMENSIONS</small><strong>{scaleStatus?.dataset.dimensions || 1024}</strong><span>normalized float vectors</span></div>
+          <div><small>HNSW INDEXED</small><strong>{scaleStatus ? scaleStatus.hnsw.indexed_rows.toLocaleString() : "—"}</strong><span>pending {scaleStatus?.hnsw.pending_rows ?? "—"}</span></div>
+          <div><small>INDEX STATE</small><strong className={scaleStatus?.hnsw.state === "Finished" ? "healthy" : ""}>{scaleStatus?.hnsw.state || "NOT CHECKED"}</strong><span>{scaleStatus ? `${scaleStatus.hnsw.index_type} / ${scaleStatus.hnsw.metric}` : "HNSW / COSINE"}</span></div>
+          <div><small>BUILD PARAMS</small><strong>M={scaleStatus?.hnsw.parameters?.M || "8"}</strong><span>efConstruction={scaleStatus?.hnsw.parameters?.efConstruction || "160"}</span></div>
+        </div>
+
+        <div className="index-compare">
+          <article>
+            <div><span>GROUND TRUTH</span><b>FLAT</b></div>
+            <strong>{scaleStatus ? scaleStatus.flat.rows.toLocaleString() : "100,000"} rows</strong>
+            <p>穷举计算所有满足 Filter 的向量，得到精确 Top-K。实验对照使用，不建议作为大规模在线索引。</p>
+          </article>
+          <i>VERSUS</i>
+          <article className="approximate">
+            <div><span>ONLINE CANDIDATE</span><b>HNSW</b></div>
+            <strong>{scaleStatus ? scaleStatus.hnsw.rows.toLocaleString() : "100,000"} rows</strong>
+            <p>通过多层近邻图缩小搜索范围。ef 越大，访问节点更多，通常召回更高、计算成本也更高。</p>
+          </article>
+        </div>
+
+        <div className="scale-workbench">
+          <aside className="scale-controls">
+            <div className="control-heading"><span>QUERY CONTROLS</span><b>固定 Seed，可重复实验</b></div>
+            <label>
+              <span>TOPIC / 0—999</span>
+              <div className="topic-control">
+                <input type="number" min="0" max="999" value={scaleTopic} onChange={(event) => setScaleTopic(Number(event.target.value))} />
+                <button onClick={() => setScaleTopic((scaleTopic + 137) % 1000)}>换一个主题</button>
+              </div>
+            </label>
+            <label>
+              <span>FILTER SCENARIO</span>
+              <select value={scaleScenario} onChange={(event) => setScaleScenario(event.target.value)}>
+                <option value="active_all">Active · 全部租户</option>
+                <option value="public_active">Public + Active</option>
+                <option value="tenant_admin_active">Tenant Admin + Public</option>
+              </select>
+            </label>
+            <label>
+              <span>TOP-K</span>
+              <input type="number" min="1" max="20" value={scaleTopK} onChange={(event) => setScaleTopK(Number(event.target.value))} />
+            </label>
+            <fieldset>
+              <legend>SEARCH EF</legend>
+              <div className="ef-options">
+                {[16, 32, 64, 128].map((value) => (
+                  <button className={scaleEF === value ? "selected" : ""} key={value} onClick={() => setScaleEF(value)}>
+                    <span>ef</span>{value}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+            <button className="scale-search-button" onClick={searchScale} disabled={scaleLoading}>
+              {scaleLoading ? "COMPARING FLAT + HNSW…" : "运行双索引对照 →"}
+            </button>
+            {scaleError && <div className="scale-error"><b>实验暂不可用</b><span>{scaleError}</span><small>确认 Milvus 与 serve-lab 已启动，100K Collection 没有被删除。</small></div>}
+            <div className="ef-explainer">
+              <b>你正在改变什么？</b>
+              <p><code>M / efConstruction</code> 是建库参数；这里的 <code>ef</code> 是查询参数。提高 ef 不会重建索引，适合按查询风险动态调整。</p>
+            </div>
+          </aside>
+
+          <div className="scale-output">
+            {scaleResult ? <>
+              <div className="scale-result-head">
+                <div><span>TOPIC</span><strong>{scaleResult.topic}</strong><small>{scaleResult.tenant}</small></div>
+                <div><span>EXACT RECALL@{scaleResult.top_k}</span><strong>{scaleResult.exact_recall_at_k.toFixed(3)}</strong><small>HNSW ∩ FLAT</small></div>
+                <div><span>TOPIC PRECISION</span><strong>{scaleResult.topic_precision_at_k.toFixed(3)}</strong><small>business relevance</small></div>
+                <div><span>HNSW LATENCY</span><strong>{scaleResult.hnsw_latency_ms.toFixed(2)}</strong><small>ms · ef={scaleResult.ef}</small></div>
+              </div>
+              <div className="scale-query-proof">
+                <div><span>QUERY VECTOR · first 8 / L2 {scaleResult.query_l2_norm.toFixed(4)}</span><code>[{formatVector(scaleResult.query_vector_preview)}]</code></div>
+                <code>{scaleResult.filter}</code>
+              </div>
+              <div className="scale-legend">
+                <span><i className="exact-dot" /> 同时属于 FLAT Top-K</span>
+                <span><i className="topic-dot" /> 同主题但不是同一 Chunk</span>
+                <b>FLAT {scaleResult.flat_latency_ms.toFixed(2)}ms · TOTAL {scaleResult.total_latency_ms.toFixed(2)}ms</b>
+              </div>
+              <div className="scale-hit-list">
+                {scaleResult.hits.map((hit) => <article key={hit.chunk_id}>
+                  <div className="scale-rank"><span>#{hit.rank}</span><strong>{hit.distance.toFixed(5)}</strong></div>
+                  <div className="scale-hit-copy">
+                    <div><strong>{hit.title}</strong><span>{hit.tenant_id} · {hit.visibility} · {hit.status}</span></div>
+                    <p>{hit.content}</p>
+                    <code>{hit.chunk_id}</code>
+                  </div>
+                  <div className="match-badges">
+                    {hit.in_exact_top_k && <span className="exact">EXACT</span>}
+                    {!hit.in_exact_top_k && hit.expected_topic && <span className="topic">SAME TOPIC</span>}
+                  </div>
+                </article>)}
+              </div>
+              <details className="ground-truth">
+                <summary>查看 FLAT Ground Truth Top-{scaleResult.top_k}</summary>
+                <div>{scaleResult.exact_top_k.map((id) => <code key={id}>{id}</code>)}</div>
+              </details>
+            </> : <div className="scale-placeholder">
+              <span>FLAT GROUND TRUTH × HNSW APPROXIMATE SEARCH</span>
+              <strong>选择同一个 Topic，先把 ef 从 16 调到 128。</strong>
+              <p>观察 Exact Recall 是否提高、Topic Precision 是否已经足够，以及更大的搜索范围是否值得额外延迟。这就是向量索引选参的可视化实验。</p>
+              <div><b>01</b><i /><b>16</b><i /><b>32</b><i /><b>64</b><i /><b>128</b></div>
+            </div>}
           </div>
         </div>
       </section>
