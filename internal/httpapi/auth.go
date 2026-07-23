@@ -14,13 +14,15 @@ import (
 type identityContextKey struct{}
 
 type EnterpriseOptions struct {
-	Manager *auth.Manager
-	Audit   *auth.AuditLog
+	Verifier  auth.Verifier
+	DevIssuer *auth.Manager
+	Audit     *auth.AuditLog
 }
 
 type authAPI struct {
-	manager *auth.Manager
-	audit   *auth.AuditLog
+	verifier  auth.Verifier
+	devIssuer *auth.Manager
+	audit     *auth.AuditLog
 }
 
 type statusRecorder struct {
@@ -46,7 +48,7 @@ func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 		requestID := newRequestID()
 		writer.Header().Set("X-Request-ID", requestID)
 		writer.Header().Set("Cache-Control", "no-store")
-		identity, err := api.manager.VerifyAuthorization(request.Header.Get("Authorization"))
+		identity, err := api.verifier.VerifyAuthorization(request.Header.Get("Authorization"))
 		if err != nil {
 			writeError(writer, http.StatusUnauthorized, "authentication_required", "a valid Bearer token is required")
 			api.audit.Append(auth.AuditEvent{
@@ -74,6 +76,10 @@ func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 }
 
 func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) {
+	if api.devIssuer == nil {
+		http.NotFound(writer, request)
+		return
+	}
 	writer.Header().Set("Cache-Control", "no-store")
 	writer.Header().Set("Pragma", "no-cache")
 	request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBytes)
@@ -101,12 +107,12 @@ func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) 
 		writeError(writer, http.StatusBadRequest, "unknown_persona", "persona must be one of the server-defined demo identities")
 		return
 	}
-	token, err := api.manager.Issue(identity)
+	token, err := api.devIssuer.Issue(identity)
 	if err != nil {
 		writeError(writer, http.StatusInternalServerError, "token_issue_failed", err.Error())
 		return
 	}
-	verified, err := api.manager.VerifyAuthorization("Bearer " + token)
+	verified, err := api.devIssuer.VerifyAuthorization("Bearer " + token)
 	if err != nil {
 		writeError(writer, http.StatusInternalServerError, "token_verify_failed", err.Error())
 		return

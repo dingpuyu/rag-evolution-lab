@@ -19,6 +19,12 @@ type Identity struct {
 	Expires  int64    `json:"expires_at"`
 }
 
+// Verifier is the trust boundary between HTTP authentication and an identity
+// provider. Both the local HMAC lab and enterprise OIDC implementations satisfy it.
+type Verifier interface {
+	VerifyAuthorization(value string) (Identity, error)
+}
+
 func (identity Identity) HasRole(role string) bool {
 	for _, candidate := range identity.Roles {
 		if candidate == role {
@@ -95,9 +101,9 @@ func (manager *Manager) Issue(identity Identity) (string, error) {
 }
 
 func (manager *Manager) VerifyAuthorization(value string) (Identity, error) {
-	scheme, token, ok := strings.Cut(strings.TrimSpace(value), " ")
-	if !ok || !strings.EqualFold(scheme, "Bearer") || strings.TrimSpace(token) == "" {
-		return Identity{}, fmt.Errorf("missing Bearer token")
+	token, err := bearerToken(value)
+	if err != nil {
+		return Identity{}, err
 	}
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
@@ -143,6 +149,17 @@ func (manager *Manager) VerifyAuthorization(value string) (Identity, error) {
 		Subject: claims.Subject, TenantID: claims.TenantID, Roles: append([]string(nil), claims.Roles...),
 		Issuer: claims.Issuer, Audience: claims.Audience, Expires: claims.Expires,
 	}, nil
+}
+
+func bearerToken(value string) (string, error) {
+	scheme, token, ok := strings.Cut(strings.TrimSpace(value), " ")
+	if !ok || !strings.EqualFold(scheme, "Bearer") || strings.TrimSpace(token) == "" {
+		return "", fmt.Errorf("missing Bearer token")
+	}
+	if strings.ContainsAny(strings.TrimSpace(token), " \t\r\n") {
+		return "", fmt.Errorf("malformed Bearer token")
+	}
+	return strings.TrimSpace(token), nil
 }
 
 func (manager *Manager) sign(unsigned string) []byte {

@@ -30,6 +30,8 @@ npm run dev
 
 执行检索前需要在`Trusted Identity Boundary`区域选择服务端预定义Persona并签发本地JWT。未携带Token的检索返回401；Viewer访问Admin场景返回403。Tenant和Role来自验签后的Claims，不信任网页参数。
 
+该Persona签发入口只存在于默认本地模式。配置`RAGLAB_AUTH_OIDC_ISSUER`后，API切换为企业OIDC/RS256验证并关闭`/api/v1/auth/dev-token`；此时应由企业登录前端或API客户端携带Access Token，详细配置见[企业RAG身份与审计](enterprise-rag-security.md)。
+
 ## 可交互参数
 
 | 参数 | 作用 |

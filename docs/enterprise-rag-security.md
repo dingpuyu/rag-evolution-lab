@@ -16,18 +16,55 @@ flowchart LR
     A --> L
 ```
 
-当前本地Lab使用HS256签名JWT，校验：
+认证层抽象为统一`auth.Verifier`，有两种运行模式：
 
-- 签名；
-- 固定算法，拒绝算法降级；
-- Issuer；
-- Audience；
-- Expiration与Issued At；
-- Subject、Tenant和Roles完整性。
+- 本地实验：服务端预定义Persona，HS256签发和验签；
+- 企业接入：OIDC Discovery + JWKS + RS256验签，RAG服务不持有私钥。
 
-生产环境应把本地签发端替换为企业OIDC Provider，并使用JWKS/RS256完成密钥轮换；RAG服务仍复用相同的可信Claims和授权接口。
+OIDC模式固定接受`RS256`，根据`kid`选择公钥，缓存JWKS，并在遇到未知`kid`时限频刷新以支持密钥轮换。启动时预热Discovery/JWKS，身份平台不可用或没有可用Key时拒绝启动；运行时验签、Claims或刷新失败均Fail Closed。
 
-## 2. 信任边界
+## 2. OIDC生产配置
+
+自动Discovery：
+
+```bash
+RAGLAB_AUTH_OIDC_ISSUER=https://id.example.com/realms/acme \
+RAGLAB_AUTH_AUDIENCE=raglab-api \
+go run ./cmd/raglab serve-lab
+```
+
+不能提供Discovery时，可显式配置JWKS：
+
+```bash
+RAGLAB_AUTH_OIDC_ISSUER=https://id.example.com/realms/acme \
+RAGLAB_AUTH_JWKS_URL=https://id.example.com/realms/acme/protocol/openid-connect/certs \
+RAGLAB_AUTH_AUDIENCE=raglab-api \
+go run ./cmd/raglab serve-lab
+```
+
+OIDC模式开启后：
+
+- `POST /api/v1/auth/dev-token`不会注册，避免生产环境自助提权；
+- `GET /api/v1/auth/me`可用于验证当前Token映射结果；
+- Discovery返回的Issuer必须与配置一致；
+- Provider URL必须使用HTTPS，只有loopback开发地址允许HTTP；
+- JWKS响应有大小上限，只接受至少2048 bit的RSA签名公钥；
+- 未知`kid`允许一次主动刷新，随后短时间限频，避免攻击者制造JWKS请求风暴。
+
+IdP需要把业务身份映射到Access Token：
+
+| Claim | 要求 | 用途 |
+|---|---|---|
+| `sub` | 必填 | 用户稳定标识 |
+| `tenant_id` | 必填 | 租户数据边界 |
+| `roles` | 必填其一 | `viewer`、`admin`、`platform_admin` |
+| `realm_access.roles` | Keycloak兼容 | 与顶层`roles`合并去重 |
+| `iss`、`aud`、`exp` | 必填 | Token归属、目标服务和有效期 |
+| `iat`、`nbf` | 可选但建议 | 签发时间与生效时间 |
+
+这里验证的是Resource Server一侧的Bearer Token。浏览器生产登录仍应由网关或前端使用Authorization Code + PKCE完成；本项目不把本地Persona页面宣称为企业SSO登录页。
+
+## 3. 信任边界
 
 ### 不可信输入
 
@@ -54,7 +91,7 @@ flowchart LR
 
 服务端也会覆盖为已验签Claims中的Tenant和Role。客户端不能通过修改请求获得更高权限。
 
-## 3. 授权规则
+## 4. 授权规则
 
 | 场景 | 允许角色 | Milvus Filter |
 |---|---|---|
@@ -65,7 +102,7 @@ flowchart LR
 
 Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返回`403 Forbidden`，请求不会发送到Milvus。
 
-## 4. 审计事件
+## 5. 审计事件
 
 认证中间件为每次受保护请求生成`X-Request-ID`并记录：
 
@@ -81,7 +118,7 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 
 生产环境应将同一事件接口替换为异步持久化Sink，例如Kafka + ClickHouse/Elasticsearch，并增加数据保留、脱敏和告警策略。
 
-## 5. 本地身份体验
+## 6. 本地身份体验
 
 `POST /api/v1/auth/dev-token`只允许签发服务端预定义Persona：
 
@@ -100,11 +137,18 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 4. Platform Admin可以运行全局场景并读取审计事件；
 5. 每次成功或拒绝请求都有Request ID。
 
-## 6. 已覆盖安全测试
+## 7. 已覆盖安全测试
 
 - 篡改JWT签名后拒绝；
 - 过期Token拒绝；
 - Issuer/Audience不匹配拒绝；
+- HS256/`none`等算法混淆拒绝；
+- OIDC Discovery与JWKS缓存；
+- Audience字符串和数组两种格式；
+- 未知`kid`刷新后接受轮换Key；
+- 未知`kid`刷新限频和Provider不可用时Fail Closed；
+- 非HTTPS远端Provider配置拒绝；
+- OIDC生产模式不暴露本地Token签发路由；
 - 无Token的受保护搜索返回401；
 - Body伪造Tenant和Role无效；
 - Viewer调用Tenant Admin场景返回403；
@@ -112,12 +156,19 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 - ACL Hard Negative保持0次越权召回；
 - CORS只允许localhost开发Origin，并显式允许Authorization Header。
 
-## 7. 企业化后续阶段
+## 8. 企业化后续阶段
 
-### P1：身份接入
+### 已完成：身份接入
 
 - OIDC Discovery与JWKS缓存/轮换；
-- 对接Keycloak、Auth0或企业统一身份平台；
+- 统一Verifier边界与生产模式关闭Dev Issuer；
+- Issuer/Audience/时间窗口/算法/Key强度校验；
+- 服务启动预热与请求Fail Closed。
+
+对接具体Keycloak、Auth0或企业统一身份平台时，只需完成Client、Audience和自定义Claims Mapper配置；不同组织/知识库Scope映射属于业务授权模型，不应写死在Token解析器中。
+
+### P1：身份治理
+
 - Token撤销与短期Access Token；
 - 用户、组织、项目和知识库Scope映射。
 
@@ -144,4 +195,4 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 - Prompt Injection、数据投毒和越权红队集；
 - Canary索引与自动回滚门禁。
 
-当前版本已经具备企业RAG最关键的“可信身份不能被客户端伪造、权限在ANN之前执行、每次决策可审计”纵向证据链，但不把本地JWT签发与内存审计夸大为完整生产IAM。
+当前版本已经具备“企业IdP签发Token → OIDC/JWKS验签 → 可信Claims → 接口授权 → Milvus Pre-ANN ACL → Request ID审计”的纵向证据链，但不把Resource Server验签、内存审计或本地Persona夸大为完整企业IAM。

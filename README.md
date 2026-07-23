@@ -106,15 +106,17 @@ Phase 5 已完成首轮工程基线实验：
 - 同参数重复压测的 12 组质量指标逐项一致，ACL 越权为 0
 - 完整分析见 [100K Scale Benchmark](docs/scale-benchmark-100k.md)
 
-企业身份与权限闭环已完成首版：
+企业身份与权限闭环已完成：
 
-- HS256 JWT签名、Issuer/Audience/Expiration校验
+- 本地HS256演示模式与生产OIDC/RS256模式共用统一Verifier边界
+- OIDC Discovery、JWKS缓存、`kid`选钥、未知Key刷新与密钥轮换
+- 固定算法、Issuer、Audience、Expiration、Not Before和Issued At校验
 - 服务端从可信Claims读取Subject、Tenant和Roles
 - 客户端伪造Tenant/Role无效，未认证搜索返回401
 - Viewer调用Admin场景返回403且不会访问Milvus
 - Milvus Pre-ANN ACL与结构化Request ID审计
-- 网页可切换预定义Persona并查看允许/拒绝效果
-- 设计边界与生产OIDC演进见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
+- 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
+- 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。

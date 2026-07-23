@@ -16,6 +16,10 @@ import (
 )
 
 func newEnterpriseTestHandler(t *testing.T, searchFilter *string) http.Handler {
+	return newEnterpriseTestHandlerWithDevIssuer(t, searchFilter, true)
+}
+
+func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, enableDevIssuer bool) http.Handler {
 	t.Helper()
 	milvusServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v2/vectordb/entities/search" {
@@ -56,13 +60,27 @@ func newEnterpriseTestHandler(t *testing.T, searchFilter *string) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	handler, err := NewEnterpriseLabHandler(embeddingService, vectorService, scaleService, EnterpriseOptions{
-		Manager: manager, Audit: auth.NewAuditLog(20),
-	})
+	options := EnterpriseOptions{Verifier: manager, Audit: auth.NewAuditLog(20)}
+	if enableDevIssuer {
+		options.DevIssuer = manager
+	}
+	handler, err := NewEnterpriseLabHandler(embeddingService, vectorService, scaleService, options)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return handler
+}
+
+func TestEnterpriseProductionModeDoesNotExposeDevIssuer(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandlerWithDevIssuer(t, &filter, false)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(
+		http.MethodPost, "/api/v1/auth/dev-token", strings.NewReader(`{"persona":"platform_admin"}`),
+	))
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("production mode exposed dev issuer: status=%d body=%s", response.Code, response.Body.String())
+	}
 }
 
 func issueTestPersona(t *testing.T, handler http.Handler, persona string) string {

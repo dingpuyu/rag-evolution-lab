@@ -38,8 +38,8 @@ func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 }
 
 func NewEnterpriseLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, options EnterpriseOptions) (http.Handler, error) {
-	if options.Manager == nil || options.Audit == nil {
-		return nil, fmt.Errorf("enterprise lab requires auth manager and audit log")
+	if options.Verifier == nil || options.Audit == nil {
+		return nil, fmt.Errorf("enterprise lab requires auth verifier and audit log")
 	}
 	return newLabHandler(embeddingService, milvusService, scaleService, options)
 }
@@ -56,9 +56,12 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	vectorAPI := &MilvusAPI{service: milvusService}
 	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
 	vectorSearch := http.Handler(http.HandlerFunc(vectorAPI.search))
-	if enterprise.Manager != nil {
-		authenticator := &authAPI{manager: enterprise.Manager, audit: enterprise.Audit}
-		mux.HandleFunc("POST /api/v1/auth/dev-token", authenticator.devToken)
+	var authenticator *authAPI
+	if enterprise.Verifier != nil {
+		authenticator = &authAPI{verifier: enterprise.Verifier, devIssuer: enterprise.DevIssuer, audit: enterprise.Audit}
+		if enterprise.DevIssuer != nil {
+			mux.HandleFunc("POST /api/v1/auth/dev-token", authenticator.devToken)
+		}
 		mux.Handle("GET /api/v1/auth/me", authenticator.requireIdentity(http.HandlerFunc(authenticator.me)))
 		mux.Handle("GET /api/v1/audit/recent", authenticator.requireIdentity(http.HandlerFunc(authenticator.recentAudit)))
 		vectorSearch = authenticator.requireIdentity(vectorSearch)
@@ -68,8 +71,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		scaleAPI := &ScaleAPI{service: scaleService}
 		mux.HandleFunc("GET /api/v1/milvus/scale/status", scaleAPI.status)
 		scaleSearch := http.Handler(http.HandlerFunc(scaleAPI.search))
-		if enterprise.Manager != nil {
-			authenticator := &authAPI{manager: enterprise.Manager, audit: enterprise.Audit}
+		if authenticator != nil {
 			scaleSearch = authenticator.requireIdentity(scaleSearch)
 		}
 		mux.Handle("POST /api/v1/milvus/scale/search", scaleSearch)

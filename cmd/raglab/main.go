@@ -205,6 +205,8 @@ func runLabServer(args []string) {
 	authSecret := flags.String("auth-secret", environmentOr("RAGLAB_AUTH_SECRET", "raglab-local-development-secret-change-me"), "JWT HMAC secret for local lab")
 	authIssuer := flags.String("auth-issuer", environmentOr("RAGLAB_AUTH_ISSUER", "raglab-local"), "JWT issuer")
 	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
+	authOIDCIssuer := flags.String("auth-oidc-issuer", os.Getenv("RAGLAB_AUTH_OIDC_ISSUER"), "enterprise OIDC issuer; enables RS256/JWKS mode")
+	authJWKSURL := flags.String("auth-jwks-url", os.Getenv("RAGLAB_AUTH_JWKS_URL"), "optional direct JWKS URL; otherwise OIDC discovery is used")
 	_ = flags.Parse(args)
 
 	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
@@ -230,14 +232,35 @@ func runLabServer(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	authManager, err := auth.NewManager(auth.Config{
-		Secret: []byte(*authSecret), Issuer: *authIssuer, Audience: *authAudience, TTL: time.Hour,
-	})
-	if err != nil {
-		fatal(err)
+	var verifier auth.Verifier
+	var devIssuer *auth.Manager
+	authMode := "local_hs256"
+	if strings.TrimSpace(*authOIDCIssuer) != "" || strings.TrimSpace(*authJWKSURL) != "" {
+		oidcVerifier, oidcErr := auth.NewOIDCVerifier(auth.OIDCConfig{
+			Issuer: *authOIDCIssuer, Audience: *authAudience, JWKSURL: *authJWKSURL,
+		})
+		if oidcErr != nil {
+			fatal(oidcErr)
+		}
+		warmupContext, cancelWarmup := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelWarmup()
+		if oidcErr := oidcVerifier.Warmup(warmupContext); oidcErr != nil {
+			fatal(oidcErr)
+		}
+		verifier = oidcVerifier
+		authMode = "oidc_rs256"
+	} else {
+		authManager, managerErr := auth.NewManager(auth.Config{
+			Secret: []byte(*authSecret), Issuer: *authIssuer, Audience: *authAudience, TTL: time.Hour,
+		})
+		if managerErr != nil {
+			fatal(managerErr)
+		}
+		verifier = authManager
+		devIssuer = authManager
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
-		Manager: authManager, Audit: auth.NewAuditLog(200),
+		Verifier: verifier, DevIssuer: devIssuer, Audit: auth.NewAuditLog(200),
 	})
 	if err != nil {
 		fatal(err)
@@ -246,7 +269,7 @@ func runLabServer(args []string) {
 		Addr: *address, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 15 * time.Second, WriteTimeout: 2 * time.Minute, IdleTimeout: time.Minute,
 	}
-	runHTTPServer(server, fmt.Sprintf("lab_api=http://%s embedder=%s milvus=%s collection=%s", *address, embedder.Name(), *milvusURL, *collection))
+	runHTTPServer(server, fmt.Sprintf("lab_api=http://%s embedder=%s milvus=%s collection=%s auth_mode=%s", *address, embedder.Name(), *milvusURL, *collection, authMode))
 }
 
 func runHTTPServer(server *http.Server, readyMessage string) {
