@@ -100,6 +100,34 @@ type ScaleSearchResult = {
   }>;
 };
 
+type AuthSession = {
+  access_token: string;
+  token_type: string;
+  expires_at: number;
+  identity: {
+    subject: string;
+    tenant_id: string;
+    roles: string[];
+    issuer: string;
+    audience: string;
+    expires_at: number;
+  };
+};
+
+type AuditEvent = {
+  request_id: string;
+  timestamp: string;
+  subject?: string;
+  tenant_id?: string;
+  roles?: string[];
+  method: string;
+  path: string;
+  decision: string;
+  reason?: string;
+  status: number;
+  duration_ms: number;
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
@@ -189,6 +217,11 @@ export default function Home() {
   const [scaleError, setScaleError] = useState("");
   const [scaleLoading, setScaleLoading] = useState(false);
   const [scaleStatusLoading, setScaleStatusLoading] = useState(false);
+  const [authPersona, setAuthPersona] = useState("tenant037_admin");
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [authLoading, setAuthLoading] = useState(false);
+  const [lastRequestID, setLastRequestID] = useState("");
+  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const current = cases[activeCase];
 
   async function compareEmbeddings() {
@@ -233,7 +266,10 @@ export default function Home() {
         fetch(`${base}/api/v1/milvus/status`),
         fetch(`${base}/api/v1/milvus/search`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(authSession ? { Authorization: `Bearer ${authSession.access_token}` } : {}),
+          },
           body: JSON.stringify({ query: vectorQuery, tenant_id: vectorTenant, user_role: vectorRole, product: vectorProduct, status: "active", top_k: vectorTopK }),
         }),
       ]);
@@ -273,11 +309,15 @@ export default function Home() {
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/scale/search`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authSession ? { Authorization: `Bearer ${authSession.access_token}` } : {}),
+        },
         body: JSON.stringify({ topic: scaleTopic, scenario: scaleScenario, top_k: scaleTopK, ef: scaleEF }),
       });
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
       setScaleResult(body);
       if (!scaleStatus) void refreshScaleStatus();
     } catch (error) {
@@ -285,6 +325,45 @@ export default function Home() {
       setScaleError(error instanceof Error ? error.message : "100K 向量检索失败");
     } finally {
       setScaleLoading(false);
+    }
+  }
+
+  async function issueDevIdentity() {
+    setAuthLoading(true);
+    setScaleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/auth/dev-token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ persona: authPersona }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setAuthSession(body);
+      setScaleResult(null);
+      setAuditEvents([]);
+    } catch (error) {
+      setAuthSession(null);
+      setScaleError(error instanceof Error ? error.message : "身份令牌签发失败");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function loadAuditEvents() {
+    if (!authSession) return;
+    setScaleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/audit/recent`, {
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setAuditEvents(body.events || []);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+    } catch (error) {
+      setAuditEvents([]);
+      setScaleError(error instanceof Error ? error.message : "读取审计事件失败");
     }
   }
 
@@ -558,6 +637,47 @@ export default function Home() {
           </button>
         </div>
 
+        <div className="enterprise-auth">
+          <div className="auth-story">
+            <span>TRUSTED IDENTITY BOUNDARY</span>
+            <strong>客户端不能决定自己是谁</strong>
+            <p>本地演示由服务端签发HS256 JWT；生产环境应替换为企业OIDC/JWKS。检索接口只使用验签后的Claims，请求体里的Tenant与Role会被忽略。</p>
+          </div>
+          <div className="auth-flow" aria-label="Enterprise identity flow">
+            <div className={authSession ? "done" : "active"}><small>01</small><b>Signed JWT</b><span>issuer · audience · exp</span></div>
+            <i>→</i>
+            <div className={authSession ? "done" : ""}><small>02</small><b>Verified Claims</b><span>subject · tenant · roles</span></div>
+            <i>→</i>
+            <div><small>03</small><b>Pre-ANN ACL</b><span>Milvus scalar filter</span></div>
+            <i>→</i>
+            <div><small>04</small><b>Audit Event</b><span>request · decision · latency</span></div>
+          </div>
+          <div className="persona-control">
+            <label><span>DEMO PERSONA</span>
+              <select value={authPersona} onChange={(event) => setAuthPersona(event.target.value)}>
+                <option value="public_viewer">Public Viewer</option>
+                <option value="tenant037_viewer">Tenant 037 · Viewer</option>
+                <option value="tenant037_admin">Tenant 037 · Admin</option>
+                <option value="platform_admin">Platform Admin</option>
+              </select>
+            </label>
+            <button onClick={issueDevIdentity} disabled={authLoading}>{authLoading ? "SIGNING…" : authSession ? "切换并重新签发" : "签发演示 JWT"}</button>
+          </div>
+          <div className={authSession ? "verified-identity" : "verified-identity empty"}>
+            {authSession ? <>
+              <span>✓ SIGNATURE VERIFIED</span>
+              <strong>{authSession.identity.subject}</strong>
+              <code>tenant={authSession.identity.tenant_id}</code>
+              <code>roles=[{authSession.identity.roles.join(", ")}]</code>
+              <small>iss={authSession.identity.issuer} · aud={authSession.identity.audience} · exp={new Date(authSession.expires_at * 1000).toLocaleTimeString()}</small>
+            </> : <>
+              <span>NO TRUSTED IDENTITY</span>
+              <strong>检索请求将返回 401</strong>
+              <small>先选择一个服务端预定义身份并签发令牌。</small>
+            </>}
+          </div>
+        </div>
+
         <div className="scale-health">
           <div><small>DATASET</small><strong>{scaleStatus ? scaleStatus.dataset.chunks.toLocaleString() : "100,000"}</strong><span>chunks · {scaleStatus?.dataset.profile || "hard-v2"}</span></div>
           <div><small>DIMENSIONS</small><strong>{scaleStatus?.dataset.dimensions || 1024}</strong><span>normalized float vectors</span></div>
@@ -630,6 +750,7 @@ export default function Home() {
                 <div><span>TOPIC PRECISION</span><strong>{scaleResult.topic_precision_at_k.toFixed(3)}</strong><small>business relevance</small></div>
                 <div><span>HNSW LATENCY</span><strong>{scaleResult.hnsw_latency_ms.toFixed(2)}</strong><small>ms · ef={scaleResult.ef}</small></div>
               </div>
+              {lastRequestID && <div className="request-id"><span>AUDIT REQUEST ID</span><code>{lastRequestID}</code></div>}
               <div className="scale-query-proof">
                 <div><span>QUERY VECTOR · first 8 / L2 {scaleResult.query_l2_norm.toFixed(4)}</span><code>[{formatVector(scaleResult.query_vector_preview)}]</code></div>
                 <code>{scaleResult.filter}</code>
@@ -663,6 +784,22 @@ export default function Home() {
               <p>观察 Exact Recall 是否提高、Topic Precision 是否已经足够，以及更大的搜索范围是否值得额外延迟。这就是向量索引选参的可视化实验。</p>
               <div><b>01</b><i /><b>16</b><i /><b>32</b><i /><b>64</b><i /><b>128</b></div>
             </div>}
+          </div>
+        </div>
+        <div className="audit-console">
+          <div>
+            <span>SECURITY AUDIT TRAIL</span>
+            <strong>每次认证决策都有 Request ID</strong>
+            <p>只有Platform Admin能读取跨租户审计事件。Tenant级管理员无权查看全局日志。</p>
+          </div>
+          <button onClick={loadAuditEvents} disabled={!authSession}>读取最近审计事件</button>
+          <div className="audit-list">
+            {auditEvents.length > 0 ? auditEvents.slice(0, 8).map((event) => <article key={event.request_id}>
+              <span className={event.decision}>{event.status} · {event.decision.toUpperCase()}</span>
+              <code>{event.method} {event.path}</code>
+              <b>{event.subject || "anonymous"} · {event.tenant_id || "no tenant"}</b>
+              <small>{event.request_id} · {event.duration_ms.toFixed(2)}ms</small>
+            </article>) : <p>使用Platform Admin身份签发JWT，然后执行检索并读取日志。</p>}
           </div>
         </div>
       </section>

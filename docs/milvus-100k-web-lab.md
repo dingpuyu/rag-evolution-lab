@@ -28,6 +28,8 @@ npm run dev
 
 如果100K Collection不存在，需要先运行`make scale-100k`重建数据。
 
+执行检索前需要在`Trusted Identity Boundary`区域选择服务端预定义Persona并签发本地JWT。未携带Token的检索返回401；Viewer访问Admin场景返回403。Tenant和Role来自验签后的Claims，不信任网页参数。
+
 ## 可交互参数
 
 | 参数 | 作用 |
@@ -36,6 +38,7 @@ npm run dev
 | Scenario | 切换Active、Public、Tenant+Role三类标量过滤 |
 | Top-K | 控制返回候选数量 |
 | ef | 控制HNSW查询时遍历的候选范围，不需要重建索引 |
+| Persona | 切换Public Viewer、Tenant Viewer/Admin和Platform Admin权限 |
 
 页面会显示：
 
@@ -78,6 +81,8 @@ Content-Type: application/json
 3. 展开FLAT Ground Truth，指出HNSW可能返回不同Chunk；
 4. 对比Topic Precision，解释“精确邻居集合不同”不一定等于“业务检索错误”；
 5. 切换Public和Tenant Admin场景，展示Filter在ANN前执行以及ACL Fail Closed；
-6. 最后说明FLAT只用于离线评测，线上使用HNSW并通过Harness选参。
+6. 用Viewer调用Admin场景展示403，再用Tenant Admin成功检索；
+7. 使用Platform Admin读取带Request ID的审计事件；
+8. 最后说明FLAT只用于离线评测，线上使用HNSW并通过Harness选参。
 
 这套演示适合回答面试中的HNSW参数、ANN评测、标量过滤、多租户ACL和检索质量解释问题。

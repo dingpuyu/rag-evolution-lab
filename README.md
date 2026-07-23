@@ -106,6 +106,16 @@ Phase 5 已完成首轮工程基线实验：
 - 同参数重复压测的 12 组质量指标逐项一致，ACL 越权为 0
 - 完整分析见 [100K Scale Benchmark](docs/scale-benchmark-100k.md)
 
+企业身份与权限闭环已完成首版：
+
+- HS256 JWT签名、Issuer/Audience/Expiration校验
+- 服务端从可信Claims读取Subject、Tenant和Roles
+- 客户端伪造Tenant/Role无效，未认证搜索返回401
+- Viewer调用Admin场景返回403且不会访问Milvus
+- Milvus Pre-ANN ACL与结构化Request ID审计
+- 网页可切换预定义Persona并查看允许/拒绝效果
+- 设计边界与生产OIDC演进见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
@@ -125,6 +135,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [10K Milvus 规模验证设计与结果](docs/scale-benchmark-10k.md)
 - [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
+- [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)

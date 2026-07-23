@@ -30,6 +30,21 @@ func NewEmbeddingHandler(service *embeddinglab.Service) (http.Handler, error) {
 }
 
 func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleServices ...*scalebench.DemoService) (http.Handler, error) {
+	var scaleService *scalebench.DemoService
+	if len(scaleServices) > 0 {
+		scaleService = scaleServices[0]
+	}
+	return newLabHandler(embeddingService, milvusService, scaleService, EnterpriseOptions{})
+}
+
+func NewEnterpriseLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, options EnterpriseOptions) (http.Handler, error) {
+	if options.Manager == nil || options.Audit == nil {
+		return nil, fmt.Errorf("enterprise lab requires auth manager and audit log")
+	}
+	return newLabHandler(embeddingService, milvusService, scaleService, options)
+}
+
+func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, enterprise EnterpriseOptions) (http.Handler, error) {
 	if embeddingService == nil {
 		return nil, fmt.Errorf("embedding service must not be nil")
 	}
@@ -40,11 +55,24 @@ func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	registerEmbeddingRoutes(mux, &EmbeddingAPI{service: embeddingService})
 	vectorAPI := &MilvusAPI{service: milvusService}
 	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
-	mux.HandleFunc("POST /api/v1/milvus/search", vectorAPI.search)
-	if len(scaleServices) > 0 && scaleServices[0] != nil {
-		scaleAPI := &ScaleAPI{service: scaleServices[0]}
+	vectorSearch := http.Handler(http.HandlerFunc(vectorAPI.search))
+	if enterprise.Manager != nil {
+		authenticator := &authAPI{manager: enterprise.Manager, audit: enterprise.Audit}
+		mux.HandleFunc("POST /api/v1/auth/dev-token", authenticator.devToken)
+		mux.Handle("GET /api/v1/auth/me", authenticator.requireIdentity(http.HandlerFunc(authenticator.me)))
+		mux.Handle("GET /api/v1/audit/recent", authenticator.requireIdentity(http.HandlerFunc(authenticator.recentAudit)))
+		vectorSearch = authenticator.requireIdentity(vectorSearch)
+	}
+	mux.Handle("POST /api/v1/milvus/search", vectorSearch)
+	if scaleService != nil {
+		scaleAPI := &ScaleAPI{service: scaleService}
 		mux.HandleFunc("GET /api/v1/milvus/scale/status", scaleAPI.status)
-		mux.HandleFunc("POST /api/v1/milvus/scale/search", scaleAPI.search)
+		scaleSearch := http.Handler(http.HandlerFunc(scaleAPI.search))
+		if enterprise.Manager != nil {
+			authenticator := &authAPI{manager: enterprise.Manager, audit: enterprise.Audit}
+			scaleSearch = authenticator.requireIdentity(scaleSearch)
+		}
+		mux.Handle("POST /api/v1/milvus/scale/search", scaleSearch)
 	}
 	return localDevelopmentCORS(mux), nil
 }
@@ -85,6 +113,10 @@ func (a *MilvusAPI) search(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
 		return
 	}
+	if identity := identityFromContext(request.Context()); identity.Subject != "" {
+		input.Tenant = identity.TenantID
+		input.Role = identity.PrimaryRole()
+	}
 	result, err := a.service.Search(request.Context(), input)
 	if err != nil {
 		writeError(writer, http.StatusUnprocessableEntity, "vector_search_failed", err.Error())
@@ -115,8 +147,19 @@ func (a *ScaleAPI) search(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
 		return
 	}
-	result, err := a.service.Search(request.Context(), input)
+	identity := identityFromContext(request.Context())
+	var result scalebench.DemoSearchResult
+	var err error
+	if identity.Subject == "" {
+		result, err = a.service.Search(request.Context(), input)
+	} else {
+		result, err = a.service.SearchAs(request.Context(), input, scalebench.DemoIdentity{TenantID: identity.TenantID, Roles: identity.Roles})
+	}
 	if err != nil {
+		if errors.Is(err, scalebench.ErrForbidden) {
+			writeError(writer, http.StatusForbidden, "forbidden", err.Error())
+			return
+		}
 		writeError(writer, http.StatusUnprocessableEntity, "scale_search_failed", err.Error())
 		return
 	}
@@ -193,7 +236,8 @@ func localDevelopmentCORS(next http.Handler) http.Handler {
 		if strings.HasPrefix(origin, "http://localhost:") || strings.HasPrefix(origin, "http://127.0.0.1:") {
 			writer.Header().Set("Access-Control-Allow-Origin", origin)
 			writer.Header().Set("Vary", "Origin")
-			writer.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+			writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+			writer.Header().Set("Access-Control-Expose-Headers", "X-Request-ID")
 			writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
 		}
 		if request.Method == http.MethodOptions {

@@ -3,6 +3,7 @@ package scalebench
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -16,6 +17,8 @@ const (
 	ScenarioPublicActive      = "public_active"
 	ScenarioTenantAdminActive = "tenant_admin_active"
 )
+
+var ErrForbidden = errors.New("forbidden")
 
 type DemoService struct {
 	client      *milvus.Client
@@ -48,6 +51,11 @@ type DemoQuery struct {
 	Scenario string `json:"scenario"`
 	TopK     int    `json:"top_k"`
 	EF       int    `json:"ef"`
+}
+
+type DemoIdentity struct {
+	TenantID string
+	Roles    []string
 }
 
 type DemoHit struct {
@@ -111,6 +119,11 @@ func (s *DemoService) Status(ctx context.Context) (DemoStatus, error) {
 }
 
 func (s *DemoService) Search(ctx context.Context, input DemoQuery) (DemoSearchResult, error) {
+	identity := DemoIdentity{TenantID: s.generator.Tenant(input.Topic), Roles: []string{"admin", "platform_admin"}}
+	return s.SearchAs(ctx, input, identity)
+}
+
+func (s *DemoService) SearchAs(ctx context.Context, input DemoQuery, identity DemoIdentity) (DemoSearchResult, error) {
 	if input.Topic < 0 || input.Topic >= s.generator.config.Topics {
 		return DemoSearchResult{}, fmt.Errorf("topic must be between 0 and %d", s.generator.config.Topics-1)
 	}
@@ -120,7 +133,7 @@ func (s *DemoService) Search(ctx context.Context, input DemoQuery) (DemoSearchRe
 	if input.EF < input.TopK || input.EF > 4096 {
 		return DemoSearchResult{}, fmt.Errorf("ef must be between top_k and 4096")
 	}
-	filter, err := s.filter(input.Scenario, input.Topic)
+	filter, err := s.filter(input.Scenario, identity)
 	if err != nil {
 		return DemoSearchResult{}, err
 	}
@@ -152,7 +165,7 @@ func (s *DemoService) Search(ctx context.Context, input DemoQuery) (DemoSearchRe
 	}
 	topicPrefix := fmt.Sprintf("bench-t%04d-", input.Topic)
 	result := DemoSearchResult{
-		Topic: input.Topic, Scenario: input.Scenario, Tenant: s.generator.Tenant(input.Topic),
+		Topic: input.Topic, Scenario: input.Scenario, Tenant: identity.TenantID,
 		TopK: input.TopK, EF: input.EF, Filter: filter,
 		QueryVectorPreview: append([]float64(nil), vector[:min(8, len(vector))]...),
 		QueryL2Norm:        l2Norm(vector),
@@ -223,17 +236,36 @@ func (s *DemoService) indexStatus(ctx context.Context, collection, indexName str
 	}, nil
 }
 
-func (s *DemoService) filter(scenario string, topic int) (string, error) {
+func (s *DemoService) filter(scenario string, identity DemoIdentity) (string, error) {
 	switch scenario {
 	case ScenarioActiveAll:
+		if !containsRole(identity.Roles, "platform_admin") {
+			return "", fmt.Errorf("%w: active_all requires platform_admin", ErrForbidden)
+		}
 		return `status == "active"`, nil
 	case ScenarioPublicActive:
 		return `visibility == "public" and status == "active"`, nil
 	case ScenarioTenantAdminActive:
-		return `(visibility == "public" or (array_contains(allowed_tenants, "` + s.generator.Tenant(topic) + `") and array_contains(allowed_roles, "admin"))) and status == "active"`, nil
+		if strings.TrimSpace(identity.TenantID) == "" || !containsRole(identity.Roles, "admin") {
+			return "", fmt.Errorf("%w: tenant_admin_active requires a trusted tenant and admin role", ErrForbidden)
+		}
+		return `(visibility == "public" or (array_contains(allowed_tenants, "` + escapeDemoFilter(identity.TenantID) + `") and array_contains(allowed_roles, "admin"))) and status == "active"`, nil
 	default:
 		return "", fmt.Errorf("unknown scenario %q", scenario)
 	}
+}
+
+func containsRole(roles []string, target string) bool {
+	for _, role := range roles {
+		if role == target {
+			return true
+		}
+	}
+	return false
+}
+
+func escapeDemoFilter(value string) string {
+	return strings.ReplaceAll(strings.ReplaceAll(value, "\\", "\\\\"), `"`, `\"`)
 }
 
 func l2Norm(vector []float64) float64 {

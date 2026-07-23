@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
+	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
@@ -201,6 +202,9 @@ func runLabServer(args []string) {
 	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
 	scalePrefix := flags.String("scale-prefix", "raglab_bench_100k", "100K scale collection prefix")
 	scaleVersion := flags.String("scale-version", "v2", "100K scale collection version")
+	authSecret := flags.String("auth-secret", environmentOr("RAGLAB_AUTH_SECRET", "raglab-local-development-secret-change-me"), "JWT HMAC secret for local lab")
+	authIssuer := flags.String("auth-issuer", environmentOr("RAGLAB_AUTH_ISSUER", "raglab-local"), "JWT issuer")
+	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
 	_ = flags.Parse(args)
 
 	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
@@ -226,7 +230,15 @@ func runLabServer(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	handler, err := httpapi.NewLabHandler(embeddingService, milvusService, scaleService)
+	authManager, err := auth.NewManager(auth.Config{
+		Secret: []byte(*authSecret), Issuer: *authIssuer, Audience: *authAudience, TTL: time.Hour,
+	})
+	if err != nil {
+		fatal(err)
+	}
+	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
+		Manager: authManager, Audit: auth.NewAuditLog(200),
+	})
 	if err != nil {
 		fatal(err)
 	}
