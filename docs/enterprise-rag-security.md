@@ -174,11 +174,13 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 
 ### P2：数据生命周期
 
-- 增量Upsert/Delete；
+- [x] 增量Upsert/Delete与删除后Strong Query验证；
+- [x] Event ID幂等、Revision乱序门禁与删除Tombstone；
+- [x] Embedding版本混写门禁；
 - Outbox与幂等消费；
-- Collection Alias蓝绿切换；
-- Embedding版本与索引版本一致性；
-- 文档删除后的可验证清除。
+- [x] Active Collection Alias创建与Alias检索；
+- Collection Alias蓝绿发布、原子晋升与回滚；
+- 文档在缓存、关键词索引、对象存储和备份中的协同清除。
 
 ### P3：生产可靠性
 

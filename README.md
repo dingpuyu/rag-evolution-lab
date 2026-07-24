@@ -118,6 +118,17 @@ Phase 5 已完成首轮工程基线实验：
 - 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 
+增量知识生命周期首版已完成：
+
+- `event_id`幂等、Pending/Completed持久化与安全重放
+- `source_revision`乱序拒绝和删除Tombstone
+- 新Chunk先Upsert、陈旧Chunk后Delete
+- 删除后Strong Query验证零残留
+- Content Hash、Embedding Model/Version和向量维度一致性门禁
+- 独立物理Collection与Active Alias，避免影响现有实验数据
+- 网页可执行写入、更新、Alias检索、删除和再次检索
+- 算法、实测结果与生产Outbox边界见 [增量索引与删除一致性](docs/incremental-index-lifecycle.md)
+
 当前基线结果见 [Phase 1 Baseline Report](eval/reports/phase1-baselines.md)。
 本地真实模型的初始对比见 [Local Embedding Benchmark](eval/reports/local-embedding-benchmark.md)。
 Metadata Filter 实验见 [Phase 2 Metadata Filter Report](eval/reports/phase2-metadata-filter.md)。
@@ -138,6 +149,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
+- [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)

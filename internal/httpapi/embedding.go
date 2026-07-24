@@ -34,17 +34,21 @@ func NewLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	if len(scaleServices) > 0 {
 		scaleService = scaleServices[0]
 	}
-	return newLabHandler(embeddingService, milvusService, scaleService, EnterpriseOptions{})
+	return newLabHandler(embeddingService, milvusService, scaleService, nil, EnterpriseOptions{})
 }
 
-func NewEnterpriseLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, options EnterpriseOptions) (http.Handler, error) {
+func NewEnterpriseLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, options EnterpriseOptions, lifecycleServices ...*milvus.LifecycleService) (http.Handler, error) {
 	if options.Verifier == nil || options.Audit == nil {
 		return nil, fmt.Errorf("enterprise lab requires auth verifier and audit log")
 	}
-	return newLabHandler(embeddingService, milvusService, scaleService, options)
+	var lifecycleService *milvus.LifecycleService
+	if len(lifecycleServices) > 0 {
+		lifecycleService = lifecycleServices[0]
+	}
+	return newLabHandler(embeddingService, milvusService, scaleService, lifecycleService, options)
 }
 
-func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, enterprise EnterpriseOptions) (http.Handler, error) {
+func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus.Service, scaleService *scalebench.DemoService, lifecycleService *milvus.LifecycleService, enterprise EnterpriseOptions) (http.Handler, error) {
 	if embeddingService == nil {
 		return nil, fmt.Errorf("embedding service must not be nil")
 	}
@@ -75,6 +79,15 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			scaleSearch = authenticator.requireIdentity(scaleSearch)
 		}
 		mux.Handle("POST /api/v1/milvus/scale/search", scaleSearch)
+	}
+	if lifecycleService != nil {
+		if authenticator == nil {
+			return nil, fmt.Errorf("lifecycle API requires enterprise authentication")
+		}
+		lifecycleAPI := &LifecycleAPI{service: lifecycleService}
+		mux.Handle("GET /api/v1/milvus/lifecycle/status", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.status)))
+		mux.Handle("POST /api/v1/milvus/lifecycle/apply", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.apply)))
+		mux.Handle("POST /api/v1/milvus/lifecycle/search", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.search)))
 	}
 	return localDevelopmentCORS(mux), nil
 }

@@ -49,10 +49,73 @@ func TestCreateCollectionUsesExplicitHNSWCosineSchema(t *testing.T) {
 			t.Fatalf("ACL field %s must allow public rows to omit empty arrays: %#v", name, field)
 		}
 	}
+	for _, name := range []string{"content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at"} {
+		if fieldByName[name] == nil {
+			t.Fatalf("lifecycle field %s is missing", name)
+		}
+	}
 	vector := fields[len(fields)-1].(map[string]any)
 	params := vector["elementTypeParams"].(map[string]any)
 	if params["dim"] != "2560" {
 		t.Fatalf("unexpected vector dimensions: %#v", params)
+	}
+}
+
+func TestQueryDeleteAndAliasUseLifecycleContracts(t *testing.T) {
+	var paths []string
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		paths = append(paths, request.URL.Path)
+		var payload map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		switch request.URL.Path {
+		case "/v2/vectordb/entities/query":
+			if payload["filter"] != `document_id == "doc-1"` || payload["consistencyLevel"] != "Strong" {
+				t.Fatalf("unexpected query payload: %#v", payload)
+			}
+			_ = json.NewEncoder(writer).Encode(map[string]any{
+				"code": 0, "data": []map[string]any{{"chunk_id": "doc-1#c001", "document_id": "doc-1", "source_revision": 7}},
+			})
+		case "/v2/vectordb/entities/delete":
+			if payload["filter"] != `chunk_id in ["doc-1#c002"]` {
+				t.Fatalf("unexpected delete payload: %#v", payload)
+			}
+			_ = json.NewEncoder(writer).Encode(map[string]any{"code": 0, "data": map[string]any{}})
+		case "/v2/vectordb/aliases/create", "/v2/vectordb/aliases/alter":
+			if payload["collectionName"] != "chunks_v2" || payload["aliasName"] != "chunks_active" {
+				t.Fatalf("unexpected alias payload: %#v", payload)
+			}
+			_ = json.NewEncoder(writer).Encode(map[string]any{"code": 0, "data": map[string]any{}})
+		case "/v2/vectordb/aliases/describe":
+			_ = json.NewEncoder(writer).Encode(map[string]any{
+				"code": 0, "data": map[string]any{"aliasName": "chunks_active", "collectionName": "chunks_v2", "dbName": "default"},
+			})
+		default:
+			t.Fatalf("unexpected path %s", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+	client := NewClient(Config{BaseURL: server.URL})
+	entities, err := client.QueryEntities(context.Background(), "chunks_active", `document_id == "doc-1"`, 100)
+	if err != nil || len(entities) != 1 || entities[0].SourceRevision != 7 {
+		t.Fatalf("entities=%#v err=%v", entities, err)
+	}
+	if err := client.DeleteByFilter(context.Background(), "chunks_active", `chunk_id in ["doc-1#c002"]`); err != nil {
+		t.Fatal(err)
+	}
+	if err := client.CreateAlias(context.Background(), "chunks_v2", "chunks_active"); err != nil {
+		t.Fatal(err)
+	}
+	alias, err := client.DescribeAlias(context.Background(), "chunks_active")
+	if err != nil || alias.CollectionName != "chunks_v2" {
+		t.Fatalf("alias=%#v err=%v", alias, err)
+	}
+	if err := client.AlterAlias(context.Background(), "chunks_v2", "chunks_active"); err != nil {
+		t.Fatal(err)
+	}
+	if len(paths) != 5 {
+		t.Fatalf("unexpected calls: %#v", paths)
 	}
 }
 

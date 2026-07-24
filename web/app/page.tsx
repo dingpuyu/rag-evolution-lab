@@ -128,6 +128,41 @@ type AuditEvent = {
   duration_ms: number;
 };
 
+type LifecycleStatus = {
+  collection: string;
+  alias: string;
+  embedding_model: string;
+  embedding_version: string;
+  state_path: string;
+  events: number;
+  pending_events: number;
+  documents: Record<string, {
+    source_revision: number;
+    deleted: boolean;
+    document_version?: string;
+    last_event_id: string;
+    updated_at: string;
+  }>;
+};
+
+type LifecycleResult = {
+  event_id: string;
+  operation: string;
+  document_id: string;
+  source_revision: number;
+  collection: string;
+  alias: string;
+  embedding_model: string;
+  embedding_version: string;
+  previous_chunks: number;
+  current_chunks: number;
+  upserted_chunks: number;
+  deleted_chunks: number;
+  duplicate: boolean;
+  verified: boolean;
+  completed_at: string;
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
@@ -222,6 +257,16 @@ export default function Home() {
   const [authLoading, setAuthLoading] = useState(false);
   const [lastRequestID, setLastRequestID] = useState("");
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
+  const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
+  const [lifecycleResult, setLifecycleResult] = useState<LifecycleResult | null>(null);
+  const [lifecycleSearch, setLifecycleSearch] = useState<MilvusSearchResult | null>(null);
+  const [lifecycleDocumentID, setLifecycleDocumentID] = useState("lifecycle-demo");
+  const [lifecycleRevision, setLifecycleRevision] = useState(1);
+  const [lifecycleVersion, setLifecycleVersion] = useState("1.0");
+  const [lifecycleContent, setLifecycleContent] = useState("# 企业知识更新\n\n旧版入口位于安全设置页面。\n\n管理员需要配置单点登录。");
+  const [lifecycleQuery, setLifecycleQuery] = useState("单点登录入口在哪里？");
+  const [lifecycleError, setLifecycleError] = useState("");
+  const [lifecycleLoading, setLifecycleLoading] = useState(false);
   const current = cases[activeCase];
 
   async function compareEmbeddings() {
@@ -367,6 +412,98 @@ export default function Home() {
     }
   }
 
+  async function refreshLifecycleStatus() {
+    if (!authSession) {
+      setLifecycleError("请先签发 Platform Admin 身份");
+      return;
+    }
+    setLifecycleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/lifecycle/status`, {
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLifecycleStatus(body);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+    } catch (error) {
+      setLifecycleError(error instanceof Error ? error.message : "读取生命周期状态失败");
+    }
+  }
+
+  async function applyLifecycle(operation: "upsert" | "delete") {
+    if (!authSession) {
+      setLifecycleError("请先签发 Platform Admin 身份");
+      return;
+    }
+    setLifecycleLoading(true);
+    setLifecycleError("");
+    try {
+      const eventID = `${lifecycleDocumentID}-r${lifecycleRevision}-${operation}`;
+      const payload = operation === "upsert" ? {
+        event_id: eventID,
+        operation,
+        source_revision: lifecycleRevision,
+        document: {
+          document_id: lifecycleDocumentID,
+          title: "企业知识生命周期演示",
+          content: lifecycleContent,
+          product: "identity",
+          version: lifecycleVersion,
+          status: "active",
+          visibility: "public",
+          allowed_tenants: [],
+          allowed_roles: [],
+        },
+      } : {
+        event_id: eventID,
+        operation,
+        source_revision: lifecycleRevision,
+        document_id: lifecycleDocumentID,
+      };
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/lifecycle/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify(payload),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLifecycleResult(body);
+      setLifecycleRevision((value) => value + 1);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+      await refreshLifecycleStatus();
+    } catch (error) {
+      setLifecycleError(error instanceof Error ? error.message : "生命周期变更失败");
+    } finally {
+      setLifecycleLoading(false);
+    }
+  }
+
+  async function searchLifecycle() {
+    if (!authSession) {
+      setLifecycleError("请先签发身份");
+      return;
+    }
+    setLifecycleLoading(true);
+    setLifecycleError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/milvus/lifecycle/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify({ query: lifecycleQuery, status: "active", top_k: 5 }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLifecycleSearch(body);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+    } catch (error) {
+      setLifecycleSearch(null);
+      setLifecycleError(error instanceof Error ? error.message : "生命周期检索失败");
+    } finally {
+      setLifecycleLoading(false);
+    }
+  }
+
   function formatVector(vector: number[]) {
     return vector.map((value) => value.toFixed(5)).join(", ");
   }
@@ -385,6 +522,7 @@ export default function Home() {
           <a href="#embedding-lab">Embedding 实验</a>
           <a href="#milvus-lab">Milvus Lab</a>
           <a href="#scale-lab">100K Lab</a>
+          <a href="#lifecycle-lab">增量索引</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -675,6 +813,52 @@ export default function Home() {
               <strong>检索请求将返回 401</strong>
               <small>先选择一个服务端预定义身份并签发令牌。</small>
             </>}
+          </div>
+        </div>
+
+        <div className="lifecycle-lab" id="lifecycle-lab">
+          <div className="lifecycle-intro">
+            <span>INCREMENTAL KNOWLEDGE LIFECYCLE</span>
+            <h3>写入、更新、删除都要能证明一致</h3>
+            <p>使用稳定Chunk ID做幂等Upsert；新版本写入后删除陈旧Chunk；删除后再次Query确认零残留。Event ID防重复，Source Revision防乱序，Embedding Version防止不同向量空间混写。</p>
+            <button onClick={refreshLifecycleStatus}>读取生命周期状态</button>
+          </div>
+          <div className="lifecycle-controls">
+            <div className="lifecycle-fields">
+              <label><span>DOCUMENT ID</span><input value={lifecycleDocumentID} onChange={(event) => setLifecycleDocumentID(event.target.value)} /></label>
+              <label><span>SOURCE REVISION</span><input type="number" min="1" value={lifecycleRevision} onChange={(event) => setLifecycleRevision(Number(event.target.value))} /></label>
+              <label><span>DOCUMENT VERSION</span><input value={lifecycleVersion} onChange={(event) => setLifecycleVersion(event.target.value)} /></label>
+            </div>
+            <label><span>MARKDOWN CONTENT</span><textarea value={lifecycleContent} onChange={(event) => setLifecycleContent(event.target.value)} /></label>
+            <div className="lifecycle-actions">
+              <button onClick={() => applyLifecycle("upsert")} disabled={lifecycleLoading}>UPSERT 当前版本</button>
+              <button className="danger" onClick={() => applyLifecycle("delete")} disabled={lifecycleLoading}>DELETE 并验证</button>
+            </div>
+            <div className="lifecycle-search-control">
+              <input value={lifecycleQuery} onChange={(event) => setLifecycleQuery(event.target.value)} />
+              <button onClick={searchLifecycle} disabled={lifecycleLoading}>检索 Active Alias</button>
+            </div>
+            {lifecycleError && <div className="scale-error"><b>LIFECYCLE ERROR</b><span>{lifecycleError}</span><small>变更接口仅允许Platform Admin。发生Revision冲突时请使用更大的版本号。</small></div>}
+          </div>
+          <div className="lifecycle-output">
+            <div className="lifecycle-metrics">
+              <div><span>COLLECTION</span><strong>{lifecycleStatus?.collection || "raglab_lifecycle_v1"}</strong></div>
+              <div><span>ACTIVE ALIAS</span><strong>{lifecycleStatus?.alias || "raglab_knowledge_active"}</strong></div>
+              <div><span>EMBEDDING VERSION</span><strong>{lifecycleStatus?.embedding_version || "qwen3…v1"}</strong></div>
+              <div><span>EVENTS / PENDING</span><strong>{lifecycleStatus ? `${lifecycleStatus.events} / ${lifecycleStatus.pending_events}` : "— / —"}</strong></div>
+            </div>
+            {lifecycleResult ? <article className="lifecycle-receipt">
+              <span>{lifecycleResult.verified ? "✓ POST-MUTATION VERIFIED" : "NOT VERIFIED"}</span>
+              <strong>{lifecycleResult.operation.toUpperCase()} · revision {lifecycleResult.source_revision}</strong>
+              <code>{lifecycleResult.event_id}</code>
+              <div><b>{lifecycleResult.previous_chunks}</b><small>BEFORE</small><i>→</i><b>{lifecycleResult.current_chunks}</b><small>AFTER</small><em>deleted {lifecycleResult.deleted_chunks}</em></div>
+              <p>{lifecycleResult.duplicate ? "相同Event ID被识别为重复投递，没有重复写入。" : "变更已写入Milvus，并通过Strong Query完成结果核对。"}</p>
+            </article> : <div className="lifecycle-placeholder">先使用Platform Admin签发JWT，再写入revision 1。修改正文后写入revision 2，观察旧Chunk被清除；最后Delete并检索，验证文档不会残留。</div>}
+            {lifecycleSearch && <div className="lifecycle-hits">
+              <span>ALIAS SEARCH · {lifecycleSearch.hits.length} HITS</span>
+              <code>{lifecycleSearch.filter}</code>
+              {lifecycleSearch.hits.map((hit) => <article key={hit.chunk_id}><b>{hit.title}</b><p>{hit.content}</p><small>{hit.chunk_id} · {hit.distance.toFixed(5)}</small></article>)}
+            </div>}
           </div>
         </div>
 

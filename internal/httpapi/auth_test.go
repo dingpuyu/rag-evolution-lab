@@ -54,6 +54,12 @@ func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, e
 	if err != nil {
 		t.Fatal(err)
 	}
+	lifecycleService, err := milvus.NewLifecycleService(client, embedder, milvus.LifecycleConfig{
+		Collection: "lifecycle", EmbeddingVersion: "hash-v1", StatePath: t.TempDir() + "/lifecycle.json",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 	manager, err := auth.NewManager(auth.Config{
 		Secret: []byte("01234567890123456789012345678901"), Issuer: "raglab", Audience: "raglab-api", TTL: time.Hour,
 	})
@@ -64,11 +70,33 @@ func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, e
 	if enableDevIssuer {
 		options.DevIssuer = manager
 	}
-	handler, err := NewEnterpriseLabHandler(embeddingService, vectorService, scaleService, options)
+	handler, err := NewEnterpriseLabHandler(embeddingService, vectorService, scaleService, options, lifecycleService)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return handler
+}
+
+func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	viewer := issueTestPersona(t, handler, "tenant037_admin")
+	denied := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/milvus/lifecycle/status", nil)
+	request.Header.Set("Authorization", "Bearer "+viewer)
+	handler.ServeHTTP(denied, request)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("tenant admin accessed lifecycle administration: status=%d body=%s", denied.Code, denied.Body.String())
+	}
+
+	platform := issueTestPersona(t, handler, "platform_admin")
+	allowed := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "/api/v1/milvus/lifecycle/status", nil)
+	request.Header.Set("Authorization", "Bearer "+platform)
+	handler.ServeHTTP(allowed, request)
+	if allowed.Code != http.StatusOK || !strings.Contains(allowed.Body.String(), `"embedding_version":"hash-v1"`) {
+		t.Fatalf("platform lifecycle status failed: status=%d body=%s", allowed.Code, allowed.Body.String())
+	}
 }
 
 func TestEnterpriseProductionModeDoesNotExposeDevIssuer(t *testing.T) {

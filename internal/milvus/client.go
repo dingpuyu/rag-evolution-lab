@@ -76,6 +76,12 @@ type CollectionStats struct {
 	RowCount flexibleInt64 `json:"rowCount"`
 }
 
+type AliasDescription struct {
+	Database       string `json:"dbName"`
+	CollectionName string `json:"collectionName"`
+	AliasName      string `json:"aliasName"`
+}
+
 type flexibleInt64 int64
 
 func (value *flexibleInt64) UnmarshalJSON(data []byte) error {
@@ -100,7 +106,24 @@ type Record struct {
 	Version        string    `json:"version"`
 	Status         string    `json:"status"`
 	Visibility     string    `json:"visibility"`
+	ContentHash    string    `json:"content_hash,omitempty"`
+	EmbeddingModel string    `json:"embedding_model,omitempty"`
+	EmbeddingVer   string    `json:"embedding_version,omitempty"`
+	DocumentVer    string    `json:"document_version,omitempty"`
+	SourceRevision int64     `json:"source_revision,omitempty"`
+	IndexedAt      int64     `json:"indexed_at,omitempty"`
 	Embedding      []float64 `json:"embedding"`
+}
+
+type Entity struct {
+	ChunkID        string `json:"chunk_id"`
+	DocumentID     string `json:"document_id"`
+	ContentHash    string `json:"content_hash"`
+	EmbeddingModel string `json:"embedding_model"`
+	EmbeddingVer   string `json:"embedding_version"`
+	DocumentVer    string `json:"document_version"`
+	SourceRevision int64  `json:"source_revision"`
+	IndexedAt      int64  `json:"indexed_at"`
 }
 
 type SearchRequest struct {
@@ -256,6 +279,12 @@ func (c *Client) CreateCollectionWithOptions(ctx context.Context, collection str
 				{"fieldName": "version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
 				{"fieldName": "status", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
 				{"fieldName": "visibility", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
+				{"fieldName": "content_hash", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "embedding_model", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "256"}},
+				{"fieldName": "embedding_version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "document_version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "source_revision", "dataType": "Int64"},
+				{"fieldName": "indexed_at", "dataType": "Int64"},
 				{"fieldName": "embedding", "dataType": "FloatVector", "elementTypeParams": map[string]string{"dim": fmt.Sprint(options.Dimensions)}},
 			},
 		},
@@ -285,6 +314,57 @@ func (c *Client) Upsert(ctx context.Context, collection string, records []Record
 
 func (c *Client) FlushCollection(ctx context.Context, collection string) error {
 	return c.post(ctx, "/v2/vectordb/collections/flush", map[string]any{"collectionName": collection}, nil)
+}
+
+func (c *Client) QueryEntities(ctx context.Context, collection, filter string, limit int) ([]Entity, error) {
+	if strings.TrimSpace(filter) == "" {
+		return nil, fmt.Errorf("Milvus query filter must not be empty")
+	}
+	if limit <= 0 || limit > 16_384 {
+		limit = 16_384
+	}
+	var entities []Entity
+	err := c.post(ctx, "/v2/vectordb/entities/query", map[string]any{
+		"collectionName": collection,
+		"filter":         filter,
+		"outputFields": []string{
+			"chunk_id", "document_id", "content_hash", "embedding_model", "embedding_version",
+			"document_version", "source_revision", "indexed_at",
+		},
+		"limit":            limit,
+		"consistencyLevel": "Strong",
+	}, &entities)
+	return entities, err
+}
+
+func (c *Client) DeleteByFilter(ctx context.Context, collection, filter string) error {
+	if strings.TrimSpace(filter) == "" {
+		return fmt.Errorf("Milvus delete filter must not be empty")
+	}
+	return c.post(ctx, "/v2/vectordb/entities/delete", map[string]any{
+		"collectionName": collection,
+		"filter":         filter,
+	}, nil)
+}
+
+func (c *Client) CreateAlias(ctx context.Context, collection, alias string) error {
+	return c.post(ctx, "/v2/vectordb/aliases/create", map[string]any{
+		"collectionName": collection,
+		"aliasName":      alias,
+	}, nil)
+}
+
+func (c *Client) DescribeAlias(ctx context.Context, alias string) (AliasDescription, error) {
+	var description AliasDescription
+	err := c.post(ctx, "/v2/vectordb/aliases/describe", map[string]any{"aliasName": alias}, &description)
+	return description, err
+}
+
+func (c *Client) AlterAlias(ctx context.Context, collection, alias string) error {
+	return c.post(ctx, "/v2/vectordb/aliases/alter", map[string]any{
+		"collectionName": collection,
+		"aliasName":      alias,
+	}, nil)
 }
 
 func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, error) {

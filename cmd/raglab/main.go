@@ -202,6 +202,10 @@ func runLabServer(args []string) {
 	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
 	scalePrefix := flags.String("scale-prefix", "raglab_bench_100k", "100K scale collection prefix")
 	scaleVersion := flags.String("scale-version", "v2", "100K scale collection version")
+	lifecycleCollection := flags.String("lifecycle-collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "incremental knowledge collection")
+	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
+	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
+	lifecycleState := flags.String("lifecycle-state", environmentOr("RAGLAB_LIFECYCLE_STATE", "data/lifecycle/state.json"), "durable lifecycle event state")
 	authSecret := flags.String("auth-secret", environmentOr("RAGLAB_AUTH_SECRET", "raglab-local-development-secret-change-me"), "JWT HMAC secret for local lab")
 	authIssuer := flags.String("auth-issuer", environmentOr("RAGLAB_AUTH_ISSUER", "raglab-local"), "JWT issuer")
 	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
@@ -216,6 +220,13 @@ func runLabServer(args []string) {
 	}
 	milvusClient := milvus.NewClient(milvus.Config{BaseURL: *milvusURL})
 	milvusService, err := milvus.NewService(milvusClient, embedder, *collection)
+	if err != nil {
+		fatal(err)
+	}
+	lifecycleService, err := milvus.NewLifecycleService(milvusClient, embedder, milvus.LifecycleConfig{
+		Collection: *lifecycleCollection, Alias: *lifecycleAlias, EmbeddingVersion: *embeddingVersion,
+		StatePath: *lifecycleState, ChunkRunes: 700,
+	})
 	if err != nil {
 		fatal(err)
 	}
@@ -261,7 +272,7 @@ func runLabServer(args []string) {
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, Audit: auth.NewAuditLog(200),
-	})
+	}, lifecycleService)
 	if err != nil {
 		fatal(err)
 	}

@@ -21,6 +21,7 @@ deploy/milvus/volumes/
 data/cache/
 data/artifacts/
 data/checkpoints/
+data/lifecycle/
 eval/reports/generated/
 
 *.log

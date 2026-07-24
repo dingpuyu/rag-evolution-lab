@@ -18,7 +18,7 @@
 | R8 | Rerank 的必要性、选型和延迟 | 已验证首轮基线 | `v5-rerank`、可替换 `Reranker` 接口、确定性 Heuristic、单测和 V4/V5 对比 | 接入 Cross-Encoder/远程 Rerank；按 Route 选择性启用；修复多跳 NDCG 退化 |
 | R9 | 可复现 RAG 评估 | 已验证基础 | Golden Dataset；Hit@5、MRR、Recall@5、Precision@5、NDCG@5、Answerability、P50/P95、安全指标 | 扩展到 60/80 Query、独立 Blind Split、置信区间和线上反馈集 |
 | R10 | 幻觉、无答案和错误引用 | 部分验证 | Anchor/Consensus Gate；无答案 Case；引用只能指向最终 Context；Citation Violations 门禁 | 真实生成模型、Required/Forbidden Facts、Faithfulness 和 Prompt Injection 生成测试 |
-| R11 | 文档增删改和索引一致性 | 待验证 | 只存在路线设计，尚无可运行增量索引 | 版本化索引、幂等 Upsert、Delete、双写/切换和陈旧结果测试 |
+| R11 | 文档增删改和索引一致性 | 已验证首版 | Event ID幂等、Revision乱序门禁、稳定Chunk ID Upsert、陈旧Chunk Delete、删除后Strong Query、Embedding版本门禁、Active Alias网页实验 | 补齐全量回填、发布门禁、Alias原子晋升与回滚演练 |
 | R12 | 扩展性、可观测性与成本 | 部分验证 | Query Trace、Embedding Cache、P50/P95、候选数、Context Token 估算 | OpenTelemetry、压测、超时降级、缓存命中率、Token/金额和资源水位 |
 
 ## 本轮新增的可验证知识点

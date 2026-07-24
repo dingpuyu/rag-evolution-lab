@@ -46,6 +46,10 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /TRUSTED IDENTITY BOUNDARY/);
   assert.match(html, /签发演示 JWT/);
   assert.match(html, /SECURITY AUDIT TRAIL/);
+  assert.match(html, /INCREMENTAL KNOWLEDGE LIFECYCLE/);
+  assert.match(html, /UPSERT 当前版本/);
+  assert.match(html, /DELETE 并验证/);
+  assert.match(html, /EMBEDDING VERSION/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/);
 });
 
