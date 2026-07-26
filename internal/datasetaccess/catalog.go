@@ -27,10 +27,11 @@ type Dataset struct {
 }
 
 type CreateDataset struct {
-	Name        string `json:"name"`
-	Slug        string `json:"slug"`
-	Description string `json:"description"`
-	Visibility  string `json:"visibility"`
+	Name         string   `json:"name"`
+	Slug         string   `json:"slug"`
+	Description  string   `json:"description"`
+	Visibility   string   `json:"visibility"`
+	AllowedRoles []string `json:"allowed_roles,omitempty"`
 }
 
 type Membership struct {

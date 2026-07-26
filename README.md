@@ -118,6 +118,13 @@ Phase 5 已完成首轮工程基线实验：
 - 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
+
+面向业务体验的独立客服门户已完成：
+
+- `/portal` 提供登录、知识库选择、Milvus 检索预览、流式回答与引用展示
+- 租户管理员可创建带 `viewer` / `admin` 策略的知识库，并向自有租户库导入资料
+- 权限与审计页面展示服务端 Claims、PostgreSQL membership、数据集策略和请求决策
+- 详细启动方式与验收步骤见 [RAG Desk 企业智能客服门户](docs/customer-portal.md)
 - 真实登录 → PostgreSQL 授权 → Milvus Filter → Top-K 结果的自动回归见
   [Dataset Search Harness 报告](eval/reports/dataset-search-latest.md)
 

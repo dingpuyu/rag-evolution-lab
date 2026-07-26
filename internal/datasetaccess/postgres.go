@@ -173,6 +173,17 @@ func (store *PostgresStore) Create(ctx context.Context, identity auth.Identity, 
 	if !identity.HasRole("platform_admin") && (membershipRole != "admin" || membershipStatus != "active") {
 		return Dataset{}, ErrDatasetDenied
 	}
+	allowedRoles := normalizeAllowedRoles(input.AllowedRoles)
+	if len(allowedRoles) == 0 {
+		allowedRoles = []string{"admin"}
+	}
+	if !identity.HasRole("platform_admin") {
+		for _, role := range allowedRoles {
+			if role != "viewer" && role != "admin" {
+				return Dataset{}, fmt.Errorf("tenant administrators may grant only viewer or admin access")
+			}
+		}
+	}
 	id := ownerTenant + "-" + slug
 	product := "dataset-" + id
 	tx, err := store.db.BeginTx(ctx, nil)
@@ -182,7 +193,7 @@ func (store *PostgresStore) Create(ctx context.Context, identity auth.Identity, 
 	defer tx.Rollback()
 	dataset := Dataset{
 		ID: id, Name: name, Description: strings.TrimSpace(input.Description), Product: product,
-		Visibility: visibility, OwnerTenant: ownerTenant, AllowedRoles: []string{"admin"},
+		Visibility: visibility, OwnerTenant: ownerTenant, AllowedRoles: allowedRoles,
 		Status: "active", CreatedBy: identity.Subject,
 	}
 	if _, err := tx.ExecContext(ctx, `
@@ -192,8 +203,10 @@ func (store *PostgresStore) Create(ctx context.Context, identity auth.Identity, 
 		dataset.Product, dataset.Visibility, dataset.CreatedBy); err != nil {
 		return Dataset{}, fmt.Errorf("create dataset: %w", err)
 	}
-	if _, err := tx.ExecContext(ctx, `INSERT INTO dataset_roles (dataset_id, role) VALUES ($1, 'admin')`, dataset.ID); err != nil {
-		return Dataset{}, fmt.Errorf("create dataset role: %w", err)
+	for _, role := range dataset.AllowedRoles {
+		if _, err := tx.ExecContext(ctx, `INSERT INTO dataset_roles (dataset_id, role) VALUES ($1, $2)`, dataset.ID, role); err != nil {
+			return Dataset{}, fmt.Errorf("create dataset role: %w", err)
+		}
 	}
 	after, _ := json.Marshal(dataset)
 	if _, err := tx.ExecContext(ctx, `
@@ -206,6 +219,23 @@ func (store *PostgresStore) Create(ctx context.Context, identity auth.Identity, 
 		return Dataset{}, err
 	}
 	return dataset, nil
+}
+
+func normalizeAllowedRoles(roles []string) []string {
+	seen := make(map[string]struct{}, len(roles))
+	result := make([]string, 0, len(roles))
+	for _, role := range roles {
+		role = strings.TrimSpace(strings.ToLower(role))
+		if role == "" {
+			continue
+		}
+		if _, ok := seen[role]; ok {
+			continue
+		}
+		seen[role] = struct{}{}
+		result = append(result, role)
+	}
+	return result
 }
 
 func (store *PostgresStore) Members(ctx context.Context, identity auth.Identity) ([]Membership, error) {

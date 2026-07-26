@@ -946,6 +946,7 @@ export default function Home() {
           <div className="hero-actions">
             <a className="primary-button" href="#experiment">查看优化效果 <span>↓</span></a>
             <a className="text-button" href="#architecture">浏览系统架构 <span>→</span></a>
+            <a className="text-button" href="/portal">进入智能客服门户 <span>↗</span></a>
           </div>
         </div>
 
