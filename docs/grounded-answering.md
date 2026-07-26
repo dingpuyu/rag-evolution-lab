@@ -139,6 +139,15 @@ POST /api/v1/datasets/{dataset_id}/answer/stream
 事件表达。网页的 Answer Lab 会展示事件时间线、首个检索事件耗时、生成耗时、Token
 统计、安全调整和服务端重建的 Citation。
 
-目前本地 Ollama 的结构化 JSON 输出仍是一次性生成，因此这里的“流式”是可观测的
-阶段流，而不是逐 Token 文本流。下一步可以在不改变最终 Citation Contract 的前提下，
-增加可取消的 token channel，并比较 TTFT、完整回答延迟和客户端断开后的资源回收。
+Ollama 现在使用 `stream=true`。服务端从结构化 JSON 的 `answer` 字段增量提取自然语言
+delta，网页在等待完整 JSON 校验期间就能显示回答预览；`completed` 事件仍携带完整、
+已校验的 Answer Response。这样 Token Streaming 只改善传输体验，不让未校验的模型引用
+直接成为最终结果。客户端取消会沿请求 Context 传递到 Ollama HTTP 请求，释放生成资源。
+
+一次本地 Tenant A 实测（Apple M1 Pro，模型已预热）观察到 TTFT 约 `25.35s`，
+结构化生成总耗时约 `29.77s`，Token Rate 约 `20.77 token/s`，共收到 50 个 SSE token
+事件；最终 Citation 仍为服务端校验后的 Tenant A 文档。这组数值是体验基线，不代表
+生产延迟。
+
+当前仍需继续补充：真实 TTFT/Token Rate 指标写入 Harness、模型超时后的安全降级策略，
+以及客户端断开、模型半包和无效 JSON 的长连接压力测试。

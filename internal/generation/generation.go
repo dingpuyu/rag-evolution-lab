@@ -61,12 +61,24 @@ type Generator interface {
 	Name() string
 }
 
+// StreamGenerator is optional. Generators that support it can expose answer
+// deltas while preserving the same final structured Output contract.
+type StreamGenerator interface {
+	Generator
+	GenerateStream(context.Context, Request, func(GenerationStreamEvent) error) (Generation, error)
+}
+
+type GenerationStreamEvent struct {
+	Delta string `json:"delta"`
+}
+
 // ProgressEvent is deliberately coarse grained. The answer contract remains
 // atomic and validated at the end, while callers can observe retrieval,
 // generation, safety and completion milestones over SSE.
 type ProgressEvent struct {
 	Type       string             `json:"type"`
 	ElapsedMS  float64            `json:"elapsed_ms"`
+	Delta      string             `json:"delta,omitempty"`
 	Search     *RetrievalProgress `json:"search,omitempty"`
 	Generation *Metadata          `json:"generation,omitempty"`
 	Response   *Response          `json:"response,omitempty"`
@@ -105,6 +117,8 @@ type Metadata struct {
 	PromptVersion     string   `json:"prompt_version"`
 	FinishReason      string   `json:"finish_reason,omitempty"`
 	LatencyMS         float64  `json:"latency_ms"`
+	TTFTMS            float64  `json:"ttft_ms,omitempty"`
+	TokenRateTPS      float64  `json:"token_rate_tps,omitempty"`
 	PromptTokens      int      `json:"prompt_tokens"`
 	OutputTokens      int      `json:"output_tokens"`
 	SafetyAdjustments []string `json:"safety_adjustments,omitempty"`
@@ -210,7 +224,23 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 	}}); err != nil {
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
-	generated, err := service.generator.Generate(ctx, Request{Query: query.Text, Evidence: evidence})
+	generationRequest := Request{Query: query.Text, Evidence: evidence}
+	var generated Generation
+	generationStarted := time.Now()
+	var firstTokenAt time.Time
+	if streamingGenerator, ok := service.generator.(StreamGenerator); ok {
+		generated, err = streamingGenerator.GenerateStream(ctx, generationRequest, func(event GenerationStreamEvent) error {
+			if strings.TrimSpace(event.Delta) == "" {
+				return nil
+			}
+			if firstTokenAt.IsZero() {
+				firstTokenAt = time.Now()
+			}
+			return emit(ProgressEvent{Type: "token", Delta: event.Delta})
+		})
+	} else {
+		generated, err = service.generator.Generate(ctx, generationRequest)
+	}
 	if err != nil {
 		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
 		return Response{}, fmt.Errorf("generate grounded answer: %w", err)
@@ -222,6 +252,13 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		Generator: service.generator.Name(), Model: generated.Model, PromptVersion: generated.PromptVersion,
 		FinishReason: generated.FinishReason, LatencyMS: generated.LatencyMS,
 		PromptTokens: generated.Usage.PromptTokens, OutputTokens: generated.Usage.CompletionTokens,
+	}
+	if !firstTokenAt.IsZero() {
+		response.Generation.TTFTMS = milliseconds(firstTokenAt.Sub(generationStarted))
+		remainingMS := generated.LatencyMS - response.Generation.TTFTMS
+		if remainingMS > 0 && generated.Usage.CompletionTokens > 0 {
+			response.Generation.TokenRateTPS = float64(generated.Usage.CompletionTokens) / (remainingMS / 1000)
+		}
 	}
 	if injectionEvidence {
 		response.Generation.SafetyAdjustments = append(

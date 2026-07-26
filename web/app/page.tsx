@@ -158,6 +158,8 @@ type DatasetAnswerResult = {
     prompt_version: string;
     finish_reason?: string;
     latency_ms: number;
+    ttft_ms?: number;
+    token_rate_tps?: number;
     prompt_tokens: number;
     output_tokens: number;
     safety_adjustments?: string[];
@@ -172,6 +174,7 @@ type DatasetAnswerResponse = {
 type AnswerStreamEvent = {
   type: string;
   elapsed_ms: number;
+  delta?: string;
   search?: {
     hits: number;
     filter: string;
@@ -363,6 +366,7 @@ export default function Home() {
   const [datasetLoading, setDatasetLoading] = useState(false);
   const [answerResult, setAnswerResult] = useState<DatasetAnswerResponse | null>(null);
   const [answerEvents, setAnswerEvents] = useState<AnswerStreamEvent[]>([]);
+  const [answerStreamPreview, setAnswerStreamPreview] = useState("");
   const [answerError, setAnswerError] = useState("");
   const [answerLoading, setAnswerLoading] = useState(false);
   const answerAbortRef = useRef<AbortController | null>(null);
@@ -651,6 +655,7 @@ export default function Home() {
     setAnswerError("");
     setAnswerResult(null);
     setAnswerEvents([]);
+    setAnswerStreamPreview("");
     try {
       const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/datasets/${encodeURIComponent(datasetID)}/answer/stream`, {
         method: "POST",
@@ -672,9 +677,14 @@ export default function Home() {
         const payload = JSON.parse(data) as { dataset?: DatasetResource; event?: AnswerStreamEvent };
         if (!payload.event) return;
         const event = payload.event;
-        setAnswerEvents((currentEvents) => [...currentEvents, event]);
+        if (event.type === "token") {
+          setAnswerStreamPreview((currentPreview) => currentPreview + (event.delta || ""));
+        } else {
+          setAnswerEvents((currentEvents) => [...currentEvents, event]);
+        }
         if (event.type === "completed" && event.response && payload.dataset) {
           setAnswerResult({ dataset: payload.dataset, result: event.response });
+          setAnswerStreamPreview(event.response.answer);
         }
         if (event.type === "error") setAnswerError(event.error || "流式回答失败");
       };
@@ -1304,7 +1314,7 @@ export default function Home() {
               {answerResult ? <>
                 <div className="answer-result-head">
                   <div><span>{answerResult.result.answerable ? "✓ GROUNDED" : "○ REFUSED"}</span><strong>{answerResult.dataset.name}</strong><small>{answerResult.result.refusal_reason || "citations verified"}</small></div>
-                  <div><span>GENERATION</span><strong>{answerResult.result.generation.latency_ms.toFixed(0)} ms</strong><small>{answerResult.result.generation.model || answerResult.result.generation.generator}</small></div>
+                  <div><span>TTFT / TOTAL</span><strong>{answerResult.result.generation.ttft_ms ? `${answerResult.result.generation.ttft_ms.toFixed(0)} / ${answerResult.result.generation.latency_ms.toFixed(0)} ms` : `${answerResult.result.generation.latency_ms.toFixed(0)} ms`}</strong><small>{answerResult.result.generation.model || answerResult.result.generation.generator}</small></div>
                   <div><span>TOKENS</span><strong>{answerResult.result.generation.prompt_tokens} / {answerResult.result.generation.output_tokens}</strong><small>prompt / output</small></div>
                 </div>
                 <div className="answer-copy"><p>{answerResult.result.answer}</p></div>
@@ -1313,7 +1323,7 @@ export default function Home() {
                   <span>SERVER-VERIFIED CITATIONS · {answerResult.result.citations.length}</span>
                   {answerResult.result.citations.length ? answerResult.result.citations.map((citation) => <article key={citation.chunk_id}><b>{citation.document}</b><code>{citation.document_id} · {citation.chunk_id}</code><p>{citation.excerpt}</p></article>) : <small>拒答结果不携带证据引用。</small>}
                 </div>
-              </> : <div className="answer-placeholder"><span>SEARCH → SAFETY GATE → GENERATION → CITATION</span><strong>最终答案会显示在这里</strong><p>服务端只接受检索结果中的 Chunk 引用；模型输出的引用会再次与已选上下文比对，无法引用上下文外的文档。</p></div>}
+              </> : answerStreamPreview ? <div className="answer-stream-preview"><span>LIVE ANSWER DELTA · 已通过 SSE 收到模型增量</span><p>{answerStreamPreview}<i className={answerLoading ? "typing-caret" : ""} /></p><small>完整 JSON 收齐后，服务端才会提交 Citation 和安全契约校验。</small></div> : <div className="answer-placeholder"><span>SEARCH → SAFETY GATE → GENERATION → CITATION</span><strong>最终答案会显示在这里</strong><p>服务端只接受检索结果中的 Chunk 引用；模型输出的引用会再次与已选上下文比对，无法引用上下文外的文档。</p></div>}
             </div>
           </div>
         </div>

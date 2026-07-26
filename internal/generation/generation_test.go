@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
@@ -28,6 +29,24 @@ type stubGenerator struct {
 	err         error
 	calls       int
 	lastRequest Request
+}
+
+type stubStreamGenerator struct {
+	generation Generation
+}
+
+func (generator *stubStreamGenerator) Name() string { return "stream-stub" }
+
+func (generator *stubStreamGenerator) Generate(context.Context, Request) (Generation, error) {
+	return generator.generation, nil
+}
+
+func (generator *stubStreamGenerator) GenerateStream(_ context.Context, _ Request, sink func(GenerationStreamEvent) error) (Generation, error) {
+	time.Sleep(5 * time.Millisecond)
+	if err := sink(GenerationStreamEvent{Delta: "streamed answer"}); err != nil {
+		return Generation{}, err
+	}
+	return generator.generation, nil
 }
 
 func (generator *stubGenerator) Name() string { return "stub" }
@@ -94,6 +113,30 @@ func TestServiceProgressEmitsRetrievalGenerationAndCompletion(t *testing.T) {
 	}
 	if events[1].Search == nil || events[1].Search.Hits != 1 || events[3].Generation == nil || events[4].Response == nil {
 		t.Fatalf("progress payloads lost observability: %#v", events)
+	}
+}
+
+func TestServiceStreamingMetadataIncludesTTFTAndTokenRate(t *testing.T) {
+	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{{
+		ChunkID: "doc-a#c001", DocumentID: "doc-a", Content: "evidence",
+	}}}}
+	generator := &stubStreamGenerator{generation: Generation{Output: Output{
+		Answerable: true, Answer: "streamed answer",
+		Citations: []CitationReference{{ChunkID: "doc-a#c001", DocumentID: "doc-a"}},
+	}, Model: "stream-model", LatencyMS: 20, Usage: Usage{CompletionTokens: 10}}}
+	service, _ := NewService(searcher, generator)
+	var tokenDelta string
+	response, err := service.AnswerWithProgress(context.Background(), milvus.Query{Text: "stream"}, func(event ProgressEvent) error {
+		if event.Type == "token" {
+			tokenDelta += event.Delta
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tokenDelta != "streamed answer" || response.Generation.TTFTMS <= 0 || response.Generation.TokenRateTPS <= 0 {
+		t.Fatalf("stream metrics not captured: delta=%q generation=%#v", tokenDelta, response.Generation)
 	}
 }
 
@@ -253,6 +296,70 @@ func TestOllamaGeneratorUsesUntrustedEvidencePromptAndParsesJSON(t *testing.T) {
 	if !result.Answerable || result.Answer != "可信回答" || result.Usage.PromptTokens != 120 ||
 		result.Usage.CompletionTokens != 24 || result.FinishReason != "stop" {
 		t.Fatalf("unexpected generation %#v", result)
+	}
+}
+
+func TestOllamaGeneratorStreamsAnswerDeltasAndValidatesFinalJSON(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			Stream bool `json:"stream"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if !payload.Stream {
+			t.Fatal("stream generator must set stream=true")
+		}
+		writer.Header().Set("Content-Type", "application/x-ndjson")
+		flusher, ok := writer.(http.Flusher)
+		if !ok {
+			t.Fatal("test server must support flushing")
+		}
+		chunks := []struct {
+			content string
+			done    bool
+		}{
+			{content: `{"answerable":true,"ans`},
+			{content: `wer":"企`},
+			{content: `业 SSO`},
+			{content: `","citations":[{"chunk_id":"doc-a#c001","document_id":"doc-a"}],"refusal_reason":""}`, done: true},
+		}
+		for index, chunk := range chunks {
+			body := map[string]any{
+				"model": "qwen3.5:9b", "message": map[string]string{"content": chunk.content}, "done": chunk.done,
+			}
+			if chunk.done {
+				body["done_reason"] = "stop"
+				body["prompt_eval_count"] = 31
+				body["eval_count"] = 5
+			}
+			if err := json.NewEncoder(writer).Encode(body); err != nil {
+				t.Fatal(err)
+			}
+			flusher.Flush()
+			if index == len(chunks)-1 {
+				return
+			}
+		}
+	}))
+	defer server.Close()
+
+	generator := OllamaGenerator{BaseURL: server.URL, Model: "qwen3.5:9b"}
+	var deltas []string
+	result, err := generator.GenerateStream(context.Background(), Request{
+		Query: "SSO", Evidence: []Evidence{{ChunkID: "doc-a#c001", DocumentID: "doc-a", Content: "Use SSO"}},
+	}, func(event GenerationStreamEvent) error {
+		deltas = append(deltas, event.Delta)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.Answerable || result.Answer != "企业 SSO" || result.Model != "qwen3.5:9b" || result.Usage.PromptTokens != 31 {
+		t.Fatalf("unexpected streamed result: %#v", result)
+	}
+	if strings.Join(deltas, "") != "企业 SSO" || len(deltas) < 2 {
+		t.Fatalf("streamed answer deltas=%q", deltas)
 	}
 }
 
