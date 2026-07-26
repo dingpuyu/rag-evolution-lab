@@ -61,6 +61,28 @@ type Generator interface {
 	Name() string
 }
 
+// ProgressEvent is deliberately coarse grained. The answer contract remains
+// atomic and validated at the end, while callers can observe retrieval,
+// generation, safety and completion milestones over SSE.
+type ProgressEvent struct {
+	Type       string             `json:"type"`
+	ElapsedMS  float64            `json:"elapsed_ms"`
+	Search     *RetrievalProgress `json:"search,omitempty"`
+	Generation *Metadata          `json:"generation,omitempty"`
+	Response   *Response          `json:"response,omitempty"`
+	Error      string             `json:"error,omitempty"`
+}
+
+type RetrievalProgress struct {
+	Hits               int     `json:"hits"`
+	Filter             string  `json:"filter"`
+	EmbeddingLatencyMS float64 `json:"embedding_latency_ms"`
+	SearchLatencyMS    float64 `json:"search_latency_ms"`
+	TotalLatencyMS     float64 `json:"total_latency_ms"`
+}
+
+type ProgressSink func(ProgressEvent) error
+
 type Citation struct {
 	ChunkID    string `json:"chunk_id"`
 	DocumentID string `json:"document_id"`
@@ -105,9 +127,32 @@ func NewService(searcher Searcher, generator Generator) (*Service, error) {
 }
 
 func (service *Service) Answer(ctx context.Context, query milvus.Query) (Response, error) {
+	return service.AnswerWithProgress(ctx, query, nil)
+}
+
+func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Query, sink ProgressSink) (Response, error) {
+	started := time.Now()
+	emit := func(event ProgressEvent) error {
+		event.ElapsedMS = milliseconds(time.Since(started))
+		if sink == nil {
+			return nil
+		}
+		return sink(event)
+	}
+	if err := emit(ProgressEvent{Type: "started"}); err != nil {
+		return Response{}, fmt.Errorf("emit answer progress: %w", err)
+	}
 	search, err := service.searcher.Search(ctx, query)
 	if err != nil {
+		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
 		return Response{}, fmt.Errorf("retrieve answer evidence: %w", err)
+	}
+	if err := emit(ProgressEvent{Type: "retrieved", Search: &RetrievalProgress{
+		Hits: searchHitCount(search), Filter: search.Filter,
+		EmbeddingLatencyMS: search.EmbeddingLatencyMS, SearchLatencyMS: search.SearchLatencyMS,
+		TotalLatencyMS: search.TotalLatencyMS,
+	}}); err != nil {
+		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
 	response := Response{Search: search}
 	if len(search.Hits) == 0 {
@@ -116,6 +161,9 @@ func (service *Service) Answer(ctx context.Context, query milvus.Query) (Respons
 		response.RefusalReason = "no_retrieval_evidence"
 		response.Generation = Metadata{
 			Generator: service.generator.Name(), PromptVersion: PromptVersion,
+		}
+		if err := emit(ProgressEvent{Type: "completed", Response: &response}); err != nil {
+			return Response{}, fmt.Errorf("emit answer progress: %w", err)
 		}
 		return response, nil
 	}
@@ -139,6 +187,9 @@ func (service *Service) Answer(ctx context.Context, query milvus.Query) (Respons
 			Generator: service.generator.Name(), PromptVersion: PromptVersion,
 			SafetyAdjustments: []string{"prompt_injection_evidence_redacted", "unsafe_query_refused"},
 		}
+		if err := emit(ProgressEvent{Type: "completed", Response: &response}); err != nil {
+			return Response{}, fmt.Errorf("emit answer progress: %w", err)
+		}
 		return response, nil
 	}
 	if len(evidence) == 0 {
@@ -149,10 +200,19 @@ func (service *Service) Answer(ctx context.Context, query milvus.Query) (Respons
 			Generator: service.generator.Name(), PromptVersion: PromptVersion,
 			SafetyAdjustments: []string{"prompt_injection_evidence_redacted", "unsafe_context_refused"},
 		}
+		if err := emit(ProgressEvent{Type: "completed", Response: &response}); err != nil {
+			return Response{}, fmt.Errorf("emit answer progress: %w", err)
+		}
 		return response, nil
+	}
+	if err := emit(ProgressEvent{Type: "generation_started", Generation: &Metadata{
+		Generator: service.generator.Name(), PromptVersion: PromptVersion,
+	}}); err != nil {
+		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
 	generated, err := service.generator.Generate(ctx, Request{Query: query.Text, Evidence: evidence})
 	if err != nil {
+		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
 		return Response{}, fmt.Errorf("generate grounded answer: %w", err)
 	}
 	response.Answerable = generated.Answerable
@@ -167,6 +227,9 @@ func (service *Service) Answer(ctx context.Context, query milvus.Query) (Respons
 		response.Generation.SafetyAdjustments = append(
 			response.Generation.SafetyAdjustments, "prompt_injection_evidence_redacted",
 		)
+	}
+	if err := emit(ProgressEvent{Type: "generation_completed", Generation: &response.Generation}); err != nil {
+		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
 	if !generated.Answerable && len(generated.Citations) > 0 {
 		// A refusal must never return excerpts from a malicious or irrelevant
@@ -201,7 +264,14 @@ func (service *Service) Answer(ctx context.Context, query milvus.Query) (Respons
 	if response.Answerable && len(response.Citations) == 0 {
 		return Response{}, fmt.Errorf("answerable output requires at least one valid citation")
 	}
+	if err := emit(ProgressEvent{Type: "completed", Response: &response}); err != nil {
+		return Response{}, fmt.Errorf("emit answer progress: %w", err)
+	}
 	return response, nil
+}
+
+func searchHitCount(search milvus.SearchResult) int {
+	return len(search.Hits)
 }
 
 func containsPromptInjection(value string) bool {

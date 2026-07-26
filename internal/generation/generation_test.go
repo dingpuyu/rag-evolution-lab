@@ -63,6 +63,40 @@ func TestServiceMapsOnlyServerSelectedCitations(t *testing.T) {
 	}
 }
 
+func TestServiceProgressEmitsRetrievalGenerationAndCompletion(t *testing.T) {
+	searcher := &stubSearcher{result: milvus.SearchResult{
+		Filter: "tenant filter", EmbeddingLatencyMS: 3, SearchLatencyMS: 2,
+		Hits: []milvus.SearchHit{{ChunkID: "doc-a#c001", DocumentID: "doc-a", Title: "Guide", Content: "Use HTTPS"}},
+	}}
+	generator := &stubGenerator{generation: Generation{Output: Output{
+		Answerable: true, Answer: "Use HTTPS",
+		Citations: []CitationReference{{ChunkID: "doc-a#c001", DocumentID: "doc-a"}},
+	}}}
+	service, err := NewService(searcher, generator)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var events []ProgressEvent
+	if _, err := service.AnswerWithProgress(context.Background(), milvus.Query{Text: "callback"}, func(event ProgressEvent) error {
+		events = append(events, event)
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"started", "retrieved", "generation_started", "generation_completed", "completed"}
+	if len(events) != len(want) {
+		t.Fatalf("unexpected progress events: %#v", events)
+	}
+	for index, event := range events {
+		if event.Type != want[index] || event.ElapsedMS < 0 {
+			t.Fatalf("progress[%d]=%#v, want type=%s", index, event, want[index])
+		}
+	}
+	if events[1].Search == nil || events[1].Search.Hits != 1 || events[3].Generation == nil || events[4].Response == nil {
+		t.Fatalf("progress payloads lost observability: %#v", events)
+	}
+}
+
 func TestServiceRejectsCitationOutsideContext(t *testing.T) {
 	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{{
 		ChunkID: "doc-a#c001", DocumentID: "doc-a", Content: "evidence",

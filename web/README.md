@@ -10,6 +10,7 @@
 - 可替换 Pipeline 架构
 - Evaluation Harness 与回归门禁
 - 两段文字的 Embedding 向量、Cosine、Dot Product 与 Euclidean Distance
+- 数据集授权后的 Grounded Answer SSE 事件时间线、拒答原因、生成指标与服务端 Citation
 
 ## 本地运行
 
@@ -26,6 +27,14 @@ Embedding 实验需要在仓库根目录另开终端启动 API：
 RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
   go run ./cmd/raglab serve-embedding --backend ollama
 ```
+
+Answer Lab 需要启动完整企业实验服务：
+
+```bash
+go run ./cmd/raglab serve-lab
+```
+
+打开数据隔离区，登录或签发演示身份，选择数据集后点击“流式生成 Grounded Answer”。
 
 验证：
 

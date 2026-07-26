@@ -185,6 +185,48 @@ func TestDatasetAnswerReusesAuthorizationAndFailsClosedWithoutEvidence(t *testin
 	}
 }
 
+func TestDatasetAnswerStreamEmitsGroundedLifecycle(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	token := issueTestPersona(t, handler, "tenant_a_admin")
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/answer/stream", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("stream status=%d body=%s", response.Code, response.Body.String())
+	}
+	if !strings.HasPrefix(response.Header().Get("Content-Type"), "text/event-stream") {
+		t.Fatalf("expected SSE content type, got %q", response.Header().Get("Content-Type"))
+	}
+	body := response.Body.String()
+	for _, event := range []string{"event: started", "event: retrieved", "event: completed", "event: done"} {
+		if !strings.Contains(body, event) {
+			t.Fatalf("missing %s in stream: %s", event, body)
+		}
+	}
+	if !strings.Contains(body, `"refusal_reason":"no_retrieval_evidence"`) {
+		t.Fatalf("stream did not carry deterministic refusal: %s", body)
+	}
+}
+
+func TestDatasetAnswerStreamPreservesResourceNonEnumeration(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	token := issueTestPersona(t, handler, "tenant_a_admin")
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-b-operations/answer/stream", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNotFound || filter != "" || strings.Contains(response.Body.String(), "text/event-stream") {
+		t.Fatalf("cross-tenant stream leaked resource or reached Milvus: status=%d filter=%q body=%s", response.Code, filter, response.Body.String())
+	}
+}
+
 func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {
 	var filter string
 	handler := newEnterpriseTestHandler(t, &filter)

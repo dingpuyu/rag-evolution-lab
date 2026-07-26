@@ -114,6 +114,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("POST /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.create)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answer)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer/stream", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answerStream)))
 		mux.Handle("GET /api/v1/control-plane/status", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.status)))
 		mux.Handle("GET /api/v1/memberships", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.members)))
 	}

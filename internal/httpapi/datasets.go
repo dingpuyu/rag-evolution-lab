@@ -3,8 +3,10 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
@@ -72,6 +74,53 @@ func (api *DatasetAPI) answer(writer http.ResponseWriter, request *http.Request)
 		"dataset": dataset,
 		"result":  result,
 	})
+}
+
+func (api *DatasetAPI) answerStream(writer http.ResponseWriter, request *http.Request) {
+	dataset, identity, ok := api.authorizeDataset(writer, request)
+	if !ok {
+		return
+	}
+	input, ok := decodeDatasetQuery(writer, request)
+	if !ok {
+		return
+	}
+	flusher, ok := writer.(http.Flusher)
+	if !ok {
+		writeError(writer, http.StatusNotImplemented, "sse_not_supported", "streaming responses are not supported by this server")
+		return
+	}
+	writer.Header().Set("Content-Type", "text/event-stream; charset=utf-8")
+	writer.Header().Set("Cache-Control", "no-cache, no-transform")
+	writer.Header().Set("Connection", "keep-alive")
+	writer.Header().Set("X-Accel-Buffering", "no")
+	writer.WriteHeader(http.StatusOK)
+	started := time.Now()
+	send := func(event generation.ProgressEvent) error {
+		payload, err := json.Marshal(map[string]any{
+			"dataset": dataset,
+			"event":   event,
+		})
+		if err != nil {
+			return fmt.Errorf("encode SSE event: %w", err)
+		}
+		if _, err := fmt.Fprintf(writer, "event: %s\ndata: %s\n\n", event.Type, payload); err != nil {
+			return err
+		}
+		flusher.Flush()
+		return nil
+	}
+	_, err := api.answerService.AnswerWithProgress(
+		request.Context(), buildDatasetQuery(dataset, identity, input.Query, input.TopK), send,
+	)
+	if err != nil {
+		// The response headers are already committed. Report failures as an SSE
+		// event so clients can distinguish a generation failure from a network
+		// disconnect without parsing an HTML error page.
+		_ = send(generation.ProgressEvent{Type: "error", Error: err.Error()})
+		return
+	}
+	_ = send(generation.ProgressEvent{Type: "done", ElapsedMS: float64(time.Since(started).Microseconds()) / 1000})
 }
 
 func (api *DatasetAPI) authorizeDataset(writer http.ResponseWriter, request *http.Request) (datasetaccess.Dataset, auth.Identity, bool) {

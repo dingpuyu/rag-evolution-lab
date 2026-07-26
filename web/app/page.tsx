@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 type SimilarityResult = {
   embedder: string;
@@ -144,6 +144,44 @@ type MembershipResource = {
 type DatasetSearchResponse = {
   dataset: DatasetResource;
   result: MilvusSearchResult;
+};
+
+type DatasetAnswerResult = {
+  answerable: boolean;
+  answer: string;
+  refusal_reason?: string;
+  citations: Array<{ chunk_id: string; document_id: string; document: string; excerpt: string }>;
+  search: MilvusSearchResult;
+  generation: {
+    generator: string;
+    model: string;
+    prompt_version: string;
+    finish_reason?: string;
+    latency_ms: number;
+    prompt_tokens: number;
+    output_tokens: number;
+    safety_adjustments?: string[];
+  };
+};
+
+type DatasetAnswerResponse = {
+  dataset: DatasetResource;
+  result: DatasetAnswerResult;
+};
+
+type AnswerStreamEvent = {
+  type: string;
+  elapsed_ms: number;
+  search?: {
+    hits: number;
+    filter: string;
+    embedding_latency_ms: number;
+    search_latency_ms: number;
+    total_latency_ms: number;
+  };
+  generation?: DatasetAnswerResult["generation"];
+  response?: DatasetAnswerResult;
+  error?: string;
 };
 
 type AuditEvent = {
@@ -323,6 +361,11 @@ export default function Home() {
   const [datasetResult, setDatasetResult] = useState<DatasetSearchResponse | null>(null);
   const [datasetError, setDatasetError] = useState("");
   const [datasetLoading, setDatasetLoading] = useState(false);
+  const [answerResult, setAnswerResult] = useState<DatasetAnswerResponse | null>(null);
+  const [answerEvents, setAnswerEvents] = useState<AnswerStreamEvent[]>([]);
+  const [answerError, setAnswerError] = useState("");
+  const [answerLoading, setAnswerLoading] = useState(false);
+  const answerAbortRef = useRef<AbortController | null>(null);
   const [controlPlane, setControlPlane] = useState<ControlPlaneStatus | null>(null);
   const [memberships, setMemberships] = useState<MembershipResource[]>([]);
   const [newDatasetName, setNewDatasetName] = useState("产品支持知识库");
@@ -596,6 +639,70 @@ export default function Home() {
     }
   }
 
+  async function streamDatasetAnswer() {
+    if (!authSession) {
+      setAnswerError("请先登录或签发身份");
+      return;
+    }
+    answerAbortRef.current?.abort();
+    const controller = new AbortController();
+    answerAbortRef.current = controller;
+    setAnswerLoading(true);
+    setAnswerError("");
+    setAnswerResult(null);
+    setAnswerEvents([]);
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/datasets/${encodeURIComponent(datasetID)}/answer/stream`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify({ query: datasetQuery, top_k: 5 }),
+        signal: controller.signal,
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => null);
+        throw new Error(`${response.status} · ${body?.error?.message || "回答请求被拒绝"}`);
+      }
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("浏览器不支持 SSE 读取");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const consumeFrame = (frame: string) => {
+        const data = frame.split("\n").filter((line) => line.startsWith("data:")).map((line) => line.slice(5).trimStart()).join("\n");
+        if (!data) return;
+        const payload = JSON.parse(data) as { dataset?: DatasetResource; event?: AnswerStreamEvent };
+        if (!payload.event) return;
+        const event = payload.event;
+        setAnswerEvents((currentEvents) => [...currentEvents, event]);
+        if (event.type === "completed" && event.response && payload.dataset) {
+          setAnswerResult({ dataset: payload.dataset, result: event.response });
+        }
+        if (event.type === "error") setAnswerError(event.error || "流式回答失败");
+      };
+      while (true) {
+        const read = await reader.read();
+        buffer += decoder.decode(read.value || new Uint8Array(), { stream: !read.done });
+        const frames = buffer.split("\n\n");
+        buffer = frames.pop() || "";
+        frames.forEach(consumeFrame);
+        if (read.done) break;
+      }
+      if (buffer.trim()) consumeFrame(buffer);
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setAnswerError("已取消本次回答");
+      } else {
+        setAnswerError(error instanceof Error ? error.message : "流式回答失败");
+      }
+    } finally {
+      if (answerAbortRef.current === controller) answerAbortRef.current = null;
+      setAnswerLoading(false);
+    }
+  }
+
+  function cancelDatasetAnswer() {
+    answerAbortRef.current?.abort();
+  }
+
   async function loadAuditEvents() {
     if (!authSession) return;
     setScaleError("");
@@ -807,6 +914,7 @@ export default function Home() {
           <a href="#milvus-lab">Milvus Lab</a>
           <a href="#scale-lab">100K Lab</a>
           <a href="#dataset-isolation">数据隔离</a>
+          <a href="#answer-lab">Answer Lab</a>
           <a href="#lifecycle-lab">增量索引</a>
           <a href="#ingestion-jobs">导入任务</a>
           <a href="#experiment">效果对比</a>
@@ -1169,6 +1277,44 @@ export default function Home() {
                 <b>{hit.title}</b><p>{hit.content}</p><small>{hit.tenant_id} · {hit.visibility} · {hit.distance.toFixed(5)}</small>
               </article>)}
             </div>}
+          </div>
+        </div>
+
+        <div className="answer-lab" id="answer-lab">
+          <div className="answer-lab-heading">
+            <div><span>GROUNDED ANSWER · SSE LIVE</span><h3>从检索证据到带引用的回答</h3></div>
+            <p>同一个数据集授权边界下，服务端先检索，再执行安全门禁，最后生成结构化回答。事件时间线用于观察 TTFE、生成耗时、拒答原因和引用闭环。</p>
+            <div className="answer-actions">
+              <button onClick={streamDatasetAnswer} disabled={answerLoading || !authSession}>{answerLoading ? "STREAMING…" : "流式生成 Grounded Answer →"}</button>
+              {answerLoading && <button className="secondary" onClick={cancelDatasetAnswer}>取消生成</button>}
+            </div>
+          </div>
+          {answerError && <div className="answer-error"><b>ANSWER STREAM</b><span>{answerError}</span><small>跨租户资源会在进入流式响应前返回统一 404。</small></div>}
+          <div className="answer-timeline">
+            <div className="answer-event-list">
+              <span>EVENT TIMELINE</span>
+              {answerEvents.length ? answerEvents.map((event, index) => <article key={`${event.type}-${index}`} className={event.type === "error" ? "error" : event.type === "completed" ? "completed" : ""}>
+                <b>{event.type.toUpperCase()}</b><code>{event.elapsed_ms.toFixed(1)} ms</code>
+                {event.search && <small>{event.search.hits} hits · embed {event.search.embedding_latency_ms.toFixed(1)} · search {event.search.search_latency_ms.toFixed(1)} ms</small>}
+                {event.generation && <small>{event.generation.model || event.generation.generator} · {event.generation.latency_ms.toFixed(1)} ms</small>}
+                {event.error && <small>{event.error}</small>}
+              </article>) : <p>登录后选择一个数据集，点击上方按钮观察 SSE 事件。</p>}
+            </div>
+            <div className="answer-output">
+              {answerResult ? <>
+                <div className="answer-result-head">
+                  <div><span>{answerResult.result.answerable ? "✓ GROUNDED" : "○ REFUSED"}</span><strong>{answerResult.dataset.name}</strong><small>{answerResult.result.refusal_reason || "citations verified"}</small></div>
+                  <div><span>GENERATION</span><strong>{answerResult.result.generation.latency_ms.toFixed(0)} ms</strong><small>{answerResult.result.generation.model || answerResult.result.generation.generator}</small></div>
+                  <div><span>TOKENS</span><strong>{answerResult.result.generation.prompt_tokens} / {answerResult.result.generation.output_tokens}</strong><small>prompt / output</small></div>
+                </div>
+                <div className="answer-copy"><p>{answerResult.result.answer}</p></div>
+                {answerResult.result.generation.safety_adjustments?.length ? <div className="answer-safety"><b>SAFETY ADJUSTMENTS</b>{answerResult.result.generation.safety_adjustments.map((item) => <code key={item}>{item}</code>)}</div> : null}
+                <div className="answer-citations">
+                  <span>SERVER-VERIFIED CITATIONS · {answerResult.result.citations.length}</span>
+                  {answerResult.result.citations.length ? answerResult.result.citations.map((citation) => <article key={citation.chunk_id}><b>{citation.document}</b><code>{citation.document_id} · {citation.chunk_id}</code><p>{citation.excerpt}</p></article>) : <small>拒答结果不携带证据引用。</small>}
+                </div>
+              </> : <div className="answer-placeholder"><span>SEARCH → SAFETY GATE → GENERATION → CITATION</span><strong>最终答案会显示在这里</strong><p>服务端只接受检索结果中的 Chunk 引用；模型输出的引用会再次与已选上下文比对，无法引用上下文外的文档。</p></div>}
+            </div>
           </div>
         </div>
 

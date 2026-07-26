@@ -119,3 +119,26 @@ Suite：
 本机 9B 模型生成延迟较高，因此下一阶段应增加 SSE 的 Time To First Token，
 并对比更小的本地模型、缓存和超时降级。当前结果用于功能与安全基线，不宣称生产延迟。
 
+## 6. SSE Answer Lab
+
+当前已增加：
+
+```text
+POST /api/v1/datasets/{dataset_id}/answer/stream
+  -> event: started
+  -> event: retrieved       # 命中数、Filter、Embedding/Search 分段耗时
+  -> event: generation_started
+  -> event: generation_completed
+  -> event: completed       # 完整、已校验的 Answer Response
+  -> event: done
+```
+
+这个接口仍然使用与 JSON Answer 完全相同的授权、检索、安全门禁和引用校验，SSE
+只改变传输方式，不降低最终契约。服务端在鉴权失败、数据集不存在或跨租户访问时，
+会在写入 SSE 响应前返回普通 HTTP 错误；进入流之后的模型和网络错误使用 `error`
+事件表达。网页的 Answer Lab 会展示事件时间线、首个检索事件耗时、生成耗时、Token
+统计、安全调整和服务端重建的 Citation。
+
+目前本地 Ollama 的结构化 JSON 输出仍是一次性生成，因此这里的“流式”是可观测的
+阶段流，而不是逐 Token 文本流。下一步可以在不改变最终 Citation Contract 的前提下，
+增加可取消的 token channel，并比较 TTFT、完整回答延迟和客户端断开后的资源回收。

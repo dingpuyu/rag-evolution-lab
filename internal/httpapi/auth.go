@@ -51,6 +51,15 @@ func (recorder *statusRecorder) Write(data []byte) (int, error) {
 	return recorder.ResponseWriter.Write(data)
 }
 
+func (recorder *statusRecorder) Flush() {
+	if recorder.status == 0 {
+		recorder.WriteHeader(http.StatusOK)
+	}
+	if flusher, ok := recorder.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
 func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		started := time.Now()
