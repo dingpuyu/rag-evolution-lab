@@ -12,7 +12,7 @@ PostgreSQL Dataset Authorize
   -> Milvus pre-ANN Filter
   -> Top-K Evidence
   -> Prompt Injection Gate
-  -> Ollama Structured Generation
+  -> Configured Structured Generation Provider
   -> Citation Allowlist
   -> Answer / Refusal
 ```
@@ -33,7 +33,8 @@ PostgreSQL Dataset Authorize
 }
 ```
 
-Ollama 请求使用 JSON Schema 约束字段和拒答枚举。拒答原因只能是：
+Ollama 请求使用 JSON Schema；OpenAI-compatible 请求使用 JSON Output。两者都由服务端
+校验同一份最终契约。拒答原因只能是：
 
 - `insufficient_evidence`
 - `irrelevant_evidence`
@@ -116,10 +117,38 @@ Suite：
 覆盖公开回答、Tenant A/B 私有回答、无答案拒答、Prompt Injection 和跨租户资源
 非枚举。安全注入请求在生成前拒绝，LLM Token 为 0。
 
-本机 9B 模型生成延迟较高，因此下一阶段应增加 SSE 的 Time To First Token，
-并对比更小的本地模型、缓存和超时降级。当前结果用于功能与安全基线，不宣称生产延迟。
+本机 9B 模型生成延迟较高，因此该结果用于功能与安全基线，不宣称生产延迟；切换到
+OpenAI-compatible Provider 后应重新运行同一 Harness，比较 TTFT、Token Rate、完整
+回答延迟和费用。
 
-## 6. SSE Answer Lab
+## 6. OpenAI-compatible Provider
+
+不需要把 API Token 写入代码或发给前端。服务启动时通过环境变量选择 Provider：
+
+```bash
+export RAGLAB_GENERATION_PROVIDER=deepseek
+export RAGLAB_GENERATION_API_KEY='your-deepseek-token'
+export RAGLAB_GENERATION_BASE_URL='https://api.deepseek.com'
+export RAGLAB_GENERATION_MODEL='deepseek-v4-pro'
+make serve-lab
+```
+
+如果已经使用常见的 `DEEPSEEK_API_KEY` 环境变量，项目会自动识别并默认切换到
+`deepseek`；也可以显式设置 `RAGLAB_GENERATION_PROVIDER=ollama` 保持本地模式。
+
+本机已用当前 Token 完成一次真实 Tenant A Answer 验证：`deepseek-v4-pro` 返回正确的
+`ops-priority-a`，Citation 映射到 Tenant A 私有文档；TTFT `4.86s`、生成总耗时
+`5.35s`，收到 9 个 token 事件。Token 只存在服务进程环境中，没有写入仓库。
+
+也可以把 Provider 设置为 `openai-compatible`，把 Base URL 指向企业网关、兼容代理或
+私有模型服务。服务端只发送 `Authorization: Bearer`，Token 不进入回答、审计正文、
+网页状态或 Git。缺少 API Key 时服务不会静默回退到远端，启动会明确报错。
+
+DeepSeek 的 Chat Completions 接口使用 `/chat/completions`，JSON 输出使用
+`response_format: {"type":"json_object"}`；流式返回使用 `data:` SSE 和 `[DONE]`。
+本项目在 Provider 层适配这些协议，向上仍暴露统一的 Generator/引用校验接口。
+
+## 7. SSE Answer Lab
 
 当前已增加：
 

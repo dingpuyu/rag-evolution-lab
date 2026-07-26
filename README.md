@@ -140,6 +140,7 @@ Grounded Answering 首版已完成：
 - Prompt Injection Evidence 移除、响应脱敏和危险请求生成前拒绝
 - 6 条真实回答 Harness 全部通过，禁止事实、引用违规和越权召回均为 0
 - 增加 `answer/stream` SSE Token Streaming 与网页 Answer Lab，可观察 TTFT、生成、安全调整和最终引用
+- 增加 OpenAI-compatible Generator，可通过环境变量切换 DeepSeek、OpenAI 或企业兼容网关
 - 实现与失败实验见 [Grounded Answering](docs/grounded-answering.md)
 
 增量知识生命周期首版已完成：

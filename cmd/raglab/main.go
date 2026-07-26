@@ -218,7 +218,17 @@ func runLabServer(args []string) {
 	lifecycleCollection := flags.String("lifecycle-collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "incremental knowledge collection")
 	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
 	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
-	generationModel := flags.String("generation-model", environmentOr("RAGLAB_GENERATION_MODEL", "qwen3.5:9b"), "Ollama model used for grounded dataset answers")
+	generationProviderDefault := strings.TrimSpace(os.Getenv("RAGLAB_GENERATION_PROVIDER"))
+	if generationProviderDefault == "" {
+		if strings.TrimSpace(os.Getenv("RAGLAB_GENERATION_API_KEY")) != "" || strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY")) != "" {
+			generationProviderDefault = "deepseek"
+		} else {
+			generationProviderDefault = "ollama"
+		}
+	}
+	generationProvider := flags.String("generation-provider", generationProviderDefault, "grounded answer provider: ollama or openai-compatible")
+	generationModel := flags.String("generation-model", os.Getenv("RAGLAB_GENERATION_MODEL"), "grounded answer model; provider-specific default when empty")
+	generationBaseURL := flags.String("generation-base-url", environmentOr("RAGLAB_GENERATION_BASE_URL", "https://api.deepseek.com"), "OpenAI-compatible generation base URL")
 	generationTimeout := flags.Duration("generation-timeout", 2*time.Minute, "grounded answer generation timeout")
 	generationMaxTokens := flags.Int("generation-max-tokens", 512, "maximum generated answer tokens")
 	lifecycleState := flags.String("lifecycle-state", environmentOr("RAGLAB_LIFECYCLE_STATE", "data/lifecycle/state.json"), "durable lifecycle event state")
@@ -288,6 +298,24 @@ func runLabServer(args []string) {
 		defer postgresStore.Close()
 		datasetStore = postgresStore
 	}
+	provider := strings.ToLower(strings.TrimSpace(*generationProvider))
+	if strings.TrimSpace(*generationModel) == "" {
+		if provider == "deepseek" {
+			*generationModel = "deepseek-v4-pro"
+		} else if provider == "openai" || provider == "openai-compatible" {
+			*generationModel = "deepseek-chat"
+		} else {
+			*generationModel = "qwen3.5:9b"
+		}
+	}
+	generationAPIKey := strings.TrimSpace(os.Getenv("RAGLAB_GENERATION_API_KEY"))
+	if generationAPIKey == "" {
+		generationAPIKey = strings.TrimSpace(os.Getenv("DEEPSEEK_API_KEY"))
+	}
+	generationGenerator, generationErr := newGenerationGenerator(provider, *generationBaseURL, generationAPIKey, *ollamaURL, *generationModel, *generationTimeout, *generationMaxTokens)
+	if generationErr != nil {
+		fatal(generationErr)
+	}
 	authMode := "local_hs256"
 	if strings.TrimSpace(*authOIDCIssuer) != "" || strings.TrimSpace(*authJWKSURL) != "" {
 		oidcVerifier, oidcErr := auth.NewOIDCVerifier(auth.OIDCConfig{
@@ -332,9 +360,7 @@ func runLabServer(args []string) {
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
 		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore,
-		Generator: generation.OllamaGenerator{
-			BaseURL: *ollamaURL, Model: *generationModel, Timeout: *generationTimeout, NumPredict: *generationMaxTokens,
-		},
+		Generator: generationGenerator,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)
@@ -343,7 +369,7 @@ func runLabServer(args []string) {
 		Addr: *address, Handler: handler, ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout: 15 * time.Second, WriteTimeout: 2 * time.Minute, IdleTimeout: time.Minute,
 	}
-	runHTTPServer(server, fmt.Sprintf("lab_api=http://%s embedder=%s milvus=%s collection=%s auth_mode=%s", *address, embedder.Name(), *milvusURL, *collection, authMode))
+	runHTTPServer(server, fmt.Sprintf("lab_api=http://%s embedder=%s generator=%s model=%s milvus=%s collection=%s auth_mode=%s", *address, embedder.Name(), generationGenerator.Name(), *generationModel, *milvusURL, *collection, authMode))
 }
 
 func runHTTPServer(server *http.Server, readyMessage string) {
@@ -373,6 +399,26 @@ func environmentOr(name, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func newGenerationGenerator(provider, baseURL, apiKey, ollamaURL, model string, timeout time.Duration, maxTokens int) (generation.Generator, error) {
+	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "ollama", "local":
+		return generation.OllamaGenerator{BaseURL: ollamaURL, Model: model, Timeout: timeout, NumPredict: maxTokens}, nil
+	case "openai", "openai-compatible", "deepseek":
+		if strings.TrimSpace(apiKey) == "" {
+			return nil, fmt.Errorf("RAGLAB_GENERATION_API_KEY is required when RAGLAB_GENERATION_PROVIDER=%s", provider)
+		}
+		if strings.TrimSpace(baseURL) == "" {
+			baseURL = "https://api.deepseek.com"
+		}
+		return generation.OpenAICompatibleGenerator{
+			BaseURL: baseURL, APIKey: apiKey, Model: model, Provider: provider,
+			Timeout: timeout, NumPredict: maxTokens,
+		}, nil
+	default:
+		return nil, fmt.Errorf("unsupported RAGLAB_GENERATION_PROVIDER %q; use ollama or openai-compatible", provider)
+	}
 }
 
 func runValidate(root string, runtime *app.Runtime, args []string) {
