@@ -245,6 +245,8 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
 		return Response{}, fmt.Errorf("generate grounded answer: %w", err)
 	}
+	var refusalAnswerFilled bool
+	generated.Output, refusalAnswerFilled = fillRefusalAnswer(generated.Output)
 	response.Answerable = generated.Answerable
 	response.Answer = strings.TrimSpace(generated.Answer)
 	response.RefusalReason = strings.TrimSpace(generated.RefusalReason)
@@ -252,6 +254,9 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		Generator: service.generator.Name(), Model: generated.Model, PromptVersion: generated.PromptVersion,
 		FinishReason: generated.FinishReason, LatencyMS: generated.LatencyMS,
 		PromptTokens: generated.Usage.PromptTokens, OutputTokens: generated.Usage.CompletionTokens,
+	}
+	if refusalAnswerFilled {
+		response.Generation.SafetyAdjustments = append(response.Generation.SafetyAdjustments, "refusal_answer_filled")
 	}
 	if !firstTokenAt.IsZero() {
 		response.Generation.TTFTMS = milliseconds(firstTokenAt.Sub(generationStarted))
@@ -367,6 +372,30 @@ func validateOutput(output Output) error {
 		return fmt.Errorf("refusal output requires a user-facing answer")
 	}
 	return nil
+}
+
+// fillRefusalAnswer repairs only an incomplete refusal contract. The model
+// must still provide a supported refusal reason; this helper never turns an
+// uncertain answer into a refusal and never invents evidence or citations.
+func fillRefusalAnswer(output Output) (Output, bool) {
+	if output.Answerable || strings.TrimSpace(output.Answer) != "" {
+		return output, false
+	}
+	var answer string
+	switch strings.TrimSpace(output.RefusalReason) {
+	case "insufficient_evidence":
+		answer = "现有证据不足，无法可靠回答该问题。"
+	case "irrelevant_evidence":
+		answer = "检索到的内容与该问题不相关，无法可靠回答。"
+	case "conflicting_evidence":
+		answer = "检索到的证据存在冲突，暂时无法可靠回答。"
+	case "unsafe_instruction":
+		answer = "该请求涉及不可信或不安全指令，无法执行。"
+	default:
+		return output, false
+	}
+	output.Answer = answer
+	return output, true
 }
 
 func milliseconds(duration time.Duration) float64 {

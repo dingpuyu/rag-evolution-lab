@@ -141,6 +141,9 @@ Grounded Answering 首版已完成：
 - 6 条真实回答 Harness 全部通过，禁止事实、引用违规和越权召回均为 0
 - 增加 `answer/stream` SSE Token Streaming 与网页 Answer Lab，可观察 TTFT、生成、安全调整和最终引用
 - 增加 OpenAI-compatible Generator，可通过环境变量切换 DeepSeek、OpenAI 或企业兼容网关
+- Answer Harness 已支持 Provider/Model、Token、成本配置、SSE TTFT/Token Rate 和 Blind Split
+- 当前 DeepSeek `deepseek-v4-pro` 原始集 6/6、Blind 集 8/8 通过，引用/越权/禁止事实均为 0
+- 对模型空拒答增加确定性安全文案兜底，并将修正记录为 `refusal_answer_filled`
 - 实现与失败实验见 [Grounded Answering](docs/grounded-answering.md)
 
 增量知识生命周期首版已完成：
@@ -218,6 +221,17 @@ make serve-lab
 make web-dev
 make scale-100k
 make answer-eval
+make answer-eval-blind
+make answer-eval-stream
+make answer-eval-blind-stream
+```
+
+回答评测默认只统计 Token；不要把供应商价格写死在代码中。需要成本估算时，在运行命令前显式配置当前账单费率：
+
+```bash
+RAGLAB_PROMPT_COST_PER_1M_USD='input-rate' \
+RAGLAB_COMPLETION_COST_PER_1M_USD='output-rate' \
+make answer-eval-stream
 ```
 
 ### 使用 Ollama 本地 Embedding

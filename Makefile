@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval answer-eval serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -37,6 +37,15 @@ dataset-eval:
 
 answer-eval:
 	go run ./cmd/raglab answer-eval
+
+answer-eval-blind:
+	go run ./cmd/raglab answer-eval --suite datasets/answer-harness/grounded-answer-blind-v1.json --json-report eval/reports/grounded-answer-blind-latest.json --markdown-report eval/reports/grounded-answer-blind-latest.md
+
+answer-eval-stream:
+	go run ./cmd/raglab answer-eval --stream --json-report eval/reports/grounded-answer-stream-latest.json --markdown-report eval/reports/grounded-answer-stream-latest.md
+
+answer-eval-blind-stream:
+	go run ./cmd/raglab answer-eval --stream --suite datasets/answer-harness/grounded-answer-blind-v1.json --json-report eval/reports/grounded-answer-blind-stream-latest.json --markdown-report eval/reports/grounded-answer-blind-stream-latest.md
 
 serve-embedding:
 	go run ./cmd/raglab serve-embedding --backend auto

@@ -1,6 +1,7 @@
 package answereval
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -50,6 +51,25 @@ type Runner struct {
 	BaseURL    string
 	HTTPClient *http.Client
 	Passwords  map[string]string
+	Cost       CostConfig
+	Stream     bool
+}
+
+// CostConfig is supplied by the caller instead of hard-coding vendor pricing.
+// Provider prices and billing units change, so a report must expose the rates
+// used for an estimate.
+type CostConfig struct {
+	PromptPer1MUSD     float64
+	CompletionPer1MUSD float64
+}
+
+func (config CostConfig) configured() bool {
+	return config.PromptPer1MUSD > 0 || config.CompletionPer1MUSD > 0
+}
+
+func (config CostConfig) estimate(promptTokens, completionTokens int) float64 {
+	return float64(promptTokens)/1_000_000*config.PromptPer1MUSD +
+		float64(completionTokens)/1_000_000*config.CompletionPer1MUSD
 }
 
 type Report struct {
@@ -69,8 +89,19 @@ type Report struct {
 	ContractViolations     int          `json:"contract_violations"`
 	LatencyP50MS           float64      `json:"latency_p50_ms"`
 	LatencyP95MS           float64      `json:"latency_p95_ms"`
+	TTFTP50MS              float64      `json:"ttft_p50_ms,omitempty"`
+	TTFTP95MS              float64      `json:"ttft_p95_ms,omitempty"`
+	TokenRateP50TPS        float64      `json:"token_rate_p50_tps,omitempty"`
+	TokenRateP95TPS        float64      `json:"token_rate_p95_tps,omitempty"`
+	Streaming              bool         `json:"streaming"`
 	PromptTokens           int          `json:"prompt_tokens"`
 	OutputTokens           int          `json:"output_tokens"`
+	Providers              []string     `json:"providers,omitempty"`
+	Models                 []string     `json:"models,omitempty"`
+	PromptCostPer1MUSD     float64      `json:"prompt_cost_per_1m_usd"`
+	CompletionCostPer1MUSD float64      `json:"completion_cost_per_1m_usd"`
+	EstimatedCostUSD       float64      `json:"estimated_cost_usd"`
+	CostConfigured         bool         `json:"cost_configured"`
 	SafetyAdjustments      int          `json:"safety_adjustments"`
 	Results                []CaseResult `json:"results"`
 }
@@ -83,10 +114,15 @@ type CaseResult struct {
 	Answer            string   `json:"answer,omitempty"`
 	RefusalReason     string   `json:"refusal_reason,omitempty"`
 	CitationDocuments []string `json:"citation_documents,omitempty"`
+	Generator         string   `json:"generator,omitempty"`
+	Model             string   `json:"model,omitempty"`
 	LatencyMS         float64  `json:"latency_ms"`
 	GenerationMS      float64  `json:"generation_ms"`
+	TTFTMS            float64  `json:"ttft_ms,omitempty"`
+	TokenRateTPS      float64  `json:"token_rate_tps,omitempty"`
 	PromptTokens      int      `json:"prompt_tokens"`
 	OutputTokens      int      `json:"output_tokens"`
+	EstimatedCostUSD  float64  `json:"estimated_cost_usd,omitempty"`
 	SafetyAdjustments []string `json:"safety_adjustments,omitempty"`
 	Failures          []string `json:"failures,omitempty"`
 }
@@ -154,7 +190,9 @@ func (runner Runner) Run(ctx context.Context, suite Suite) (Report, error) {
 		tokens[name] = token
 	}
 	var answerableCases, answerableMatches, requiredFacts, requiredFactHits int
-	var latencies []float64
+	var latencies, ttfts, tokenRates []float64
+	providers := make(map[string]struct{})
+	models := make(map[string]struct{})
 	for _, test := range suite.Cases {
 		result, counters, err := runner.runCase(ctx, baseURL, tokens[test.Identity], test)
 		if err != nil {
@@ -175,8 +213,21 @@ func (runner Runner) Run(ctx context.Context, suite Suite) (Report, error) {
 		requiredFactHits += counters.requiredFactHits
 		report.PromptTokens += result.PromptTokens
 		report.OutputTokens += result.OutputTokens
+		report.EstimatedCostUSD += result.EstimatedCostUSD
+		if result.Generator != "" {
+			providers[result.Generator] = struct{}{}
+		}
+		if result.Model != "" {
+			models[result.Model] = struct{}{}
+		}
 		report.SafetyAdjustments += len(result.SafetyAdjustments)
 		latencies = append(latencies, result.LatencyMS)
+		if result.TTFTMS > 0 {
+			ttfts = append(ttfts, result.TTFTMS)
+		}
+		if result.TokenRateTPS > 0 {
+			tokenRates = append(tokenRates, result.TokenRateTPS)
+		}
 	}
 	report.Cases = len(report.Results)
 	for _, result := range report.Results {
@@ -196,6 +247,16 @@ func (runner Runner) Run(ctx context.Context, suite Suite) (Report, error) {
 	}
 	report.LatencyP50MS = percentile(latencies, 0.5)
 	report.LatencyP95MS = percentile(latencies, 0.95)
+	report.TTFTP50MS = percentile(ttfts, 0.5)
+	report.TTFTP95MS = percentile(ttfts, 0.95)
+	report.TokenRateP50TPS = percentile(tokenRates, 0.5)
+	report.TokenRateP95TPS = percentile(tokenRates, 0.95)
+	report.Streaming = runner.Stream
+	report.Providers = sortedSet(providers)
+	report.Models = sortedSet(models)
+	report.PromptCostPer1MUSD = runner.Cost.PromptPer1MUSD
+	report.CompletionCostPer1MUSD = runner.Cost.CompletionPer1MUSD
+	report.CostConfigured = runner.Cost.configured()
 	report.CompletedAt = time.Now().UTC()
 	return report, nil
 }
@@ -206,18 +267,24 @@ type counters struct {
 
 func (runner Runner) runCase(ctx context.Context, baseURL, token string, test Case) (CaseResult, counters, error) {
 	started := time.Now()
-	status, body, err := runner.request(ctx, http.MethodPost, baseURL+"/api/v1/datasets/"+test.DatasetID+"/answer", token, map[string]any{
-		"query": test.Query, "top_k": test.TopK,
-	})
+	var status int
+	var response answerResponse
+	var err error
+	payload := map[string]any{"query": test.Query, "top_k": test.TopK}
+	if runner.Stream && test.ExpectedStatus == http.StatusOK {
+		status, response, err = runner.requestStream(ctx, baseURL+"/api/v1/datasets/"+test.DatasetID+"/answer/stream", token, payload)
+	} else {
+		var body []byte
+		status, body, err = runner.request(ctx, http.MethodPost, baseURL+"/api/v1/datasets/"+test.DatasetID+"/answer", token, payload)
+		if err == nil {
+			err = json.Unmarshal(body, &response)
+		}
+	}
 	if err != nil {
 		return CaseResult{}, counters{}, fmt.Errorf("answer case %q: %w", test.ID, err)
 	}
 	result := CaseResult{ID: test.ID, HTTPStatus: status, LatencyMS: elapsed(started)}
 	var count counters
-	var response answerResponse
-	if err := json.Unmarshal(body, &response); err != nil {
-		return CaseResult{}, count, fmt.Errorf("answer case %q decode response: %w", test.ID, err)
-	}
 	if status != test.ExpectedStatus {
 		result.Failures = append(result.Failures, fmt.Sprintf("expected HTTP %d, got %d", test.ExpectedStatus, status))
 		count.contract++
@@ -232,8 +299,11 @@ func (runner Runner) runCase(ctx context.Context, baseURL, token string, test Ca
 	}
 	answer := response.Result
 	result.Answerable, result.Answer, result.RefusalReason = answer.Answerable, answer.Answer, answer.RefusalReason
+	result.Generator, result.Model = answer.Generation.Generator, answer.Generation.Model
 	result.GenerationMS = answer.Generation.LatencyMS
+	result.TTFTMS, result.TokenRateTPS = answer.Generation.TTFTMS, answer.Generation.TokenRateTPS
 	result.PromptTokens, result.OutputTokens = answer.Generation.PromptTokens, answer.Generation.OutputTokens
+	result.EstimatedCostUSD = runner.Cost.estimate(result.PromptTokens, result.OutputTokens)
 	result.SafetyAdjustments = append([]string(nil), answer.Generation.SafetyAdjustments...)
 	if answer.Answerable != test.ExpectedAnswerable {
 		result.Failures = append(result.Failures, fmt.Sprintf("answerable=%t, expected %t", answer.Answerable, test.ExpectedAnswerable))
@@ -327,6 +397,71 @@ func (runner Runner) request(ctx context.Context, method, url, token string, pay
 	return response.StatusCode, body, err
 }
 
+func (runner Runner) requestStream(ctx context.Context, url, token string, payload any) (int, answerResponse, error) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return 0, answerResponse{}, err
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(data))
+	if err != nil {
+		return 0, answerResponse{}, err
+	}
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Accept", "text/event-stream")
+	if token != "" {
+		request.Header.Set("Authorization", "Bearer "+token)
+	}
+	response, err := runner.HTTPClient.Do(request)
+	if err != nil {
+		return 0, answerResponse{}, err
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		body, readErr := io.ReadAll(io.LimitReader(response.Body, 4<<20))
+		if readErr != nil {
+			return response.StatusCode, answerResponse{}, readErr
+		}
+		var decoded answerResponse
+		if decodeErr := json.Unmarshal(body, &decoded); decodeErr != nil {
+			return response.StatusCode, answerResponse{}, decodeErr
+		}
+		return response.StatusCode, decoded, nil
+	}
+	type streamEnvelope struct {
+		Event struct {
+			Response *generation.Response `json:"response"`
+			Error    string               `json:"error"`
+		} `json:"event"`
+	}
+	var result *generation.Response
+	scanner := bufio.NewScanner(response.Body)
+	scanner.Buffer(make([]byte, 64<<10), 4<<20)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		var envelope streamEnvelope
+		if err := json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data:"))), &envelope); err != nil {
+			return response.StatusCode, answerResponse{}, fmt.Errorf("decode answer stream event: %w", err)
+		}
+		if envelope.Event.Error != "" {
+			return response.StatusCode, answerResponse{}, fmt.Errorf("answer stream returned error: %s", envelope.Event.Error)
+		}
+		if envelope.Event.Response != nil {
+			responseCopy := *envelope.Event.Response
+			result = &responseCopy
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return response.StatusCode, answerResponse{}, fmt.Errorf("read answer stream: %w", err)
+	}
+	if result == nil {
+		return response.StatusCode, answerResponse{}, fmt.Errorf("answer stream completed without a response")
+	}
+	return response.StatusCode, answerResponse{Result: *result}, nil
+}
+
 func MarshalReport(report Report) ([]byte, error) { return json.MarshalIndent(report, "", "  ") }
 
 func Markdown(report Report) string {
@@ -337,20 +472,29 @@ func Markdown(report Report) string {
 	var builder strings.Builder
 	fmt.Fprintf(&builder, "# Grounded Answer Harness 报告\n\n- 结果：**%s**\n- Suite：`%s` (`%s`)\n- 用例：%d（通过 %d / 失败 %d）\n\n",
 		status, report.Suite, report.Version, report.Cases, report.PassedCases, report.FailedCases)
-	fmt.Fprintf(&builder, "## 核心指标\n\n| Answerability | Required Fact Coverage | 禁止事实 | 引用违规 | 越权召回 | 契约违规 | 安全纠偏 | P50 | P95 | Prompt / Output Tokens |\n")
-	fmt.Fprintf(&builder, "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| %.3f | %.3f | %d | %d | %d | %d | %d | %.1f ms | %.1f ms | %d / %d |\n\n",
+	transport := "JSON"
+	if report.Streaming {
+		transport = "SSE stream"
+	}
+	fmt.Fprintf(&builder, "## 运行配置\n\n- Transport：`%s`\n- Provider：`%s`\n- Model：`%s`\n- 成本估算：%s\n\n", transport, strings.Join(report.Providers, ", "), strings.Join(report.Models, ", "), costSummary(report))
+	fmt.Fprintf(&builder, "## 核心指标\n\n| Answerability | Required Fact Coverage | 禁止事实 | 引用违规 | 越权召回 | 契约违规 | 安全纠偏 | P50 | P95 | TTFT P50/P95 | Token Rate P50/P95 | Prompt / Output Tokens | 估算成本 |\n")
+	fmt.Fprintf(&builder, "|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n| %.3f | %.3f | %d | %d | %d | %d | %d | %.1f ms | %.1f ms | %.1f/%.1f ms | %.1f/%.1f tps | %d / %d | $%.6f |\n\n",
 		report.AnswerabilityAccuracy, report.RequiredFactCoverage, report.ForbiddenFactHits,
 		report.CitationViolations, report.UnauthorizedRetrievals, report.ContractViolations,
-		report.SafetyAdjustments, report.LatencyP50MS, report.LatencyP95MS, report.PromptTokens, report.OutputTokens)
-	fmt.Fprintf(&builder, "## 用例\n\n| 用例 | 结果 | Answerable | Refusal | 引用 | 总延迟 | 生成延迟 |\n|---|---|---:|---|---|---:|---:|\n")
+		report.SafetyAdjustments, report.LatencyP50MS, report.LatencyP95MS,
+		report.TTFTP50MS, report.TTFTP95MS, report.TokenRateP50TPS, report.TokenRateP95TPS,
+		report.PromptTokens, report.OutputTokens, report.EstimatedCostUSD)
+	fmt.Fprintf(&builder, "## 用例\n\n| 用例 | 结果 | Answerable | Refusal | Provider / Model | 引用 | 总延迟 | 生成延迟 | 成本 |\n|---|---|---:|---|---|---|---:|---:|---:|\n")
 	for _, result := range report.Results {
 		caseStatus := "PASS"
 		if !result.Passed {
 			caseStatus = "FAIL: " + strings.Join(result.Failures, "; ")
 		}
-		fmt.Fprintf(&builder, "| `%s` | %s | %t | `%s` | `%s` | %.1f ms | %.1f ms |\n",
+		providerModel := strings.TrimSpace(strings.TrimSpace(result.Generator) + " / " + strings.TrimSpace(result.Model))
+		providerModel = strings.Trim(providerModel, " /")
+		fmt.Fprintf(&builder, "| `%s` | %s | %t | `%s` | `%s` | `%s` | %.1f ms | %.1f ms | $%.6f |\n",
 			result.ID, caseStatus, result.Answerable, result.RefusalReason,
-			strings.Join(result.CitationDocuments, ", "), result.LatencyMS, result.GenerationMS)
+			providerModel, strings.Join(result.CitationDocuments, ", "), result.LatencyMS, result.GenerationMS, result.EstimatedCostUSD)
 	}
 	fmt.Fprintf(&builder, "\n## 门禁\n\n- 模型引用只能来自服务端最终 Context，引用正文由服务端重建。\n")
 	fmt.Fprintf(&builder, "- Required/Forbidden Fact、拒答枚举和跨租户结果使用确定性规则判断。\n")
@@ -392,4 +536,21 @@ func appendUnique(values []string, target string) []string {
 		return values
 	}
 	return append(values, target)
+}
+
+func sortedSet(values map[string]struct{}) []string {
+	result := make([]string, 0, len(values))
+	for value := range values {
+		result = append(result, value)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func costSummary(report Report) string {
+	if !report.CostConfigured {
+		return "未配置费率（仅统计 Token）"
+	}
+	return fmt.Sprintf("按输入 $%.6f/1M、输出 $%.6f/1M 估算，总计 $%.6f",
+		report.PromptCostPer1MUSD, report.CompletionCostPer1MUSD, report.EstimatedCostUSD)
 }

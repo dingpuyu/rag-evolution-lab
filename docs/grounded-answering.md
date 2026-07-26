@@ -178,5 +178,68 @@ delta，网页在等待完整 JSON 校验期间就能显示回答预览；`compl
 事件；最终 Citation 仍为服务端校验后的 Tenant A 文档。这组数值是体验基线，不代表
 生产延迟。
 
-当前仍需继续补充：真实 TTFT/Token Rate 指标写入 Harness、模型超时后的安全降级策略，
-以及客户端断开、模型半包和无效 JSON 的长连接压力测试。
+当前仍需继续补充：模型超时后的安全降级策略，以及客户端断开、模型半包和无效 JSON
+的长连接压力测试。
+
+## 8. 真实模型评测闭环
+
+接入 OpenAI-compatible Provider 后，回答质量不能只用一次手工请求证明。Answer Harness
+现在支持两类传输：
+
+```bash
+# JSON Answer API：契约和质量基线
+make answer-eval
+
+# 未参与原规则调试的语义改写、拒答和跨租户用例
+make answer-eval-blind
+
+# SSE Answer API：额外记录 TTFT 和 Token Rate
+make answer-eval-stream
+make answer-eval-blind-stream
+```
+
+每次报告会保存：
+
+- Provider、Model、Transport、Prompt Version；
+- Answerability、Required Fact Coverage、Forbidden Fact、Citation 和 ACL 指标；
+- 总延迟 P50/P95、流式 TTFT P50/P95、Token Rate P50/P95；
+- Prompt/Output Token、每条用例生成耗时和安全纠偏；
+- 可选的输入/输出 Token 成本估算。
+
+供应商价格不写死在代码中。配置账单费率后才会启用金额估算：
+
+```bash
+RAGLAB_PROMPT_COST_PER_1M_USD='input-rate' \
+RAGLAB_COMPLETION_COST_PER_1M_USD='output-rate' \
+make answer-eval-stream
+```
+
+费率未配置时，报告明确显示“仅统计 Token”，避免把过期价格伪装成生产成本。
+
+### 真实 DeepSeek 回归结果
+
+当前环境使用 `openai-compatible-deepseek / deepseek-v4-pro`，最新结果：
+
+| Suite | Transport | Cases | Pass | Answerability | Fact Coverage | Citation/ACL/Forbidden | P95 | TTFT P50/P95 | Tokens |
+|---|---|---:|---:|---:|---:|---|---:|---:|---:|
+| `grounded-dataset-answer` | JSON | 6 | 6 | 1.000 | 1.000 | 0 / 0 / 0 | 约 3.3s | 2.41s / 2.52s | 1619 / 713 |
+| `grounded-dataset-answer-blind-v1` | SSE | 8 | 8 | 1.000 | 1.000 | 0 / 0 / 0 | 约 3.7s | 2.17s / 2.91s | 1985 / 919 |
+
+报告文件：
+
+- `eval/reports/grounded-answer-latest.md`
+- `eval/reports/grounded-answer-blind-latest.md`
+- `eval/reports/grounded-answer-stream-latest.md`
+- `eval/reports/grounded-answer-blind-stream-latest.md`
+
+### 失败实验与修复
+
+Blind 首轮曾失败两条：
+
+1. Tenant B 查询同时命中“稳定回归队列”和“应急队列”，原问题标注为可回答，模型拒答；
+   修复为明确要求“用于回归验证的稳定队列标识”，保留歧义拒答能力；
+2. 模型返回合法 `refusal_reason` 但空 `answer`，服务端返回 422；现在只在拒答原因已经
+   通过枚举校验时补充固定安全文案，并记录 `refusal_answer_filled`，不猜答案、不放宽引用门禁。
+
+这两条记录说明评测闭环同时检查模型能力、数据标注质量和服务契约，不能为了让报告变绿
+而盲目修改阈值。

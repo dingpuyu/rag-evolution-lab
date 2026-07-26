@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -401,6 +402,30 @@ func environmentOr(name, fallback string) string {
 	return fallback
 }
 
+func environmentFloat(name string, fallback float64) float64 {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil || parsed < 0 {
+		fatal(fmt.Errorf("%s must be a non-negative number", name))
+	}
+	return parsed
+}
+
+func environmentBool(name string, fallback bool) bool {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.ParseBool(value)
+	if err != nil {
+		fatal(fmt.Errorf("%s must be a boolean", name))
+	}
+	return parsed
+}
+
 func newGenerationGenerator(provider, baseURL, apiKey, ollamaURL, model string, timeout time.Duration, maxTokens int) (generation.Generator, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
 	case "ollama", "local":
@@ -559,6 +584,9 @@ func runAnswerEval(root string, args []string) {
 	markdownReport := flags.String("markdown-report", filepath.Join(root, "eval", "reports", "grounded-answer-latest.md"), "Markdown report path")
 	alicePassword := flags.String("alice-password", environmentOr("RAGLAB_ALICE_PASSWORD", "RagLab-Alice-2026!"), "local lab Alice password")
 	bobPassword := flags.String("bob-password", environmentOr("RAGLAB_BOB_PASSWORD", "RagLab-Bob-2026!"), "local lab Bob password")
+	promptCost := flags.Float64("prompt-cost-per-1m-usd", environmentFloat("RAGLAB_PROMPT_COST_PER_1M_USD", 0), "input token cost in USD per 1M tokens; zero leaves cost unconfigured")
+	completionCost := flags.Float64("completion-cost-per-1m-usd", environmentFloat("RAGLAB_COMPLETION_COST_PER_1M_USD", 0), "output token cost in USD per 1M tokens; zero leaves cost unconfigured")
+	stream := flags.Bool("stream", environmentBool("RAGLAB_ANSWER_EVAL_STREAM", false), "evaluate the SSE answer stream instead of the JSON answer endpoint")
 	timeout := flags.Duration("timeout", 15*time.Minute, "whole-suite timeout")
 	_ = flags.Parse(args)
 	passwords := map[string]string{"alice": *alicePassword, "bob": *bobPassword}
@@ -580,7 +608,11 @@ func runAnswerEval(root string, args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	report, err := (answereval.Runner{BaseURL: *baseURL, Passwords: passwords}).Run(ctx, answerSuite)
+	report, err := (answereval.Runner{
+		BaseURL: *baseURL, Passwords: passwords,
+		Cost:   answereval.CostConfig{PromptPer1MUSD: *promptCost, CompletionPer1MUSD: *completionCost},
+		Stream: *stream,
+	}).Run(ctx, answerSuite)
 	if err != nil {
 		fatal(err)
 	}
@@ -599,10 +631,11 @@ func runAnswerEval(root string, args []string) {
 			fatal(err)
 		}
 	}
-	fmt.Printf("grounded_answer_suite=%s passed=%t cases=%d failed=%d answerability=%.3f fact_coverage=%.3f forbidden=%d citations=%d unauthorized=%d p95_ms=%.1f tokens=%d/%d\n",
+	fmt.Printf("grounded_answer_suite=%s passed=%t cases=%d failed=%d answerability=%.3f fact_coverage=%.3f forbidden=%d citations=%d unauthorized=%d p95_ms=%.1f tokens=%d/%d estimated_cost_usd=%.6f providers=%s models=%s\n",
 		report.Suite, report.Passed, report.Cases, report.FailedCases, report.AnswerabilityAccuracy,
 		report.RequiredFactCoverage, report.ForbiddenFactHits, report.CitationViolations,
-		report.UnauthorizedRetrievals, report.LatencyP95MS, report.PromptTokens, report.OutputTokens)
+		report.UnauthorizedRetrievals, report.LatencyP95MS, report.PromptTokens, report.OutputTokens,
+		report.EstimatedCostUSD, strings.Join(report.Providers, ","), strings.Join(report.Models, ","))
 	fmt.Printf("json_report=%s\nmarkdown_report=%s\n", *jsonReport, *markdownReport)
 	if !report.Passed {
 		os.Exit(1)

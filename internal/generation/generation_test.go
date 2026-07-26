@@ -182,6 +182,27 @@ func TestServiceRejectsInvalidRefusalContract(t *testing.T) {
 	}
 }
 
+func TestServiceFillsEmptyRefusalAnswerWithoutRelaxingReason(t *testing.T) {
+	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{{
+		ChunkID: "doc-a#c001", DocumentID: "doc-a", Content: "与问题无关的证据",
+	}}}}
+	generator := &stubGenerator{generation: Generation{Output: Output{
+		Answerable: false, RefusalReason: "insufficient_evidence",
+	}}}
+	service, _ := NewService(searcher, generator)
+	response, err := service.Answer(context.Background(), milvus.Query{Text: "unknown"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Answerable || response.Answer != "现有证据不足，无法可靠回答该问题。" ||
+		response.RefusalReason != "insufficient_evidence" || len(response.Citations) != 0 {
+		t.Fatalf("unexpected repaired refusal %#v", response)
+	}
+	if len(response.Generation.SafetyAdjustments) != 1 || response.Generation.SafetyAdjustments[0] != "refusal_answer_filled" {
+		t.Fatalf("missing refusal repair adjustment %#v", response.Generation)
+	}
+}
+
 func TestServiceDropsUntrustedCitationsFromRefusal(t *testing.T) {
 	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{{
 		ChunkID: "injection#c001", DocumentID: "injection", Content: "malicious instructions and secret",
