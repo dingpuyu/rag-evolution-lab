@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -35,6 +35,9 @@ compare-rerank:
 dataset-eval:
 	go run ./cmd/raglab dataset-eval
 
+dataset-eval-isolated:
+	RAGLAB_API_URL=$${RAGLAB_EVAL_API_URL:-http://127.0.0.1:8081} go run ./cmd/raglab dataset-eval
+
 answer-eval:
 	go run ./cmd/raglab answer-eval
 
@@ -46,6 +49,9 @@ answer-eval-stream:
 
 answer-eval-blind-stream:
 	go run ./cmd/raglab answer-eval --stream --suite datasets/answer-harness/grounded-answer-blind-v1.json --json-report eval/reports/grounded-answer-blind-stream-latest.json --markdown-report eval/reports/grounded-answer-blind-stream-latest.md
+
+answer-eval-blind-isolated:
+	RAGLAB_API_URL=$${RAGLAB_EVAL_API_URL:-http://127.0.0.1:8081} go run ./cmd/raglab answer-eval --suite datasets/answer-harness/grounded-answer-blind-v1.json --json-report eval/reports/grounded-answer-blind-isolated-latest.json --markdown-report eval/reports/grounded-answer-blind-isolated-latest.md
 
 serve-embedding:
 	go run ./cmd/raglab serve-embedding --backend auto
@@ -94,6 +100,16 @@ scale-bench:
 
 serve-lab:
 	go run ./cmd/raglab serve-lab --model $${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+
+serve-lab-eval:
+	RAGLAB_LIFECYCLE_COLLECTION=$${RAGLAB_EVAL_LIFECYCLE_COLLECTION:-raglab_lifecycle_eval_v1} \
+	RAGLAB_LIFECYCLE_ALIAS=$${RAGLAB_EVAL_LIFECYCLE_ALIAS:-raglab_knowledge_eval} \
+	RAGLAB_LIFECYCLE_STATE=$${RAGLAB_EVAL_LIFECYCLE_STATE:-data/lifecycle/eval-state.json} \
+	RAGLAB_INGESTION_JOB_STATE=$${RAGLAB_EVAL_INGESTION_JOB_STATE:-data/ingestion/eval-jobs.json} \
+	go run ./cmd/raglab serve-lab --addr $${RAGLAB_EVAL_ADDR:-127.0.0.1:8081} --model $${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+
+regression-smoke:
+	python3 scripts/regression_smoke.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080}
 
 web-dev:
 	npm --prefix web run dev

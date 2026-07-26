@@ -103,6 +103,39 @@ make answer-eval
 make dataset-eval
 ```
 
+### 评测环境隔离
+
+门户运行时会持续接收真实资料导入，因此评测不能与生产知识集合共用同一个
+Lifecycle Collection。项目提供独立评测 Profile：
+
+| Profile | Lifecycle Collection | Alias | 默认端口 |
+|---|---|---|---:|
+| portal / production-like | `raglab_lifecycle_v1` | `raglab_knowledge_active` | 8080 |
+| evaluation | `raglab_lifecycle_eval_v1` | `raglab_knowledge_eval` | 8081 |
+
+启动隔离评测服务：
+
+```bash
+make serve-lab-eval
+```
+
+在另一个终端运行检索与回答评测：
+
+```bash
+make dataset-eval-isolated
+make answer-eval-blind-isolated
+```
+
+如果只想验证线上门户的身份、权限、导入和流式链路，可以运行：
+
+```bash
+make regression-smoke
+```
+
+回归脚本位于 `scripts/regression_smoke.py`，通过 `--api` 切换目标环境，包含登录、
+数据集可见性、跨租户 404、Milvus Filter、资料导入读回校验、SSE 事件和审计权限。
+脚本的导入文档使用固定 ID + 当前时间修订号，可以重复执行而不会触发旧版本冲突。
+
 Suite 位于 `datasets/search-harness/enterprise-search-v1.json`。它会幂等写入带稳定
 beacon 的公开、Tenant A、Tenant B 三份文档，验证：
 

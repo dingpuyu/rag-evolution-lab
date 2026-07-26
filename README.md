@@ -125,8 +125,18 @@ Phase 5 已完成首轮工程基线实验：
 - 租户管理员可创建带 `viewer` / `admin` 策略的知识库，并向自有租户库导入资料
 - 权限与审计页面展示服务端 Claims、PostgreSQL membership、数据集策略和请求决策
 - 详细启动方式与验收步骤见 [RAG Desk 企业智能客服门户](docs/customer-portal.md)
+
+评测与业务数据已经支持隔离运行：
+
+- 门户默认使用 `raglab_lifecycle_v1 / raglab_knowledge_active`
+- 评测服务使用 `raglab_lifecycle_eval_v1 / raglab_knowledge_eval`
+- `make serve-lab-eval` 启动隔离评测 API，`make dataset-eval-isolated` 和 `make answer-eval-blind-isolated` 不会读取门户导入的业务资料
+- `make regression-smoke` 固化登录、租户隔离、检索 Filter、资料导入、SSE 和审计回归
+- 详细协议见 [评测协议](docs/evaluation-protocol.md)
 - 真实登录 → PostgreSQL 授权 → Milvus Filter → Top-K 结果的自动回归见
   [Dataset Search Harness 报告](eval/reports/dataset-search-latest.md)
+- 隔离环境的 DeepSeek 答案评测见
+  [Grounded Answer 隔离报告](eval/reports/grounded-answer-blind-isolated-latest.md)
 
 PostgreSQL 多租户控制面首版已完成：
 
