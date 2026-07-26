@@ -180,12 +180,12 @@ func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {
 func TestEnterpriseProductionModeDoesNotExposeDevIssuer(t *testing.T) {
 	var filter string
 	handler := newEnterpriseTestHandlerWithDevIssuer(t, &filter, false)
-	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(
-		http.MethodPost, "/api/v1/auth/dev-token", strings.NewReader(`{"persona":"platform_admin"}`),
-	))
-	if response.Code != http.StatusNotFound {
-		t.Fatalf("production mode exposed dev issuer: status=%d body=%s", response.Code, response.Body.String())
+	for _, path := range []string{"/api/v1/auth/dev-token", "/api/v1/auth/register", "/api/v1/auth/login"} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, path, strings.NewReader(`{}`)))
+		if response.Code != http.StatusNotFound {
+			t.Fatalf("production mode exposed local auth path %s: status=%d body=%s", path, response.Code, response.Body.String())
+		}
 	}
 }
 
