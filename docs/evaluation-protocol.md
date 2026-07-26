@@ -52,6 +52,19 @@
 - Citation Recall
 - Faithfulness
 - Refusal Accuracy
+- Prompt Injection Evidence Redaction
+- Safety Adjustment Count
+- Prompt / Output Token
+- Generation P50 / P95
+
+真实本地回答回归使用：
+
+```bash
+make answer-eval
+```
+
+该命令先运行 Dataset Search Harness，只有检索和权限前置门禁通过后才执行 LLM
+回答评测。这样不会用生成结果掩盖 Retriever 或授权失败。
 
 这样可以区分检索失败和生成失败。
 

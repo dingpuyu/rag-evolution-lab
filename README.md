@@ -131,6 +131,16 @@ PostgreSQL 多租户控制面首版已完成：
 - 真实数据库集成测试覆盖创建、跨租户拒绝、撤权和审计
 - 设计与实测问题见 [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 
+Grounded Answering 首版已完成：
+
+- 独立 Dataset Answer API，复用 PostgreSQL 授权与 Milvus pre-ANN Filter
+- Ollama `qwen3.5:9b`真实结构化生成和 JSON Schema 输出
+- 服务端 Citation Allowlist 和 Context 引用重建
+- 稳定拒答原因、无证据不调用模型、Prompt/Output Token 与生成耗时
+- Prompt Injection Evidence 移除、响应脱敏和危险请求生成前拒绝
+- 6 条真实回答 Harness 全部通过，禁止事实、引用违规和越权召回均为 0
+- 实现与失败实验见 [Grounded Answering](docs/grounded-answering.md)
+
 增量知识生命周期首版已完成：
 
 - `event_id`幂等、Pending/Completed持久化与安全重放
@@ -166,6 +176,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
 - [企业RAG异步导入任务状态机](docs/async-ingestion-jobs.md)
+- [Grounded Answering与回答质量门禁](docs/grounded-answering.md)
 - [商业化级企业RAG演进路线](docs/commercialization-roadmap.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
@@ -204,6 +215,7 @@ make milvus-seed
 make serve-lab
 make web-dev
 make scale-100k
+make answer-eval
 ```
 
 ### 使用 Ollama 本地 Embedding

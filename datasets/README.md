@@ -6,6 +6,10 @@
 Pipeline Golden Split。它覆盖账号登录、数据集可见性、跨租户非枚举、Milvus Filter、
 Top-K 相关性与禁止事实检查，使用 `make dataset-eval` 执行。
 
+`answer-harness/grounded-answer-v1.json`复用上述稳定语料，进一步验证真实 LLM
+回答、Required/Forbidden Fact、引用、拒答、Prompt Injection 和跨租户 Answer API。
+使用`make answer-eval`执行，命令会先完成搜索前置门禁。
+
 ## 目录规划
 
 ```text

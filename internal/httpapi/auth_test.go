@@ -155,6 +155,36 @@ func TestDatasetAuthorizationStopsCrossTenantRequestBeforeMilvus(t *testing.T) {
 	}
 }
 
+func TestDatasetAnswerReusesAuthorizationAndFailsClosedWithoutEvidence(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	tenantA := issueTestPersona(t, handler, "tenant_a_admin")
+
+	allowedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/answer", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	allowedRequest.Header.Set("Authorization", "Bearer "+tenantA)
+	allowed := httptest.NewRecorder()
+	handler.ServeHTTP(allowed, allowedRequest)
+	if allowed.Code != http.StatusOK ||
+		!strings.Contains(filter, `allowed_tenants, "tenant_a"`) ||
+		!strings.Contains(allowed.Body.String(), `"answerable":false`) ||
+		!strings.Contains(allowed.Body.String(), `"refusal_reason":"no_retrieval_evidence"`) {
+		t.Fatalf("tenant answer status=%d filter=%q body=%s", allowed.Code, filter, allowed.Body.String())
+	}
+
+	filter = ""
+	deniedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-b-operations/answer", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	deniedRequest.Header.Set("Authorization", "Bearer "+tenantA)
+	denied := httptest.NewRecorder()
+	handler.ServeHTTP(denied, deniedRequest)
+	if denied.Code != http.StatusNotFound || filter != "" {
+		t.Fatalf("cross-tenant answer status=%d filter=%q body=%s", denied.Code, filter, denied.Body.String())
+	}
+}
+
 func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {
 	var filter string
 	handler := newEnterpriseTestHandler(t, &filter)

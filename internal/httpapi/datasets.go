@@ -6,13 +6,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
+	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
 type DatasetAPI struct {
-	store   datasetaccess.Store
-	service *milvus.LifecycleService
+	store         datasetaccess.Store
+	service       *milvus.LifecycleService
+	answerService *generation.Service
 }
 
 func (api *DatasetAPI) list(writer http.ResponseWriter, request *http.Request) {
@@ -29,45 +32,15 @@ func (api *DatasetAPI) list(writer http.ResponseWriter, request *http.Request) {
 }
 
 func (api *DatasetAPI) search(writer http.ResponseWriter, request *http.Request) {
-	identity := identityFromContext(request.Context())
-	dataset, err := api.store.Authorize(request.Context(), request.PathValue("dataset_id"), identity)
-	if err != nil {
-		// Return the same response for a missing and a forbidden dataset. This
-		// prevents resource enumeration across tenants.
-		if errors.Is(err, datasetaccess.ErrDatasetNotFound) || errors.Is(err, datasetaccess.ErrDatasetDenied) {
-			writeError(writer, http.StatusNotFound, "dataset_not_found", "dataset was not found or is not accessible")
-			return
-		}
-		writeError(writer, http.StatusForbidden, "dataset_forbidden", err.Error())
+	dataset, identity, ok := api.authorizeDataset(writer, request)
+	if !ok {
 		return
 	}
-	request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBytes)
-	decoder := json.NewDecoder(request.Body)
-	decoder.DisallowUnknownFields()
-	var input struct {
-		Query string `json:"query"`
-		TopK  int    `json:"top_k"`
-	}
-	if err := decoder.Decode(&input); err != nil {
-		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+	input, ok := decodeDatasetQuery(writer, request)
+	if !ok {
 		return
 	}
-	if err := ensureEOF(decoder); err != nil {
-		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
-		return
-	}
-	query := milvus.Query{
-		Text: input.Query, TopK: input.TopK, Product: dataset.Product, Status: "active",
-	}
-	if dataset.Visibility == "public" {
-		query.Tenant = "public"
-		query.Role = "viewer"
-		query.AccessScope = "public_only"
-	} else {
-		query.Tenant = identity.TenantID
-		query.Role = identity.PrimaryRole()
-		query.AccessScope = "tenant_only"
-	}
+	query := buildDatasetQuery(dataset, identity, input.Query, input.TopK)
 	result, err := api.service.Search(request.Context(), query)
 	if err != nil {
 		writeError(writer, http.StatusUnprocessableEntity, "dataset_search_failed", err.Error())
@@ -77,6 +50,79 @@ func (api *DatasetAPI) search(writer http.ResponseWriter, request *http.Request)
 		"dataset": dataset,
 		"result":  result,
 	})
+}
+
+func (api *DatasetAPI) answer(writer http.ResponseWriter, request *http.Request) {
+	dataset, identity, ok := api.authorizeDataset(writer, request)
+	if !ok {
+		return
+	}
+	input, ok := decodeDatasetQuery(writer, request)
+	if !ok {
+		return
+	}
+	result, err := api.answerService.Answer(
+		request.Context(), buildDatasetQuery(dataset, identity, input.Query, input.TopK),
+	)
+	if err != nil {
+		writeError(writer, http.StatusUnprocessableEntity, "dataset_answer_failed", err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"dataset": dataset,
+		"result":  result,
+	})
+}
+
+func (api *DatasetAPI) authorizeDataset(writer http.ResponseWriter, request *http.Request) (datasetaccess.Dataset, auth.Identity, bool) {
+	identity := identityFromContext(request.Context())
+	dataset, err := api.store.Authorize(request.Context(), request.PathValue("dataset_id"), identity)
+	if err == nil {
+		return dataset, identity, true
+	}
+	// Return the same response for a missing and a forbidden dataset. This
+	// prevents resource enumeration across tenants.
+	if errors.Is(err, datasetaccess.ErrDatasetNotFound) || errors.Is(err, datasetaccess.ErrDatasetDenied) {
+		writeError(writer, http.StatusNotFound, "dataset_not_found", "dataset was not found or is not accessible")
+		return datasetaccess.Dataset{}, auth.Identity{}, false
+	}
+	writeError(writer, http.StatusForbidden, "dataset_forbidden", err.Error())
+	return datasetaccess.Dataset{}, auth.Identity{}, false
+}
+
+type datasetQueryInput struct {
+	Query string `json:"query"`
+	TopK  int    `json:"top_k"`
+}
+
+func decodeDatasetQuery(writer http.ResponseWriter, request *http.Request) (datasetQueryInput, bool) {
+	request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	var input datasetQueryInput
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return datasetQueryInput{}, false
+	}
+	if err := ensureEOF(decoder); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return datasetQueryInput{}, false
+	}
+	return input, true
+}
+
+func buildDatasetQuery(dataset datasetaccess.Dataset, identity auth.Identity, text string, topK int) milvus.Query {
+	query := milvus.Query{Text: text, TopK: topK, Product: dataset.Product, Status: "active"}
+	if dataset.Visibility == "public" {
+		query.Tenant = "public"
+		query.Role = "viewer"
+		query.AccessScope = "public_only"
+	} else {
+		query.Tenant = identity.TenantID
+		query.Role = identity.PrimaryRole()
+		query.AccessScope = "tenant_only"
+	}
+	return query
 }
 
 func (api *DatasetAPI) create(writer http.ResponseWriter, request *http.Request) {

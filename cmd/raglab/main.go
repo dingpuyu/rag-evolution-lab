@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/answereval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
@@ -21,6 +22,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
+	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/httpapi"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
@@ -53,6 +55,10 @@ func main() {
 	}
 	if os.Args[1] == "dataset-eval" {
 		runDatasetEval(root, os.Args[2:])
+		return
+	}
+	if os.Args[1] == "answer-eval" {
+		runAnswerEval(root, os.Args[2:])
 		return
 	}
 	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
@@ -212,6 +218,9 @@ func runLabServer(args []string) {
 	lifecycleCollection := flags.String("lifecycle-collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "incremental knowledge collection")
 	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
 	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
+	generationModel := flags.String("generation-model", environmentOr("RAGLAB_GENERATION_MODEL", "qwen3.5:9b"), "Ollama model used for grounded dataset answers")
+	generationTimeout := flags.Duration("generation-timeout", 2*time.Minute, "grounded answer generation timeout")
+	generationMaxTokens := flags.Int("generation-max-tokens", 512, "maximum generated answer tokens")
 	lifecycleState := flags.String("lifecycle-state", environmentOr("RAGLAB_LIFECYCLE_STATE", "data/lifecycle/state.json"), "durable lifecycle event state")
 	ingestionJobState := flags.String("ingestion-job-state", environmentOr("RAGLAB_INGESTION_JOB_STATE", "data/ingestion/jobs.json"), "durable ingestion job state")
 	ingestionWorkers := flags.Int("ingestion-workers", 1, "number of asynchronous ingestion workers")
@@ -323,6 +332,9 @@ func runLabServer(args []string) {
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
 		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore,
+		Generator: generation.OllamaGenerator{
+			BaseURL: *ollamaURL, Model: *generationModel, Timeout: *generationTimeout, NumPredict: *generationMaxTokens,
+		},
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)
@@ -492,6 +504,65 @@ func runDatasetEval(root string, args []string) {
 	}
 }
 
+func runAnswerEval(root string, args []string) {
+	flags := flag.NewFlagSet("answer-eval", flag.ExitOnError)
+	searchSuitePath := flags.String("search-suite", filepath.Join(root, "datasets", "search-harness", "enterprise-search-v1.json"), "preflight search suite and seed documents")
+	answerSuitePath := flags.String("suite", filepath.Join(root, "datasets", "answer-harness", "grounded-answer-v1.json"), "grounded answer suite")
+	baseURL := flags.String("api", environmentOr("RAGLAB_API_URL", "http://127.0.0.1:8080"), "enterprise lab API base URL")
+	jsonReport := flags.String("json-report", filepath.Join(root, "eval", "reports", "grounded-answer-latest.json"), "JSON report path")
+	markdownReport := flags.String("markdown-report", filepath.Join(root, "eval", "reports", "grounded-answer-latest.md"), "Markdown report path")
+	alicePassword := flags.String("alice-password", environmentOr("RAGLAB_ALICE_PASSWORD", "RagLab-Alice-2026!"), "local lab Alice password")
+	bobPassword := flags.String("bob-password", environmentOr("RAGLAB_BOB_PASSWORD", "RagLab-Bob-2026!"), "local lab Bob password")
+	timeout := flags.Duration("timeout", 15*time.Minute, "whole-suite timeout")
+	_ = flags.Parse(args)
+	passwords := map[string]string{"alice": *alicePassword, "bob": *bobPassword}
+
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	searchSuite, err := searchharness.Load(*searchSuitePath)
+	if err != nil {
+		fatal(err)
+	}
+	preflight, err := (searchharness.Runner{BaseURL: *baseURL, Passwords: passwords}).Run(ctx, searchSuite, true)
+	if err != nil {
+		fatal(err)
+	}
+	if !preflight.Passed {
+		fatal(fmt.Errorf("search preflight failed with %d cases", preflight.FailedCases))
+	}
+	answerSuite, err := answereval.Load(*answerSuitePath)
+	if err != nil {
+		fatal(err)
+	}
+	report, err := (answereval.Runner{BaseURL: *baseURL, Passwords: passwords}).Run(ctx, answerSuite)
+	if err != nil {
+		fatal(err)
+	}
+	jsonData, err := answereval.MarshalReport(report)
+	if err != nil {
+		fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		*jsonReport:     append(jsonData, '\n'),
+		*markdownReport: []byte(answereval.Markdown(report)),
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			fatal(err)
+		}
+	}
+	fmt.Printf("grounded_answer_suite=%s passed=%t cases=%d failed=%d answerability=%.3f fact_coverage=%.3f forbidden=%d citations=%d unauthorized=%d p95_ms=%.1f tokens=%d/%d\n",
+		report.Suite, report.Passed, report.Cases, report.FailedCases, report.AnswerabilityAccuracy,
+		report.RequiredFactCoverage, report.ForbiddenFactHits, report.CitationViolations,
+		report.UnauthorizedRetrievals, report.LatencyP95MS, report.PromptTokens, report.OutputTokens)
+	fmt.Printf("json_report=%s\nmarkdown_report=%s\n", *jsonReport, *markdownReport)
+	if !report.Passed {
+		os.Exit(1)
+	}
+}
+
 func evaluate(root string, runtime *app.Runtime, pipelineName, split string) evaluation.Report {
 	target, err := runtime.Pipeline(pipelineName)
 	if err != nil {
@@ -567,5 +638,5 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|dataset-eval|serve-embedding|milvus-seed|serve-lab> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|dataset-eval|answer-eval|serve-embedding|milvus-seed|serve-lab> [flags]")
 }

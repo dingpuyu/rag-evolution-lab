@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval answer-eval serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -34,6 +34,9 @@ compare-rerank:
 
 dataset-eval:
 	go run ./cmd/raglab dataset-eval
+
+answer-eval:
+	go run ./cmd/raglab answer-eval
 
 serve-embedding:
 	go run ./cmd/raglab serve-embedding --backend auto

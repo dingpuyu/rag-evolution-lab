@@ -10,6 +10,7 @@ import (
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
+	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 )
@@ -100,10 +101,19 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		if datasetStore == nil {
 			datasetStore = datasetaccess.Defaults()
 		}
-		datasetAPI := &DatasetAPI{store: datasetStore, service: lifecycleService}
+		generator := enterprise.Generator
+		if generator == nil {
+			generator = generation.ExtractiveGenerator{}
+		}
+		answerService, answerErr := generation.NewService(lifecycleService, generator)
+		if answerErr != nil {
+			return nil, answerErr
+		}
+		datasetAPI := &DatasetAPI{store: datasetStore, service: lifecycleService, answerService: answerService}
 		mux.Handle("GET /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.list)))
 		mux.Handle("POST /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.create)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answer)))
 		mux.Handle("GET /api/v1/control-plane/status", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.status)))
 		mux.Handle("GET /api/v1/memberships", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.members)))
 	}
