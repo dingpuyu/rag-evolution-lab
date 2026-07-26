@@ -71,3 +71,37 @@ func TestRegistrationDoesNotAllowRoleOrTenantSelection(t *testing.T) {
 		t.Fatalf("duplicate registration error=%v", err)
 	}
 }
+
+func TestEnsureDemoCanProvisionPlatformAdministrator(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "accounts.json")
+	store, err := NewAccountStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.EnsureDemo(
+		"admin@raglab.local", "RagLab-Platform-2026!", "platform", []string{"platform_admin"},
+	); err != nil {
+		t.Fatal(err)
+	}
+	identity, err := store.Authenticate("admin@raglab.local", "RagLab-Platform-2026!")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if identity.TenantID != "platform" || !identity.HasRole("platform_admin") || identity.HasRole("admin") {
+		t.Fatalf("unexpected platform identity %#v", identity)
+	}
+
+	reloaded, err := NewAccountStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := reloaded.EnsureDemo(
+		"admin@raglab.local", "a different ignored password", "tenant_evil", []string{"viewer"},
+	); err != nil {
+		t.Fatal(err)
+	}
+	persisted, err := reloaded.Authenticate("admin@raglab.local", "RagLab-Platform-2026!")
+	if err != nil || persisted.TenantID != "platform" || !persisted.HasRole("platform_admin") {
+		t.Fatalf("idempotent provisioning changed administrator: identity=%#v err=%v", persisted, err)
+	}
+}

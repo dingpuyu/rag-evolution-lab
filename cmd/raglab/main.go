@@ -221,6 +221,7 @@ func runLabServer(args []string) {
 	authOIDCIssuer := flags.String("auth-oidc-issuer", os.Getenv("RAGLAB_AUTH_OIDC_ISSUER"), "enterprise OIDC issuer; enables RS256/JWKS mode")
 	authJWKSURL := flags.String("auth-jwks-url", os.Getenv("RAGLAB_AUTH_JWKS_URL"), "optional direct JWKS URL; otherwise OIDC discovery is used")
 	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
+	platformAdminPassword := flags.String("platform-admin-password", environmentOr("RAGLAB_PLATFORM_ADMIN_PASSWORD", "RagLab-Platform-2026!"), "local-lab platform administrator password")
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
 	_ = flags.Parse(args)
 
@@ -308,11 +309,13 @@ func runLabServer(args []string) {
 		}
 		for _, demo := range []struct {
 			email, password, tenant string
+			roles                   []string
 		}{
-			{"alice@tenant-a.local", "RagLab-Alice-2026!", "tenant_a"},
-			{"bob@tenant-b.local", "RagLab-Bob-2026!", "tenant_b"},
+			{"admin@raglab.local", *platformAdminPassword, "platform", []string{"platform_admin"}},
+			{"alice@tenant-a.local", "RagLab-Alice-2026!", "tenant_a", []string{"admin"}},
+			{"bob@tenant-b.local", "RagLab-Bob-2026!", "tenant_b", []string{"admin"}},
 		} {
-			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, []string{"admin"}); managerErr != nil {
+			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, demo.roles); managerErr != nil {
 				fatal(managerErr)
 			}
 		}

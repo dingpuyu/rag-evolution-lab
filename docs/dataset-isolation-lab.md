@@ -33,14 +33,17 @@ Bearer JWT
 
 ## 可复现实验账号
 
-默认只监听本地地址时会创建两个演示账号：
+默认只监听本地地址时会创建三个演示账号：
 
 | 用户 | 密码 | 可信 Claims |
 |---|---|---|
+| `admin@raglab.local` | `RagLab-Platform-2026!` | `platform / platform_admin` |
 | `alice@tenant-a.local` | `RagLab-Alice-2026!` | `tenant_a / admin` |
 | `bob@tenant-b.local` | `RagLab-Bob-2026!` | `tenant_b / admin` |
 
-演示密码不得用于公网环境。账号文件由`RAGLAB_AUTH_ACCOUNTS`控制，默认写入`data/auth/accounts.json`并被 Git 忽略。
+平台管理员可以查看审计、知识生命周期和异步 Ingestion 管理接口；普通租户管理员不能获得这些权限。
+管理员密码可通过`RAGLAB_PLATFORM_ADMIN_PASSWORD`覆盖。演示密码不得用于公网环境。
+账号文件由`RAGLAB_AUTH_ACCOUNTS`控制，默认写入`data/auth/accounts.json`并被 Git 忽略。
 
 ## 数据集授权语义
 
