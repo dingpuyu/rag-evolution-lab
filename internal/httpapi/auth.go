@@ -9,14 +9,16 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 )
 
 type identityContextKey struct{}
 
 type EnterpriseOptions struct {
-	Verifier  auth.Verifier
-	DevIssuer *auth.Manager
-	Audit     *auth.AuditLog
+	Verifier      auth.Verifier
+	DevIssuer     *auth.Manager
+	Audit         *auth.AuditLog
+	IngestionJobs *ingestionjob.Service
 }
 
 type authAPI struct {

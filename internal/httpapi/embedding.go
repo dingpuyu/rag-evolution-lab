@@ -89,6 +89,17 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("POST /api/v1/milvus/lifecycle/apply", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.apply)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/search", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.search)))
 	}
+	if enterprise.IngestionJobs != nil {
+		if authenticator == nil {
+			return nil, fmt.Errorf("ingestion job API requires enterprise authentication")
+		}
+		ingestionAPI := &IngestionAPI{service: enterprise.IngestionJobs}
+		mux.Handle("GET /api/v1/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.list)))
+		mux.Handle("POST /api/v1/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.submit)))
+		mux.Handle("GET /api/v1/ingestion/jobs/{job_id}", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.detail)))
+		mux.Handle("POST /api/v1/ingestion/jobs/{job_id}/retry", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.retry)))
+		mux.Handle("POST /api/v1/ingestion/jobs/{job_id}/cancel", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.cancel)))
+	}
 	return localDevelopmentCORS(mux), nil
 }
 

@@ -150,6 +150,8 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
+- [企业RAG异步导入任务状态机](docs/async-ingestion-jobs.md)
+- [商业化级企业RAG演进路线](docs/commercialization-roadmap.md)
 - [测试策略](docs/testing-strategy.md)
 - [版本路线图](docs/roadmap.md)
 - [架构决策记录](docs/adr/README.md)

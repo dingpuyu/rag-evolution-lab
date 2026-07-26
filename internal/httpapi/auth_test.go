@@ -10,6 +10,7 @@ import (
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
@@ -19,7 +20,7 @@ func newEnterpriseTestHandler(t *testing.T, searchFilter *string) http.Handler {
 	return newEnterpriseTestHandlerWithDevIssuer(t, searchFilter, true)
 }
 
-func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, enableDevIssuer bool) http.Handler {
+func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, enableDevIssuer bool, ingestionJobs ...*ingestionjob.Service) http.Handler {
 	t.Helper()
 	milvusServer := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/v2/vectordb/entities/search" {
@@ -69,6 +70,9 @@ func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, e
 	options := EnterpriseOptions{Verifier: manager, Audit: auth.NewAuditLog(20)}
 	if enableDevIssuer {
 		options.DevIssuer = manager
+	}
+	if len(ingestionJobs) > 0 {
+		options.IngestionJobs = ingestionJobs[0]
 	}
 	handler, err := NewEnterpriseLabHandler(embeddingService, vectorService, scaleService, options, lifecycleService)
 	if err != nil {

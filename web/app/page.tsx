@@ -163,11 +163,37 @@ type LifecycleResult = {
   completed_at: string;
 };
 
+type IngestionJob = {
+  job_id: string;
+  idempotency_key: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  stage: string;
+  attempts: number;
+  max_attempts: number;
+  cancel_requested: boolean;
+  last_error?: string;
+  result?: LifecycleResult;
+  created_at: string;
+  updated_at: string;
+};
+
+type IngestionSummary = {
+  total: number;
+  queued: number;
+  running: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  jobs: IngestionJob[];
+};
+
 const metrics = [
   { label: "Hit Rate@5", before: 0.85, after: 0.9, delta: "+5.0%" },
   { label: "MRR", before: 0.762, after: 0.9, delta: "+13.8%" },
   { label: "Doc Recall@5", before: 0.85, after: 0.9, delta: "+5.0%" },
 ];
+
+const ingestionStages = ["validating", "chunking", "embedding", "indexing", "verifying"];
 
 const localModels = [
   { name: "Semantic Hash", detail: "deterministic · offline", hit: "0.900", mrr: "0.779", recall: "0.875" },
@@ -267,6 +293,9 @@ export default function Home() {
   const [lifecycleQuery, setLifecycleQuery] = useState("单点登录入口在哪里？");
   const [lifecycleError, setLifecycleError] = useState("");
   const [lifecycleLoading, setLifecycleLoading] = useState(false);
+  const [ingestionSummary, setIngestionSummary] = useState<IngestionSummary | null>(null);
+  const [ingestionError, setIngestionError] = useState("");
+  const [ingestionLoading, setIngestionLoading] = useState(false);
   const current = cases[activeCase];
 
   async function compareEmbeddings() {
@@ -504,6 +533,89 @@ export default function Home() {
     }
   }
 
+  async function refreshIngestionJobs() {
+    if (!authSession) {
+      setIngestionError("请先签发 Platform Admin 身份");
+      return;
+    }
+    setIngestionError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/ingestion/jobs`, {
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setIngestionSummary(body);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : "读取导入任务失败");
+    }
+  }
+
+  async function submitIngestionJob() {
+    if (!authSession) {
+      setIngestionError("请先签发 Platform Admin 身份");
+      return;
+    }
+    setIngestionLoading(true);
+    setIngestionError("");
+    try {
+      const eventID = `${lifecycleDocumentID}-r${lifecycleRevision}-async-upsert`;
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/ingestion/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify({
+          idempotency_key: `job-${eventID}`,
+          change: {
+            event_id: eventID,
+            operation: "upsert",
+            source_revision: lifecycleRevision,
+            document: {
+              document_id: lifecycleDocumentID,
+              title: "企业异步知识导入演示",
+              content: lifecycleContent,
+              product: "identity",
+              version: lifecycleVersion,
+              status: "active",
+              visibility: "public",
+              allowed_tenants: [],
+              allowed_roles: [],
+            },
+          },
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLifecycleRevision((value) => value + 1);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+      await refreshIngestionJobs();
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : "创建异步导入任务失败");
+    } finally {
+      setIngestionLoading(false);
+    }
+  }
+
+  async function mutateIngestionJob(jobID: string, action: "retry" | "cancel") {
+    if (!authSession) return;
+    setIngestionLoading(true);
+    setIngestionError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/ingestion/jobs/${jobID}/${action}`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${authSession.access_token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+      await refreshIngestionJobs();
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : `任务${action}失败`);
+    } finally {
+      setIngestionLoading(false);
+    }
+  }
+
   function formatVector(vector: number[]) {
     return vector.map((value) => value.toFixed(5)).join(", ");
   }
@@ -523,6 +635,7 @@ export default function Home() {
           <a href="#milvus-lab">Milvus Lab</a>
           <a href="#scale-lab">100K Lab</a>
           <a href="#lifecycle-lab">增量索引</a>
+          <a href="#ingestion-jobs">导入任务</a>
           <a href="#experiment">效果对比</a>
           <a href="#harness">Harness</a>
           <a className="repo-link" href="https://github.com/dingpuyu/rag-evolution-lab" target="_blank" rel="noreferrer">
@@ -859,6 +972,49 @@ export default function Home() {
               <code>{lifecycleSearch.filter}</code>
               {lifecycleSearch.hits.map((hit) => <article key={hit.chunk_id}><b>{hit.title}</b><p>{hit.content}</p><small>{hit.chunk_id} · {hit.distance.toFixed(5)}</small></article>)}
             </div>}
+          </div>
+        </div>
+
+        <div className="ingestion-board" id="ingestion-jobs">
+          <div className="ingestion-heading">
+            <div>
+              <span>ASYNCHRONOUS INGESTION CONTROL PLANE</span>
+              <h3>每次导入都必须可追踪、可重试、可取消</h3>
+              <p>任务阶段由真实执行链路上报：Validating → Chunking → Embedding → Indexing → Verifying。相同幂等键不会重复执行，失败任务受最大尝试次数保护，服务重启后会恢复排队任务。</p>
+            </div>
+            <div>
+              <button onClick={submitIngestionJob} disabled={ingestionLoading}>创建异步 UPSERT</button>
+              <button className="secondary" onClick={refreshIngestionJobs} disabled={ingestionLoading}>刷新任务</button>
+            </div>
+          </div>
+          <div className="ingestion-metrics">
+            <div><span>TOTAL</span><strong>{ingestionSummary?.total ?? "—"}</strong></div>
+            <div><span>QUEUED / RUNNING</span><strong>{ingestionSummary ? `${ingestionSummary.queued} / ${ingestionSummary.running}` : "— / —"}</strong></div>
+            <div><span>COMPLETED</span><strong>{ingestionSummary?.completed ?? "—"}</strong></div>
+            <div><span>FAILED / CANCELLED</span><strong>{ingestionSummary ? `${ingestionSummary.failed} / ${ingestionSummary.cancelled}` : "— / —"}</strong></div>
+          </div>
+          {ingestionError && <div className="scale-error"><b>INGESTION ERROR</b><span>{ingestionError}</span><small>任务管理接口仅允许 Platform Admin；同一个 Idempotency Key 不能绑定不同载荷。</small></div>}
+          <div className="ingestion-jobs">
+            {ingestionSummary?.jobs.length ? ingestionSummary.jobs.slice(0, 8).map((job) => <article key={job.job_id}>
+              <div className="job-status">
+                <span className={`job-dot ${job.status}`} />
+                <div><strong>{job.status.toUpperCase()}</strong><small>{job.stage}</small></div>
+                <code>{job.job_id}</code>
+              </div>
+              <div className="job-progress">
+                {ingestionStages.map((stage) => <i key={stage} className={job.status === "completed" || ingestionStages.indexOf(stage) <= ingestionStages.indexOf(job.stage) ? "active" : ""} title={stage} />)}
+              </div>
+              <div className="job-meta">
+                <span>attempt {job.attempts}/{job.max_attempts}</span>
+                <span>{new Date(job.updated_at).toLocaleTimeString()}</span>
+                {job.result && <span>{job.result.current_chunks} chunks · verified</span>}
+              </div>
+              {job.last_error && <p>{job.last_error}</p>}
+              <div className="job-actions">
+                {(job.status === "failed" || job.status === "cancelled") && job.attempts < job.max_attempts && <button onClick={() => mutateIngestionJob(job.job_id, "retry")}>RETRY</button>}
+                {(job.status === "queued" || job.status === "running") && <button className="danger" onClick={() => mutateIngestionJob(job.job_id, "cancel")}>CANCEL</button>}
+              </div>
+            </article>) : <div className="ingestion-empty">使用上方相同文档内容创建异步任务，这里将展示任务阶段、尝试次数、结果与错误。刷新不会重新执行任务。</div>}
           </div>
         </div>
 

@@ -22,6 +22,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/httpapi"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
@@ -206,6 +207,8 @@ func runLabServer(args []string) {
 	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
 	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
 	lifecycleState := flags.String("lifecycle-state", environmentOr("RAGLAB_LIFECYCLE_STATE", "data/lifecycle/state.json"), "durable lifecycle event state")
+	ingestionJobState := flags.String("ingestion-job-state", environmentOr("RAGLAB_INGESTION_JOB_STATE", "data/ingestion/jobs.json"), "durable ingestion job state")
+	ingestionWorkers := flags.Int("ingestion-workers", 1, "number of asynchronous ingestion workers")
 	authSecret := flags.String("auth-secret", environmentOr("RAGLAB_AUTH_SECRET", "raglab-local-development-secret-change-me"), "JWT HMAC secret for local lab")
 	authIssuer := flags.String("auth-issuer", environmentOr("RAGLAB_AUTH_ISSUER", "raglab-local"), "JWT issuer")
 	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
@@ -230,6 +233,16 @@ func runLabServer(args []string) {
 	if err != nil {
 		fatal(err)
 	}
+	ingestionJobs, err := ingestionjob.New(lifecycleService, ingestionjob.Config{
+		StatePath: *ingestionJobState, Workers: *ingestionWorkers, QueueCapacity: 1_024, MaxAttempts: 3,
+	})
+	if err != nil {
+		fatal(err)
+	}
+	if err := ingestionJobs.Start(context.Background()); err != nil {
+		fatal(err)
+	}
+	defer ingestionJobs.Close()
 	scaleGenerator, err := scalebench.NewGenerator(scalebench.DatasetConfig{
 		Chunks: 100_000, Dimensions: 1024, Topics: 1_000, Tenants: 100,
 		Seed: 20260723, Profile: scalebench.ProfileHardV2,
@@ -271,7 +284,7 @@ func runLabServer(args []string) {
 		devIssuer = authManager
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
-		Verifier: verifier, DevIssuer: devIssuer, Audit: auth.NewAuditLog(200),
+		Verifier: verifier, DevIssuer: devIssuer, Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)

@@ -21,7 +21,15 @@ import (
 const (
 	OperationUpsert = "upsert"
 	OperationDelete = "delete"
+
+	LifecycleStageValidating = "validating"
+	LifecycleStageChunking   = "chunking"
+	LifecycleStageEmbedding  = "embedding"
+	LifecycleStageIndexing   = "indexing"
+	LifecycleStageVerifying  = "verifying"
 )
+
+type LifecycleObserver func(stage string)
 
 type LifecycleConfig struct {
 	Collection       string
@@ -141,9 +149,14 @@ func NewLifecycleService(client *Client, embedder retrieval.Embedder, config Lif
 }
 
 func (service *LifecycleService) Apply(ctx context.Context, change LifecycleChange) (LifecycleResult, error) {
+	return service.ApplyWithObserver(ctx, change, nil)
+}
+
+func (service *LifecycleService) ApplyWithObserver(ctx context.Context, change LifecycleChange, observer LifecycleObserver) (LifecycleResult, error) {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 
+	observeLifecycleStage(observer, LifecycleStageValidating)
 	documentID, err := validateLifecycleChange(&change)
 	if err != nil {
 		return LifecycleResult{}, err
@@ -176,9 +189,9 @@ func (service *LifecycleService) Apply(ctx context.Context, change LifecycleChan
 
 	var result LifecycleResult
 	if change.Operation == OperationUpsert {
-		result, err = service.applyUpsert(ctx, change, documentID)
+		result, err = service.applyUpsert(ctx, change, documentID, observer)
 	} else {
-		result, err = service.applyDelete(ctx, change, documentID)
+		result, err = service.applyDelete(ctx, change, documentID, observer)
 	}
 	if err != nil {
 		event := service.state.Events[change.EventID]
@@ -273,7 +286,8 @@ func (service *LifecycleService) Search(ctx context.Context, query Query) (Searc
 	}, nil
 }
 
-func (service *LifecycleService) applyUpsert(ctx context.Context, change LifecycleChange, documentID string) (LifecycleResult, error) {
+func (service *LifecycleService) applyUpsert(ctx context.Context, change LifecycleChange, documentID string, observer LifecycleObserver) (LifecycleResult, error) {
+	observeLifecycleStage(observer, LifecycleStageChunking)
 	document := change.Document
 	chunks := service.chunker.Chunk(domain.Document{
 		ID: document.ID, Title: document.Title, Content: document.Content, Product: document.Product,
@@ -287,6 +301,7 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 	for index, chunk := range chunks {
 		texts[index] = chunk.DocumentTitle + "\n" + chunk.Content
 	}
+	observeLifecycleStage(observer, LifecycleStageEmbedding)
 	vectors, err := service.embedder.EmbedDocuments(ctx, texts)
 	if err != nil {
 		return LifecycleResult{}, fmt.Errorf("embed lifecycle document: %w", err)
@@ -300,6 +315,7 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 			return LifecycleResult{}, fmt.Errorf("embedding dimension mismatch at chunk %d", index)
 		}
 	}
+	observeLifecycleStage(observer, LifecycleStageIndexing)
 	if err := service.ensureCollection(ctx, dimensions); err != nil {
 		return LifecycleResult{}, err
 	}
@@ -345,6 +361,7 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 	if err := service.client.FlushCollection(ctx, service.config.Collection); err != nil {
 		return LifecycleResult{}, fmt.Errorf("flush lifecycle collection: %w", err)
 	}
+	observeLifecycleStage(observer, LifecycleStageVerifying)
 	current, err := service.client.QueryEntities(ctx, service.config.Collection, filter, 16_384)
 	if err != nil {
 		return LifecycleResult{}, fmt.Errorf("verify lifecycle upsert: %w", err)
@@ -357,7 +374,8 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 	}, nil
 }
 
-func (service *LifecycleService) applyDelete(ctx context.Context, _ LifecycleChange, documentID string) (LifecycleResult, error) {
+func (service *LifecycleService) applyDelete(ctx context.Context, _ LifecycleChange, documentID string, observer LifecycleObserver) (LifecycleResult, error) {
+	observeLifecycleStage(observer, LifecycleStageIndexing)
 	if err := service.ensureExistingCollection(ctx); err != nil {
 		return LifecycleResult{}, err
 	}
@@ -372,6 +390,7 @@ func (service *LifecycleService) applyDelete(ctx context.Context, _ LifecycleCha
 	if err := service.client.FlushCollection(ctx, service.config.Collection); err != nil {
 		return LifecycleResult{}, fmt.Errorf("flush lifecycle delete: %w", err)
 	}
+	observeLifecycleStage(observer, LifecycleStageVerifying)
 	current, err := service.client.QueryEntities(ctx, service.config.Collection, filter, 1)
 	if err != nil {
 		return LifecycleResult{}, fmt.Errorf("verify lifecycle delete: %w", err)
@@ -380,6 +399,12 @@ func (service *LifecycleService) applyDelete(ctx context.Context, _ LifecycleCha
 		return LifecycleResult{}, fmt.Errorf("delete verification failed: %d chunks remain", len(current))
 	}
 	return LifecycleResult{PreviousChunks: len(previous), DeletedChunks: len(previous), CurrentChunks: 0}, nil
+}
+
+func observeLifecycleStage(observer LifecycleObserver, stage string) {
+	if observer != nil {
+		observer(stage)
+	}
 }
 
 func (service *LifecycleService) ensureCollection(ctx context.Context, dimensions int) error {
