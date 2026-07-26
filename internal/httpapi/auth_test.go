@@ -70,6 +70,10 @@ func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, e
 	options := EnterpriseOptions{Verifier: manager, Audit: auth.NewAuditLog(20)}
 	if enableDevIssuer {
 		options.DevIssuer = manager
+		options.LocalAccounts, err = auth.NewAccountStore(t.TempDir() + "/accounts.json")
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 	if len(ingestionJobs) > 0 {
 		options.IngestionJobs = ingestionJobs[0]
@@ -79,6 +83,76 @@ func newEnterpriseTestHandlerWithDevIssuer(t *testing.T, searchFilter *string, e
 		t.Fatal(err)
 	}
 	return handler
+}
+
+func TestLocalAccountRegistrationAndLoginUseServerAssignedTenant(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	register := httptest.NewRecorder()
+	handler.ServeHTTP(register, httptest.NewRequest(http.MethodPost, "/api/v1/auth/register", strings.NewReader(`{
+		"email":"new@example.com",
+		"password":"a strong local password",
+		"organization":"New Organization"
+	}`)))
+	if register.Code != http.StatusCreated || strings.Contains(register.Body.String(), `"tenant_id":"tenant_a"`) {
+		t.Fatalf("registration status=%d body=%s", register.Code, register.Body.String())
+	}
+
+	login := httptest.NewRecorder()
+	handler.ServeHTTP(login, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{
+		"email":"new@example.com",
+		"password":"a strong local password"
+	}`)))
+	if login.Code != http.StatusOK || !strings.Contains(login.Body.String(), `"roles":["admin"]`) {
+		t.Fatalf("login status=%d body=%s", login.Code, login.Body.String())
+	}
+
+	bad := httptest.NewRecorder()
+	handler.ServeHTTP(bad, httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", strings.NewReader(`{
+		"email":"new@example.com",
+		"password":"wrong password"
+	}`)))
+	if bad.Code != http.StatusUnauthorized || strings.Contains(bad.Body.String(), "new@example.com") {
+		t.Fatalf("bad login status=%d body=%s", bad.Code, bad.Body.String())
+	}
+}
+
+func TestDatasetAuthorizationStopsCrossTenantRequestBeforeMilvus(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	tenantA := issueTestPersona(t, handler, "tenant_a_admin")
+
+	listRequest := httptest.NewRequest(http.MethodGet, "/api/v1/datasets", nil)
+	listRequest.Header.Set("Authorization", "Bearer "+tenantA)
+	list := httptest.NewRecorder()
+	handler.ServeHTTP(list, listRequest)
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), `"tenant-a-operations"`) ||
+		strings.Contains(list.Body.String(), `"tenant-b-operations"`) {
+		t.Fatalf("dataset list status=%d body=%s", list.Code, list.Body.String())
+	}
+
+	deniedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-b-operations/search", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	deniedRequest.Header.Set("Authorization", "Bearer "+tenantA)
+	denied := httptest.NewRecorder()
+	handler.ServeHTTP(denied, deniedRequest)
+	if denied.Code != http.StatusNotFound || filter != "" {
+		t.Fatalf("cross-tenant request status=%d filter=%q body=%s", denied.Code, filter, denied.Body.String())
+	}
+
+	allowedRequest := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/search", strings.NewReader(`{
+		"query":"private queue", "top_k":5
+	}`))
+	allowedRequest.Header.Set("Authorization", "Bearer "+tenantA)
+	allowed := httptest.NewRecorder()
+	handler.ServeHTTP(allowed, allowedRequest)
+	if allowed.Code != http.StatusOK ||
+		!strings.Contains(filter, `allowed_tenants, "tenant_a"`) ||
+		!strings.Contains(filter, `product == "tenant-operations"`) ||
+		strings.Contains(filter, `visibility == "public"`) {
+		t.Fatalf("tenant dataset status=%d filter=%q body=%s", allowed.Code, filter, allowed.Body.String())
+	}
 }
 
 func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {

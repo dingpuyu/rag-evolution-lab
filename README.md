@@ -117,6 +117,7 @@ Phase 5 已完成首轮工程基线实验：
 - Milvus Pre-ANN ACL与结构化Request ID审计
 - 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
+- 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 
 增量知识生命周期首版已完成：
 
@@ -149,6 +150,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
+- [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
 - [企业RAG异步导入任务状态机](docs/async-ingestion-jobs.md)
 - [商业化级企业RAG演进路线](docs/commercialization-roadmap.md)

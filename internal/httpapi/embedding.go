@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
@@ -62,9 +63,16 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	vectorSearch := http.Handler(http.HandlerFunc(vectorAPI.search))
 	var authenticator *authAPI
 	if enterprise.Verifier != nil {
-		authenticator = &authAPI{verifier: enterprise.Verifier, devIssuer: enterprise.DevIssuer, audit: enterprise.Audit}
+		authenticator = &authAPI{
+			verifier: enterprise.Verifier, devIssuer: enterprise.DevIssuer,
+			accounts: enterprise.LocalAccounts, audit: enterprise.Audit,
+		}
 		if enterprise.DevIssuer != nil {
 			mux.HandleFunc("POST /api/v1/auth/dev-token", authenticator.devToken)
+		}
+		if enterprise.LocalAccounts != nil {
+			mux.HandleFunc("POST /api/v1/auth/register", authenticator.register)
+			mux.HandleFunc("POST /api/v1/auth/login", authenticator.login)
 		}
 		mux.Handle("GET /api/v1/auth/me", authenticator.requireIdentity(http.HandlerFunc(authenticator.me)))
 		mux.Handle("GET /api/v1/audit/recent", authenticator.requireIdentity(http.HandlerFunc(authenticator.recentAudit)))
@@ -88,6 +96,9 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("GET /api/v1/milvus/lifecycle/status", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.status)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/apply", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.apply)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/search", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.search)))
+		datasetAPI := &DatasetAPI{catalog: datasetaccess.Defaults(), service: lifecycleService}
+		mux.Handle("GET /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.list)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
 	}
 	if enterprise.IngestionJobs != nil {
 		if authenticator == nil {

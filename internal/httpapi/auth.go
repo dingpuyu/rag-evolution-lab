@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"time"
 
@@ -17,6 +18,7 @@ type identityContextKey struct{}
 type EnterpriseOptions struct {
 	Verifier      auth.Verifier
 	DevIssuer     *auth.Manager
+	LocalAccounts *auth.AccountStore
 	Audit         *auth.AuditLog
 	IngestionJobs *ingestionjob.Service
 }
@@ -24,6 +26,7 @@ type EnterpriseOptions struct {
 type authAPI struct {
 	verifier  auth.Verifier
 	devIssuer *auth.Manager
+	accounts  *auth.AccountStore
 	audit     *auth.AuditLog
 }
 
@@ -102,6 +105,8 @@ func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) 
 		"public_viewer":    {Subject: "demo-public", TenantID: "public", Roles: []string{"viewer"}},
 		"tenant037_viewer": {Subject: "demo-viewer-037", TenantID: "tenant_037", Roles: []string{"viewer"}},
 		"tenant037_admin":  {Subject: "demo-admin-037", TenantID: "tenant_037", Roles: []string{"admin"}},
+		"tenant_a_admin":   {Subject: "demo-admin-a", TenantID: "tenant_a", Roles: []string{"admin"}},
+		"tenant_b_admin":   {Subject: "demo-admin-b", TenantID: "tenant_b", Roles: []string{"admin"}},
 		"platform_admin":   {Subject: "demo-platform-admin", TenantID: "platform", Roles: []string{"platform_admin"}},
 	}
 	identity, ok := personas[input.Persona]
@@ -122,6 +127,86 @@ func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) 
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"access_token": token, "token_type": "Bearer", "expires_at": verified.Expires, "identity": verified,
 	})
+}
+
+func (api *authAPI) register(writer http.ResponseWriter, request *http.Request) {
+	if api.accounts == nil || api.devIssuer == nil {
+		http.NotFound(writer, request)
+		return
+	}
+	var input struct {
+		Email        string `json:"email"`
+		Password     string `json:"password"`
+		Organization string `json:"organization"`
+	}
+	if !decodeAuthInput(writer, request, &input) {
+		return
+	}
+	identity, err := api.accounts.Register(auth.Registration{
+		Email: input.Email, Password: input.Password, Organization: input.Organization,
+	})
+	if err != nil {
+		status, code := http.StatusUnprocessableEntity, "registration_failed"
+		if errors.Is(err, auth.ErrAccountExists) {
+			status, code = http.StatusConflict, "account_exists"
+		}
+		writeError(writer, status, code, err.Error())
+		return
+	}
+	api.issueIdentity(writer, identity, http.StatusCreated)
+}
+
+func (api *authAPI) login(writer http.ResponseWriter, request *http.Request) {
+	if api.accounts == nil || api.devIssuer == nil {
+		http.NotFound(writer, request)
+		return
+	}
+	var input struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if !decodeAuthInput(writer, request, &input) {
+		return
+	}
+	identity, err := api.accounts.Authenticate(input.Email, input.Password)
+	if err != nil {
+		writeError(writer, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
+		return
+	}
+	api.issueIdentity(writer, identity, http.StatusOK)
+}
+
+func (api *authAPI) issueIdentity(writer http.ResponseWriter, identity auth.Identity, status int) {
+	token, err := api.devIssuer.Issue(identity)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "token_issue_failed", err.Error())
+		return
+	}
+	verified, err := api.devIssuer.VerifyAuthorization("Bearer " + token)
+	if err != nil {
+		writeError(writer, http.StatusInternalServerError, "token_verify_failed", err.Error())
+		return
+	}
+	writeJSON(writer, status, map[string]any{
+		"access_token": token, "token_type": "Bearer", "expires_at": verified.Expires, "identity": verified,
+	})
+}
+
+func decodeAuthInput(writer http.ResponseWriter, request *http.Request, destination any) bool {
+	writer.Header().Set("Cache-Control", "no-store")
+	writer.Header().Set("Pragma", "no-cache")
+	request.Body = http.MaxBytesReader(writer, request.Body, maxRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return false
+	}
+	if err := ensureEOF(decoder); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return false
+	}
+	return true
 }
 
 func (api *authAPI) me(writer http.ResponseWriter, request *http.Request) {

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
@@ -82,5 +83,25 @@ func TestRetrieverExposesProductionTraceAttributes(t *testing.T) {
 	attributes := target.TraceAttributes(domain.QueryRequest{})
 	if attributes["vector_backend"] != "milvus" || attributes["filter_stage"] != "pre_ann" || attributes["index_type"] != "HNSW" {
 		t.Fatalf("unexpected trace attributes: %#v", attributes)
+	}
+}
+
+func TestServiceDatasetScopesFailClosed(t *testing.T) {
+	publicOnly := buildFilter(Query{
+		Tenant: "tenant_a", Role: "admin", Product: "identity", AccessScope: "public_only",
+	})
+	if strings.Contains(publicOnly, "allowed_tenants") || !strings.Contains(publicOnly, `visibility == "public"`) {
+		t.Fatalf("public dataset filter=%q", publicOnly)
+	}
+	tenantOnly := buildFilter(Query{
+		Tenant: "tenant_a", Role: "admin", Product: "tenant-operations", AccessScope: "tenant_only",
+	})
+	if strings.Contains(tenantOnly, `visibility == "public"`) ||
+		!strings.Contains(tenantOnly, `allowed_tenants, "tenant_a"`) {
+		t.Fatalf("tenant dataset filter=%q", tenantOnly)
+	}
+	failClosed := buildFilter(Query{Product: "tenant-operations", AccessScope: "tenant_only"})
+	if !strings.Contains(failClosed, "false") {
+		t.Fatalf("missing trusted tenant must fail closed: %q", failClosed)
 	}
 }

@@ -23,6 +23,7 @@ data/artifacts/
 data/checkpoints/
 data/lifecycle/
 data/ingestion/
+data/auth/
 eval/reports/generated/
 
 *.log

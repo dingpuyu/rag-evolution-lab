@@ -55,6 +55,9 @@ type Query struct {
 	Product string `json:"product"`
 	Status  string `json:"status"`
 	TopK    int    `json:"top_k"`
+	// AccessScope is assigned by trusted server-side resource authorization.
+	// It is intentionally excluded from JSON so clients cannot weaken filtering.
+	AccessScope string `json:"-"`
 }
 
 type SearchResult struct {
@@ -224,9 +227,23 @@ func (s *Service) Search(ctx context.Context, query Query) (SearchResult, error)
 }
 
 func buildFilter(query Query) string {
+	tenant, role := strings.TrimSpace(query.Tenant), strings.TrimSpace(query.Role)
+	tenantAccess := `(array_contains(allowed_tenants, "` + escapeFilter(tenant) + `") and array_contains(allowed_roles, "` + escapeFilter(role) + `"))`
 	access := `visibility == "public"`
-	if tenant, role := strings.TrimSpace(query.Tenant), strings.TrimSpace(query.Role); tenant != "" && tenant != "public" && role != "" {
-		access = "(" + access + ` or (array_contains(allowed_tenants, "` + escapeFilter(tenant) + `") and array_contains(allowed_roles, "` + escapeFilter(role) + `")))`
+	switch query.AccessScope {
+	case "public_only":
+		// Public datasets must not accidentally surface tenant rows that happen
+		// to share the same product metadata.
+	case "tenant_only":
+		if tenant == "" || tenant == "public" || role == "" {
+			access = "false"
+		} else {
+			access = tenantAccess
+		}
+	default:
+		if tenant != "" && tenant != "public" && role != "" {
+			access = "(" + access + " or " + tenantAccess + ")"
+		}
 	}
 	filters := []string{access}
 	if product := strings.TrimSpace(query.Product); product != "" {

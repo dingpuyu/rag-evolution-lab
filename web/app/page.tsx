@@ -114,6 +114,20 @@ type AuthSession = {
   };
 };
 
+type DatasetResource = {
+  id: string;
+  name: string;
+  description: string;
+  visibility: "public" | "tenant";
+  owner_tenant?: string;
+  allowed_roles?: string[];
+};
+
+type DatasetSearchResponse = {
+  dataset: DatasetResource;
+  result: MilvusSearchResult;
+};
+
 type AuditEvent = {
   request_id: string;
   timestamp: string;
@@ -281,6 +295,16 @@ export default function Home() {
   const [authPersona, setAuthPersona] = useState("tenant037_admin");
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  const [accountEmail, setAccountEmail] = useState("alice@tenant-a.local");
+  const [accountPassword, setAccountPassword] = useState("RagLab-Alice-2026!");
+  const [accountOrganization, setAccountOrganization] = useState("My New Organization");
+  const [authError, setAuthError] = useState("");
+  const [datasets, setDatasets] = useState<DatasetResource[]>([]);
+  const [datasetID, setDatasetID] = useState("tenant-a-operations");
+  const [datasetQuery, setDatasetQuery] = useState("专属应急队列是什么？");
+  const [datasetResult, setDatasetResult] = useState<DatasetSearchResponse | null>(null);
+  const [datasetError, setDatasetError] = useState("");
+  const [datasetLoading, setDatasetLoading] = useState(false);
   const [lastRequestID, setLastRequestID] = useState("");
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
@@ -414,6 +438,9 @@ export default function Home() {
       const body = await response.json();
       if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
       setAuthSession(body);
+      setDatasets([]);
+      setDatasetResult(null);
+      await loadDatasets(body);
       setScaleResult(null);
       setAuditEvents([]);
     } catch (error) {
@@ -421,6 +448,78 @@ export default function Home() {
       setScaleError(error instanceof Error ? error.message : "身份令牌签发失败");
     } finally {
       setAuthLoading(false);
+    }
+  }
+
+  async function accountAuthentication(mode: "login" | "register") {
+    setAuthLoading(true);
+    setAuthError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/auth/${mode}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "login"
+          ? { email: accountEmail, password: accountPassword }
+          : { email: accountEmail, password: accountPassword, organization: accountOrganization }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setAuthSession(body);
+      setDatasetResult(null);
+      await loadDatasets(body);
+    } catch (error) {
+      setAuthSession(null);
+      setDatasets([]);
+      setAuthError(error instanceof Error ? error.message : "账号认证失败");
+    } finally {
+      setAuthLoading(false);
+    }
+  }
+
+  async function loadDatasets(session = authSession) {
+    if (!session) {
+      setDatasetError("请先登录或签发身份");
+      return;
+    }
+    setDatasetError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/datasets`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setDatasets(body.datasets || []);
+      const privateDataset = (body.datasets || []).find((item: DatasetResource) => item.visibility === "tenant");
+      if (privateDataset) setDatasetID(privateDataset.id);
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+    } catch (error) {
+      setDatasets([]);
+      setDatasetError(error instanceof Error ? error.message : "读取数据集失败");
+    }
+  }
+
+  async function searchDataset(targetID = datasetID) {
+    if (!authSession) {
+      setDatasetError("请先登录或签发身份");
+      return;
+    }
+    setDatasetLoading(true);
+    setDatasetError("");
+    setDatasetResult(null);
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/datasets/${encodeURIComponent(targetID)}/search`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify({ query: datasetQuery, top_k: 5 }),
+      });
+      const body = await response.json();
+      setLastRequestID(response.headers.get("X-Request-ID") || "");
+      if (!response.ok) throw new Error(`${response.status} · ${body?.error?.message || "访问被拒绝"}`);
+      setDatasetResult(body);
+    } catch (error) {
+      setDatasetError(error instanceof Error ? error.message : "数据集检索失败");
+    } finally {
+      setDatasetLoading(false);
     }
   }
 
@@ -634,6 +733,7 @@ export default function Home() {
           <a href="#embedding-lab">Embedding 实验</a>
           <a href="#milvus-lab">Milvus Lab</a>
           <a href="#scale-lab">100K Lab</a>
+          <a href="#dataset-isolation">数据隔离</a>
           <a href="#lifecycle-lab">增量索引</a>
           <a href="#ingestion-jobs">导入任务</a>
           <a href="#experiment">效果对比</a>
@@ -926,6 +1026,57 @@ export default function Home() {
               <strong>检索请求将返回 401</strong>
               <small>先选择一个服务端预定义身份并签发令牌。</small>
             </>}
+          </div>
+        </div>
+
+        <div className="account-access-lab" id="dataset-isolation">
+          <div className="account-panel">
+            <span>LOCAL ACCOUNT EXPERIENCE</span>
+            <h3>注册只创建新租户，不能自选已有租户</h3>
+            <p>这一登录注册仅用于本地实验。密码只保存带盐派生值；生产环境关闭这两个接口，改由 OIDC/企业 IdP 完成账号、MFA 与组织邀请。</p>
+            <label><span>EMAIL</span><input value={accountEmail} onChange={(event) => setAccountEmail(event.target.value)} /></label>
+            <label><span>PASSWORD</span><input type="password" value={accountPassword} onChange={(event) => setAccountPassword(event.target.value)} /></label>
+            <label><span>NEW ORGANIZATION</span><input value={accountOrganization} onChange={(event) => setAccountOrganization(event.target.value)} /></label>
+            <div>
+              <button onClick={() => accountAuthentication("login")} disabled={authLoading}>登录</button>
+              <button className="secondary" onClick={() => accountAuthentication("register")} disabled={authLoading}>注册隔离租户</button>
+            </div>
+            <small>DEMO A · alice@tenant-a.local / RagLab-Alice-2026!</small>
+            <small>DEMO B · bob@tenant-b.local / RagLab-Bob-2026!</small>
+            {authError && <div className="dataset-denied">{authError}</div>}
+          </div>
+
+          <div className="dataset-panel">
+            <div className="dataset-panel-head">
+              <div><span>RESOURCE AUTHORIZATION</span><h3>当前身份能看到哪些数据集？</h3></div>
+              <button onClick={() => loadDatasets()} disabled={!authSession}>刷新授权目录</button>
+            </div>
+            <div className="dataset-cards">
+              {datasets.length ? datasets.map((dataset) => <button
+                key={dataset.id}
+                className={datasetID === dataset.id ? "selected" : ""}
+                onClick={() => setDatasetID(dataset.id)}
+              >
+                <span>{dataset.visibility === "public" ? "PUBLIC" : "TENANT ONLY"}</span>
+                <strong>{dataset.name}</strong>
+                <p>{dataset.description}</p>
+                <code>{dataset.id}</code>
+              </button>) : <p>登录后，服务端只返回当前 Claims 可以访问的数据集目录。</p>}
+            </div>
+            <div className="dataset-query">
+              <label><span>DATASET RESOURCE ID</span><input value={datasetID} onChange={(event) => setDatasetID(event.target.value)} /></label>
+              <label><span>QUERY</span><input value={datasetQuery} onChange={(event) => setDatasetQuery(event.target.value)} /></label>
+              <button onClick={() => searchDataset()} disabled={datasetLoading}>{datasetLoading ? "AUTHORIZING…" : "授权并检索"}</button>
+              <button className="danger" onClick={() => searchDataset(authSession?.identity.tenant_id === "tenant_a" ? "tenant-b-operations" : "tenant-a-operations")} disabled={datasetLoading || !authSession}>模拟跨租户越权</button>
+            </div>
+            {datasetError && <div className="dataset-denied"><b>DENIED / FAILED CLOSED</b><span>{datasetError}</span><small>不存在与无权限统一返回 404；被拒绝请求不会抵达 Milvus。</small></div>}
+            {datasetResult && <div className="dataset-proof">
+              <div><span>✓ RESOURCE GRANT</span><strong>{datasetResult.dataset.name}</strong><small>{datasetResult.dataset.visibility} · {datasetResult.result.hits.length} hits</small></div>
+              <code>{datasetResult.result.filter}</code>
+              {datasetResult.result.hits.map((hit) => <article key={hit.chunk_id}>
+                <b>{hit.title}</b><p>{hit.content}</p><small>{hit.tenant_id} · {hit.visibility} · {hit.distance.toFixed(5)}</small>
+              </article>)}
+            </div>}
           </div>
         </div>
 

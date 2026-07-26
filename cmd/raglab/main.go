@@ -214,6 +214,7 @@ func runLabServer(args []string) {
 	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
 	authOIDCIssuer := flags.String("auth-oidc-issuer", os.Getenv("RAGLAB_AUTH_OIDC_ISSUER"), "enterprise OIDC issuer; enables RS256/JWKS mode")
 	authJWKSURL := flags.String("auth-jwks-url", os.Getenv("RAGLAB_AUTH_JWKS_URL"), "optional direct JWKS URL; otherwise OIDC discovery is used")
+	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
 	_ = flags.Parse(args)
 
 	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
@@ -258,6 +259,7 @@ func runLabServer(args []string) {
 	}
 	var verifier auth.Verifier
 	var devIssuer *auth.Manager
+	var localAccounts *auth.AccountStore
 	authMode := "local_hs256"
 	if strings.TrimSpace(*authOIDCIssuer) != "" || strings.TrimSpace(*authJWKSURL) != "" {
 		oidcVerifier, oidcErr := auth.NewOIDCVerifier(auth.OIDCConfig{
@@ -282,9 +284,24 @@ func runLabServer(args []string) {
 		}
 		verifier = authManager
 		devIssuer = authManager
+		localAccounts, managerErr = auth.NewAccountStore(*authAccounts)
+		if managerErr != nil {
+			fatal(managerErr)
+		}
+		for _, demo := range []struct {
+			email, password, tenant string
+		}{
+			{"alice@tenant-a.local", "RagLab-Alice-2026!", "tenant_a"},
+			{"bob@tenant-b.local", "RagLab-Bob-2026!", "tenant_b"},
+		} {
+			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, []string{"admin"}); managerErr != nil {
+				fatal(managerErr)
+			}
+		}
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
-		Verifier: verifier, DevIssuer: devIssuer, Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs,
+		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
+		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)
