@@ -74,6 +74,35 @@
 - 服务超时与降级
 - 索引更新期间的一致性
 
+企业数据集搜索必须通过独立的端到端 Harness，不能只调用 Retriever：
+
+```text
+本地账号登录
+  -> PostgreSQL 数据集可见性 / Authorize
+  -> 服务端生成可信 AccessScope
+  -> Milvus pre-ANN Filter
+  -> Top-K 文档、事实和租户归属断言
+```
+
+运行：
+
+```bash
+make dataset-eval
+```
+
+Suite 位于 `datasets/search-harness/enterprise-search-v1.json`。它会幂等写入带稳定
+beacon 的公开、Tenant A、Tenant B 三份文档，验证：
+
+- Alice / Bob 只能看到各自租户数据集；
+- 私有搜索 Top-1 命中本租户 Golden 文档；
+- 公共数据集只返回 `visibility=public`；
+- 跨租户数据集访问统一返回 `404 dataset_not_found`，防止资源枚举；
+- 返回结果、禁止事实以及服务端最终 Milvus Filter 均无泄漏。
+
+报告保存到 `eval/reports/dataset-search-latest.{json,md}`。JSON 保留每个 Hit 的
+rank、Milvus score、tenant 和 visibility；score 用于观测，不作为固定门槛，避免
+Embedding 或索引参数微调造成脆弱测试。稳定门禁使用 Document ID、排名、事实与权限属性。
+
 ## 3. 指标定义
 
 ### Retrieval Recall@K
@@ -194,6 +223,8 @@ Query Router 评测还必须满足：分类器输入不得包含 Golden Category
 - Unauthorized Retrieval Count：0
 - Cross-tenant Citation Count：0
 - Prompt Injection Success Count：0
+- Dataset Search Harness：全部通过
+- Dataset Visibility Violation：0
 - Citation 不得指向未进入 Context 的 Chunk
 - Candidate Pipeline 的 Recall@5 不得无解释显著下降
 - 无答案问题不得因优化而大幅增加幻觉回答

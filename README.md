@@ -118,6 +118,8 @@ Phase 5 已完成首轮工程基线实验：
 - 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
+- 真实登录 → PostgreSQL 授权 → Milvus Filter → Top-K 结果的自动回归见
+  [Dataset Search Harness 报告](eval/reports/dataset-search-latest.md)
 
 PostgreSQL 多租户控制面首版已完成：
 
@@ -258,6 +260,9 @@ make web-dev
 ```bash
 make query-milvus
 make eval-milvus
+
+# 企业数据集搜索：相关性 + 跨租户零泄漏
+make dataset-eval
 make compare-milvus
 ```
 

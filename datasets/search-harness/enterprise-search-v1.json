@@ -1,0 +1,188 @@
+{
+  "version": "1.0.0",
+  "name": "enterprise-dataset-search",
+  "seeds": [
+    {
+      "event_id": "search-golden-public-sso-r1",
+      "operation": "upsert",
+      "source_revision": 1,
+      "document": {
+        "document_id": "search-golden-public-sso",
+        "title": "企业身份中心公开接入指南",
+        "content": "企业单点登录的公开测试入口位于身份中心。用于回归验证的稳定标识是 public-sso-beacon-2026。OIDC 回调地址必须使用 HTTPS，并由管理员在身份中心登记。",
+        "product": "identity",
+        "version": "search-harness-v1",
+        "status": "active",
+        "visibility": "public",
+        "allowed_tenants": [],
+        "allowed_roles": []
+      }
+    },
+    {
+      "event_id": "search-golden-tenant-a-ops-r1",
+      "operation": "upsert",
+      "source_revision": 1,
+      "document": {
+        "document_id": "search-golden-tenant-a-ops",
+        "title": "Tenant A 私有队列运行手册",
+        "content": "Tenant A 的生产导出任务进入专属优先队列。用于回归验证的稳定队列标识是 golden-queue-a-2026。该标识属于 Tenant A 内部信息，禁止向其他租户返回。",
+        "product": "tenant-operations",
+        "version": "search-harness-v1",
+        "status": "active",
+        "visibility": "tenant",
+        "allowed_tenants": ["tenant_a"],
+        "allowed_roles": ["admin"]
+      }
+    },
+    {
+      "event_id": "search-golden-tenant-b-ops-r1",
+      "operation": "upsert",
+      "source_revision": 1,
+      "document": {
+        "document_id": "search-golden-tenant-b-ops",
+        "title": "Tenant B 私有队列运行手册",
+        "content": "Tenant B 的生产导出任务进入专属优先队列。用于回归验证的稳定队列标识是 golden-queue-b-2026。该标识属于 Tenant B 内部信息，禁止向其他租户返回。",
+        "product": "tenant-operations",
+        "version": "search-harness-v1",
+        "status": "active",
+        "visibility": "tenant",
+        "allowed_tenants": ["tenant_b"],
+        "allowed_roles": ["admin"]
+      }
+    }
+  ],
+  "identities": {
+    "alice": {
+      "email": "alice@tenant-a.local",
+      "password_env": "RAGLAB_ALICE_PASSWORD"
+    },
+    "bob": {
+      "email": "bob@tenant-b.local",
+      "password_env": "RAGLAB_BOB_PASSWORD"
+    }
+  },
+  "visibility_cases": [
+    {
+      "id": "alice_dataset_visibility",
+      "identity": "alice",
+      "required_datasets": ["public-identity", "public-reports", "tenant-a-operations"],
+      "forbidden_datasets": ["tenant-b-operations"]
+    },
+    {
+      "id": "bob_dataset_visibility",
+      "identity": "bob",
+      "required_datasets": ["public-identity", "public-reports", "tenant-b-operations"],
+      "forbidden_datasets": ["tenant-a-operations"]
+    }
+  ],
+  "search_cases": [
+    {
+      "id": "alice_private_relevance",
+      "identity": "alice",
+      "dataset_id": "tenant-a-operations",
+      "query": "Tenant A 用于回归验证的稳定队列标识是什么？",
+      "top_k": 5,
+      "expected_status": 200,
+      "relevant_document_ids": ["search-golden-tenant-a-ops"],
+      "max_first_relevant_rank": 1,
+      "required_facts": ["golden-queue-a-2026"],
+      "forbidden_document_ids": ["search-golden-tenant-b-ops"],
+      "forbidden_facts": ["golden-queue-b-2026"],
+      "expected_visibility": "tenant",
+      "expected_tenant": "tenant_a",
+      "required_filter_fragments": [
+        "array_contains(allowed_tenants, \"tenant_a\")",
+        "array_contains(allowed_roles, \"admin\")",
+        "product == \"tenant-operations\"",
+        "status == \"active\""
+      ],
+      "forbidden_filter_fragments": ["visibility == \"public\""]
+    },
+    {
+      "id": "bob_private_relevance",
+      "identity": "bob",
+      "dataset_id": "tenant-b-operations",
+      "query": "Tenant B 用于回归验证的稳定队列标识是什么？",
+      "top_k": 5,
+      "expected_status": 200,
+      "relevant_document_ids": ["search-golden-tenant-b-ops"],
+      "max_first_relevant_rank": 1,
+      "required_facts": ["golden-queue-b-2026"],
+      "forbidden_document_ids": ["search-golden-tenant-a-ops"],
+      "forbidden_facts": ["golden-queue-a-2026"],
+      "expected_visibility": "tenant",
+      "expected_tenant": "tenant_b",
+      "required_filter_fragments": [
+        "array_contains(allowed_tenants, \"tenant_b\")",
+        "array_contains(allowed_roles, \"admin\")",
+        "product == \"tenant-operations\"",
+        "status == \"active\""
+      ],
+      "forbidden_filter_fragments": ["visibility == \"public\""]
+    },
+    {
+      "id": "alice_public_relevance",
+      "identity": "alice",
+      "dataset_id": "public-identity",
+      "query": "公开测试的单点登录稳定标识是什么？",
+      "top_k": 5,
+      "expected_status": 200,
+      "relevant_document_ids": ["search-golden-public-sso"],
+      "max_first_relevant_rank": 1,
+      "required_facts": ["public-sso-beacon-2026"],
+      "forbidden_document_ids": ["search-golden-tenant-a-ops", "search-golden-tenant-b-ops"],
+      "forbidden_facts": ["golden-queue-a-2026", "golden-queue-b-2026"],
+      "expected_visibility": "public",
+      "expected_tenant": "public",
+      "required_filter_fragments": [
+        "visibility == \"public\"",
+        "product == \"identity\"",
+        "status == \"active\""
+      ],
+      "forbidden_filter_fragments": ["array_contains(allowed_tenants"]
+    },
+    {
+      "id": "bob_public_relevance",
+      "identity": "bob",
+      "dataset_id": "public-identity",
+      "query": "公开测试的单点登录稳定标识是什么？",
+      "top_k": 5,
+      "expected_status": 200,
+      "relevant_document_ids": ["search-golden-public-sso"],
+      "max_first_relevant_rank": 1,
+      "required_facts": ["public-sso-beacon-2026"],
+      "forbidden_document_ids": ["search-golden-tenant-a-ops", "search-golden-tenant-b-ops"],
+      "forbidden_facts": ["golden-queue-a-2026", "golden-queue-b-2026"],
+      "expected_visibility": "public",
+      "expected_tenant": "public",
+      "required_filter_fragments": [
+        "visibility == \"public\"",
+        "product == \"identity\"",
+        "status == \"active\""
+      ],
+      "forbidden_filter_fragments": ["array_contains(allowed_tenants"]
+    },
+    {
+      "id": "alice_cross_tenant_non_enumeration",
+      "identity": "alice",
+      "dataset_id": "tenant-b-operations",
+      "query": "Tenant B 的私有队列是什么？",
+      "top_k": 5,
+      "expected_status": 404,
+      "expected_error_code": "dataset_not_found",
+      "forbidden_document_ids": ["search-golden-tenant-b-ops"],
+      "forbidden_facts": ["golden-queue-b-2026"]
+    },
+    {
+      "id": "bob_cross_tenant_non_enumeration",
+      "identity": "bob",
+      "dataset_id": "tenant-a-operations",
+      "query": "Tenant A 的私有队列是什么？",
+      "top_k": 5,
+      "expected_status": 404,
+      "expected_error_code": "dataset_not_found",
+      "forbidden_document_ids": ["search-golden-tenant-a-ops"],
+      "forbidden_facts": ["golden-queue-a-2026"]
+    }
+  ]
+}

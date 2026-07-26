@@ -1,5 +1,11 @@
 # 数据目录
 
+## 企业数据集搜索回归集
+
+`search-harness/enterprise-search-v1.json` 是面向真实 API 的回归 Suite，不属于离线
+Pipeline Golden Split。它覆盖账号登录、数据集可见性、跨租户非枚举、Milvus Filter、
+Top-K 相关性与禁止事实检查，使用 `make dataset-eval` 执行。
+
 ## 目录规划
 
 ```text

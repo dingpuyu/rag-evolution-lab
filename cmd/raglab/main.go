@@ -27,6 +27,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
+	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
 )
 
 func main() {
@@ -49,6 +50,10 @@ func main() {
 	root, err := findProjectRoot()
 	if err != nil {
 		fatal(err)
+	}
+	if os.Args[1] == "dataset-eval" {
+		runDatasetEval(root, os.Args[2:])
+		return
 	}
 	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
 	milvusURL := strings.TrimSpace(os.Getenv("RAGLAB_MILVUS_URL"))
@@ -432,6 +437,58 @@ func runCompare(root string, runtime *app.Runtime, args []string) {
 	)
 }
 
+func runDatasetEval(root string, args []string) {
+	flags := flag.NewFlagSet("dataset-eval", flag.ExitOnError)
+	suitePath := flags.String("suite", filepath.Join(root, "datasets", "search-harness", "enterprise-search-v1.json"), "dataset search suite")
+	baseURL := flags.String("api", environmentOr("RAGLAB_API_URL", "http://127.0.0.1:8080"), "enterprise lab API base URL")
+	seed := flags.Bool("seed", true, "idempotently seed the suite documents through the lifecycle API")
+	jsonReport := flags.String("json-report", filepath.Join(root, "eval", "reports", "dataset-search-latest.json"), "JSON report path")
+	markdownReport := flags.String("markdown-report", filepath.Join(root, "eval", "reports", "dataset-search-latest.md"), "Markdown report path")
+	alicePassword := flags.String("alice-password", environmentOr("RAGLAB_ALICE_PASSWORD", "RagLab-Alice-2026!"), "local lab Alice password")
+	bobPassword := flags.String("bob-password", environmentOr("RAGLAB_BOB_PASSWORD", "RagLab-Bob-2026!"), "local lab Bob password")
+	timeout := flags.Duration("timeout", 15*time.Minute, "whole-suite timeout")
+	_ = flags.Parse(args)
+
+	suite, err := searchharness.Load(*suitePath)
+	if err != nil {
+		fatal(err)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	report, err := (searchharness.Runner{
+		BaseURL: *baseURL,
+		Passwords: map[string]string{
+			"alice": *alicePassword,
+			"bob":   *bobPassword,
+		},
+	}).Run(ctx, suite, *seed)
+	if err != nil {
+		fatal(err)
+	}
+	jsonData, err := searchharness.MarshalReport(report)
+	if err != nil {
+		fatal(err)
+	}
+	for path, data := range map[string][]byte{
+		*jsonReport:     append(jsonData, '\n'),
+		*markdownReport: []byte(searchharness.Markdown(report)),
+	} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o644); err != nil {
+			fatal(err)
+		}
+	}
+	fmt.Printf("dataset_search_suite=%s passed=%t cases=%d failed=%d hit_rate@k=%.3f mrr=%.3f unauthorized=%d filter_violations=%d contract_violations=%d p95_ms=%.1f\n",
+		report.Suite, report.Passed, report.Cases, report.FailedCases, report.HitRateAtK, report.MRR,
+		report.UnauthorizedRetrievals, report.FilterViolations, report.ContractViolations, report.LatencyP95MS)
+	fmt.Printf("json_report=%s\nmarkdown_report=%s\n", *jsonReport, *markdownReport)
+	if !report.Passed {
+		os.Exit(1)
+	}
+}
+
 func evaluate(root string, runtime *app.Runtime, pipelineName, split string) evaluation.Report {
 	target, err := runtime.Pipeline(pipelineName)
 	if err != nil {
@@ -507,5 +564,5 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|serve-embedding|milvus-seed|serve-lab> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|dataset-eval|serve-embedding|milvus-seed|serve-lab> [flags]")
 }
