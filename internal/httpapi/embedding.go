@@ -96,9 +96,16 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("GET /api/v1/milvus/lifecycle/status", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.status)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/apply", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.apply)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/search", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.search)))
-		datasetAPI := &DatasetAPI{catalog: datasetaccess.Defaults(), service: lifecycleService}
+		datasetStore := enterprise.DatasetStore
+		if datasetStore == nil {
+			datasetStore = datasetaccess.Defaults()
+		}
+		datasetAPI := &DatasetAPI{store: datasetStore, service: lifecycleService}
 		mux.Handle("GET /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.list)))
+		mux.Handle("POST /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.create)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
+		mux.Handle("GET /api/v1/control-plane/status", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.status)))
+		mux.Handle("GET /api/v1/memberships", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.members)))
 	}
 	if enterprise.IngestionJobs != nil {
 		if authenticator == nil {

@@ -246,6 +246,14 @@ h1 span { color: var(--acid-dark); }
 .dataset-panel { min-width: 0; padding: 25px; }
 .dataset-panel-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
 .dataset-panel-head button { background: transparent; color: var(--acid); }
+.control-plane-metrics { margin-top: 16px; display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid #354039; }
+.control-plane-metrics > div { min-width: 0; padding: 11px; border-right: 1px solid #354039; }
+.control-plane-metrics > div:last-child { border-right: 0; }
+.control-plane-metrics span, .control-plane-metrics small { display: block; color: #6f7b74; font: 6px var(--font-geist-mono); }
+.control-plane-metrics strong { display: block; margin: 6px 0; overflow: hidden; color: var(--acid); text-overflow: ellipsis; font: 14px var(--font-geist-mono); }
+.membership-strip { padding: 10px 12px; border: 1px solid #354039; border-top: 0; display: flex; align-items: center; gap: 12px; overflow-x: auto; }
+.membership-strip span { color: #c38d43; white-space: nowrap; font: 6px var(--font-geist-mono); }
+.membership-strip code { color: #7f8d84; white-space: nowrap; font: 7px var(--font-geist-mono); }
 .dataset-cards { margin: 17px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
 .dataset-cards > button { min-width: 0; padding: 13px; border-color: #394146; background: #171d21; color: #e7e9e4; text-align: left; }
 .dataset-cards > button.selected { border-color: var(--acid); box-shadow: inset 3px 0 var(--acid); }
@@ -253,6 +261,14 @@ h1 span { color: var(--acid-dark); }
 .dataset-cards > button strong { display: block; margin: 7px 0; font-size: 11px; }
 .dataset-cards > button p { margin: 0 0 8px; color: #838e87; font-size: 8px; line-height: 1.5; }
 .dataset-cards > button code { color: #657069; font-size: 7px; }
+.dataset-create { margin-bottom: 14px; padding: 12px; border: 1px solid #3b4640; display: grid; grid-template-columns: 1.1fr .8fr .7fr 1.2fr auto; gap: 8px; align-items: end; background: #141a1d; }
+.dataset-create > div { align-self: center; }
+.dataset-create > div span, .dataset-create > div strong, .dataset-create > div small { display: block; }
+.dataset-create > div span { color: var(--acid); font: 6px var(--font-geist-mono); }
+.dataset-create > div strong { margin: 5px 0; font-size: 10px; }
+.dataset-create > div small { color: #6f7a74; font-size: 7px; }
+.dataset-create label span { display: block; margin-bottom: 5px; color: #77827c; font: 6px var(--font-geist-mono); }
+.dataset-create input { width: 100%; height: 36px; border: 1px solid #394146; background: #0f1417; color: #e7e9e4; padding: 0 8px; font: 8px var(--font-geist-mono); }
 .dataset-query { display: grid; grid-template-columns: .85fr 1.5fr auto auto; gap: 8px; align-items: end; }
 .dataset-query button.danger { border-color: #a4554e; background: transparent; color: #d77a70; }
 .dataset-denied { margin-top: 14px; padding: 12px; border: 1px solid #843f3b; background: #2a1718; display: grid !important; gap: 5px !important; color: #e79a92; font: 8px var(--font-geist-mono); }
@@ -414,6 +430,7 @@ h1 span { color: var(--acid-dark); }
   .scale-heading { grid-template-columns: 1fr; gap: 20px; }.scale-status-button { width: max-content; }.scale-health { grid-template-columns: repeat(3, 1fr); }.scale-workbench { grid-template-columns: 1fr; }.scale-controls { border-right: 0; border-bottom: 1px solid #30363a; }.scale-query-proof { grid-template-columns: 1fr; }
   .enterprise-auth { grid-template-columns: 1fr 1fr; }.auth-story { border-bottom: 1px solid #30363a; }.auth-flow { grid-column: 1 / -1; grid-row: 2; border-top: 1px solid #30363a; border-right: 0; }.verified-identity { grid-column: 2; }
   .account-access-lab { grid-template-columns: 1fr; }.account-panel { border-right: 0; border-bottom: 1px solid #30363a; }.dataset-query { grid-template-columns: 1fr 1fr; }
+  .dataset-create { grid-template-columns: 1fr 1fr; }.dataset-create > div { grid-column: 1 / -1; }
   .lifecycle-lab { grid-template-columns: 1fr 1fr; }.lifecycle-intro { grid-column: 1 / -1; border-right: 0; border-bottom: 1px solid #30363a; }
   .hybrid-heading { grid-template-columns: 140px 1fr; }.hybrid-heading p { grid-column: 2; }
   .hybrid-row { grid-template-columns: 1fr repeat(4, 90px); }
@@ -441,6 +458,7 @@ h1 span { color: var(--acid-dark); }
   .scale-lab { margin-bottom: 78px; }.scale-heading, .scale-controls, .scale-output { padding: 22px; }.scale-health { grid-template-columns: 1fr 1fr; }.index-compare { grid-template-columns: 1fr; gap: 9px; }.index-compare > i { min-height: 25px; }.scale-result-head { grid-template-columns: 1fr 1fr; }.scale-result-head > div:nth-child(2) { border-right: 0; }.scale-result-head > div:nth-child(-n+2) { border-bottom: 1px solid #343a3e; }.scale-legend { align-items: flex-start; flex-direction: column; padding: 12px 0; }.scale-legend b { margin-left: 0; }.scale-hit-list article { grid-template-columns: 55px 1fr; }.match-badges { grid-column: 2; padding-top: 0; }
   .enterprise-auth { grid-template-columns: 1fr; }.auth-story, .persona-control { border-right: 0; border-bottom: 1px solid #30363a; }.auth-flow { grid-column: 1; grid-row: auto; padding: 15px; overflow-x: auto; }.auth-flow > div { min-width: 105px; }.verified-identity { grid-column: 1; }.audit-console { grid-template-columns: 1fr; }.audit-console > button { justify-self: start; }.audit-list { grid-column: 1; grid-template-columns: 1fr; }
   .dataset-cards, .dataset-query { grid-template-columns: 1fr; }
+  .control-plane-metrics { grid-template-columns: 1fr 1fr; }.control-plane-metrics > div:nth-child(2) { border-right: 0; }.control-plane-metrics > div:nth-child(-n+2) { border-bottom: 1px solid #354039; }.dataset-create { grid-template-columns: 1fr; }
   .lifecycle-lab { grid-template-columns: 1fr; }.lifecycle-intro, .lifecycle-controls { border-right: 0; border-bottom: 1px solid #30363a; }.lifecycle-fields { grid-template-columns: 1fr; }
   .ingestion-heading { align-items: stretch; flex-direction: column; }.ingestion-metrics { grid-template-columns: 1fr 1fr; }.ingestion-metrics > div { border-bottom: 1px solid #30383b; }.ingestion-jobs { grid-template-columns: 1fr; }
   .hybrid-experiment { margin-bottom: 78px; }.hybrid-heading { display: block; padding: 26px; }.hybrid-heading h2 { margin: 18px 0; }.hybrid-table { padding: 15px; overflow-x: auto; }.hybrid-row { min-width: 650px; }.hybrid-notes { grid-template-columns: 1fr; }.hybrid-notes span { padding: 15px 25px; border-right: 0; border-bottom: 1px solid #343a3e; }

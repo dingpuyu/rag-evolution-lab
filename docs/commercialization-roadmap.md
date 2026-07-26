@@ -43,15 +43,18 @@
 - OIDC/RS256、JWKS 轮换、Tenant/Role ACL、401/403 和审计；
 - Pre-ANN 权限过滤与越权召回零容忍回归；
 - 增量 Upsert、版本乱序拒绝、Tombstone、删除后零残留验证；
+- 持久化异步导入任务、五阶段进度、幂等、重试、取消和重启恢复；
+- PostgreSQL Tenant/User/Membership/Dataset控制面、Dataset创建审计和成员撤权；
+- 数据集资源授权与Milvus Pre-ANN行级过滤的双层隔离；
 - Embedding 模型、版本、维度和 Content Hash 一致性门禁；
 - Golden Dataset、确定性测试、评测报告和网页实验室。
 
 ### 尚未达到商业化验收
 
 - 多格式解析、OCR、表格与父子 Chunk 还没有生产级流水线；
-- 导入任务仍缺少独立 Worker、消息队列、死信队列和任务运营页面；
+- 导入任务已有单进程状态机和运营页面，但仍缺独立 Worker、Outbox、Lease 和死信队列；
 - 数据源 Connector、定时同步、Webhook 和增量游标尚未形成统一协议；
-- API Gateway、API Key、租户配额、Token/Embedding/存储计量尚未闭环；
+- 多租户控制面已有首版，但成员邀请、Group映射、API Key、租户配额和用量计量尚未闭环；
 - 缓存、限流、熔断、超时、Fallback 和背压缺少故障注入证明；
 - OpenTelemetry、指标、日志、Trace 和告警尚未接入统一观测面；
 - 备份恢复、索引重建、灾难恢复和升级回滚尚未演练；

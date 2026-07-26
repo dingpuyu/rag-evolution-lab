@@ -1,0 +1,176 @@
+# PostgreSQL 多租户控制面
+
+这一阶段把数据集授权从进程内静态 Catalog 迁移到 PostgreSQL。Milvus 继续承担向量数据面，PostgreSQL 成为 Tenant、User、Membership、Dataset 和管理审计的控制面事实源。
+
+## 架构边界
+
+```text
+OIDC / Local JWT
+  -> verified subject / tenant / roles
+  -> PostgreSQL Membership + Dataset authorization
+  -> server-assigned dataset product / access scope
+  -> Milvus Pre-ANN ACL
+```
+
+数据库授权和 Milvus 行级过滤不是二选一：
+
+- PostgreSQL 决定调用者是否能访问这个 Dataset Resource；
+- Milvus Filter 决定 ANN 搜索可以参与计算的向量行；
+- 禁止访问的 Dataset 在调用 Milvus 前返回统一 404；
+- 允许访问的 Dataset 仍必须带 Tenant、Role、Product 和 Status 过滤。
+
+## 数据模型
+
+### Tenant
+
+- `id`：稳定租户边界；
+- `status`：`active`或`suspended`；
+- 租户不能由请求体覆盖，来源是受信身份或 Platform Admin 管理动作。
+
+### User
+
+- 主键是外部 IdP 的稳定 Subject；
+- 不用 Email 作为授权主键；
+- 本地注册同样生成稳定 Subject，生产环境由 OIDC `sub`提供。
+
+### Membership
+
+- 复合主键：`tenant_id + subject`；
+- Role：`viewer`、`admin`、`platform_admin`；
+- Status：`active`、`revoked`；
+- 首次出现的可信 Claims 可以建立初始 Membership；
+- 已存在的 Membership 不会被后续请求自动覆盖或重新激活，因此数据库撤权可以生效。
+
+### Dataset
+
+- 强制归属于一个 Tenant；
+- Public Dataset 归属于 Platform Tenant；
+- Tenant Admin 创建的数据集由服务端强制写入当前 Tenant；
+- Product 是数据集到 Milvus Metadata 的映射，不要求全局唯一；
+- Dataset Role 单独存入`dataset_roles`，便于后续扩展 Group 和自定义角色。
+
+### Control Plane Audit
+
+管理变更保存：
+
+- Actor Subject
+- Tenant
+- Action
+- Resource Type / ID
+- Before / After JSON
+- Timestamp
+
+首版已经对 Dataset Create 写入审计，后续成员邀请、撤权、归档和配额变更复用同一结构。
+
+## 本地部署
+
+```bash
+make postgres-up
+make postgres-status
+make milvus-up
+make serve-lab
+```
+
+默认连接：
+
+```text
+postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable
+```
+
+可以使用`RAGLAB_POSTGRES_URL`替换。数据写入`data/postgres`，不会提交到 Git。
+
+服务启动时：
+
+1. 连接 PostgreSQL；
+2. 获取 Advisory Transaction Lock；
+3. 幂等创建表、约束和索引；
+4. 初始化 Platform、Tenant A、Tenant B；
+5. 初始化两个 Public Dataset 和两个 Tenant Dataset；
+6. 连接失败则拒绝启动，不静默退化为内存授权。
+
+明确传入空`--postgres-url`时才使用只读内存 Catalog，适合单元测试和最小演示。
+
+## API
+
+### 控制面状态
+
+```http
+GET /api/v1/control-plane/status
+Authorization: Bearer <token>
+```
+
+返回 Backend、连接状态以及 Tenant、User、Membership、Dataset 数量。
+
+### 当前 Tenant 成员
+
+```http
+GET /api/v1/memberships
+Authorization: Bearer <tenant-admin-token>
+```
+
+Viewer 不能枚举成员。
+
+### 创建数据集
+
+```http
+POST /api/v1/datasets
+Authorization: Bearer <tenant-admin-token>
+Content-Type: application/json
+
+{
+  "name": "客户成功知识库",
+  "slug": "customer-success",
+  "description": "Tenant A 自建数据集",
+  "visibility": "tenant"
+}
+```
+
+客户端不能提交 Owner Tenant、Product、Allowed Roles、Created By 或 Status。服务端生成：
+
+```text
+id      = tenant_a-customer-success
+product = dataset-tenant_a-customer-success
+owner   = tenant_a
+roles   = [admin]
+status  = active
+```
+
+## 已验证问题
+
+### Product 不能错误地全局唯一
+
+Tenant A 与 Tenant B 的运维数据集可以映射到相同 Product，再通过 Tenant ACL 分开。第一轮真实迁移曾给 Product 添加全局唯一约束，Seed 阶段立即产生冲突。当前 Migration 会移除该错误约束。
+
+### PostgreSQL Array 的驱动扫描差异
+
+`array_agg(text)`通过`database/sql + pgx stdlib`返回的底层类型并不适合直接扫描到`[]string`。当前查询改用有序`string_agg`并由 Repository 解析，避免依赖驱动隐式转换。
+
+这两个问题已经进入真实集成测试，而不只是写在文档中。
+
+## 集成测试
+
+设置：
+
+```bash
+RAGLAB_TEST_POSTGRES_URL='postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable' \
+  go test -v ./internal/datasetaccess
+```
+
+验证：
+
+- Migration 和 Seed 可重复执行；
+- Tenant Admin 创建自己的 Dataset；
+- Owner 可以授权；
+- 另一个 Tenant 被拒绝；
+- Membership 设为`revoked`后立即失去访问；
+- 后续请求不会自动恢复被撤销的 Membership；
+- Dataset Create 产生一条控制面审计。
+
+## 下一步
+
+- Membership 邀请、接受、Role 变更和撤权 API；
+- Dataset Archive 与删除前引用检查；
+- Document、DataSource、IngestionJob 外键化；
+- Outbox 与 Worker Lease；
+- 权限版本和短 TTL Cache；
+- PostgreSQL 备份恢复与 Migration 回滚演练。

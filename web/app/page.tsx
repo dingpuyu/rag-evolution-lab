@@ -121,6 +121,24 @@ type DatasetResource = {
   visibility: "public" | "tenant";
   owner_tenant?: string;
   allowed_roles?: string[];
+  status: string;
+  created_by?: string;
+};
+
+type ControlPlaneStatus = {
+  backend: string;
+  connected: boolean;
+  tenants: number;
+  users: number;
+  memberships: number;
+  datasets: number;
+};
+
+type MembershipResource = {
+  tenant_id: string;
+  subject: string;
+  role: string;
+  status: string;
 };
 
 type DatasetSearchResponse = {
@@ -305,6 +323,11 @@ export default function Home() {
   const [datasetResult, setDatasetResult] = useState<DatasetSearchResponse | null>(null);
   const [datasetError, setDatasetError] = useState("");
   const [datasetLoading, setDatasetLoading] = useState(false);
+  const [controlPlane, setControlPlane] = useState<ControlPlaneStatus | null>(null);
+  const [memberships, setMemberships] = useState<MembershipResource[]>([]);
+  const [newDatasetName, setNewDatasetName] = useState("产品支持知识库");
+  const [newDatasetSlug, setNewDatasetSlug] = useState("product-support");
+  const [newDatasetDescription, setNewDatasetDescription] = useState("由当前 Tenant Admin 创建并持久化的数据集");
   const [lastRequestID, setLastRequestID] = useState("");
   const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
   const [lifecycleStatus, setLifecycleStatus] = useState<LifecycleStatus | null>(null);
@@ -492,9 +515,59 @@ export default function Home() {
       const privateDataset = (body.datasets || []).find((item: DatasetResource) => item.visibility === "tenant");
       if (privateDataset) setDatasetID(privateDataset.id);
       setLastRequestID(response.headers.get("X-Request-ID") || "");
+      await loadControlPlane(session);
     } catch (error) {
       setDatasets([]);
       setDatasetError(error instanceof Error ? error.message : "读取数据集失败");
+    }
+  }
+
+  async function loadControlPlane(session = authSession) {
+    if (!session) return;
+    try {
+      const headers = { Authorization: `Bearer ${session.access_token}` };
+      const [statusResponse, memberResponse] = await Promise.all([
+        fetch(`${apiBase.replace(/\/$/, "")}/api/v1/control-plane/status`, { headers }),
+        fetch(`${apiBase.replace(/\/$/, "")}/api/v1/memberships`, { headers }),
+      ]);
+      const statusBody = await statusResponse.json();
+      const memberBody = await memberResponse.json();
+      if (!statusResponse.ok) throw new Error(statusBody?.error?.message || `HTTP ${statusResponse.status}`);
+      setControlPlane(statusBody);
+      setMemberships(memberResponse.ok ? memberBody.members || [] : []);
+    } catch (error) {
+      setControlPlane(null);
+      setMemberships([]);
+      setDatasetError(error instanceof Error ? error.message : "读取控制面失败");
+    }
+  }
+
+  async function createDataset() {
+    if (!authSession) {
+      setDatasetError("请先以 Tenant Admin 登录");
+      return;
+    }
+    setDatasetLoading(true);
+    setDatasetError("");
+    try {
+      const response = await fetch(`${apiBase.replace(/\/$/, "")}/api/v1/datasets`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${authSession.access_token}` },
+        body: JSON.stringify({
+          name: newDatasetName,
+          slug: newDatasetSlug,
+          description: newDatasetDescription,
+          visibility: "tenant",
+        }),
+      });
+      const body = await response.json();
+      if (!response.ok) throw new Error(body?.error?.message || `HTTP ${response.status}`);
+      setDatasetID(body.id);
+      await loadDatasets(authSession);
+    } catch (error) {
+      setDatasetError(error instanceof Error ? error.message : "创建数据集失败");
+    } finally {
+      setDatasetLoading(false);
     }
   }
 
@@ -1048,8 +1121,20 @@ export default function Home() {
 
           <div className="dataset-panel">
             <div className="dataset-panel-head">
-              <div><span>RESOURCE AUTHORIZATION</span><h3>当前身份能看到哪些数据集？</h3></div>
+              <div><span>POSTGRESQL CONTROL PLANE</span><h3>当前身份能看到哪些数据集？</h3></div>
               <button onClick={() => loadDatasets()} disabled={!authSession}>刷新授权目录</button>
+            </div>
+            <div className="control-plane-metrics">
+              <div><span>BACKEND</span><strong>{controlPlane?.backend || "—"}</strong><small>{controlPlane?.connected ? "CONNECTED" : "NOT CHECKED"}</small></div>
+              <div><span>TENANTS</span><strong>{controlPlane?.tenants ?? "—"}</strong><small>control-plane rows</small></div>
+              <div><span>MEMBERSHIPS</span><strong>{controlPlane?.memberships ?? "—"}</strong><small>{memberships.length} in current tenant</small></div>
+              <div><span>DATASETS</span><strong>{controlPlane?.datasets ?? "—"}</strong><small>public + tenant</small></div>
+            </div>
+            <div className="membership-strip">
+              <span>TRUSTED MEMBERSHIP</span>
+              {memberships.length ? memberships.map((membership) => <code key={`${membership.tenant_id}:${membership.subject}`}>
+                {membership.subject} → {membership.tenant_id} / {membership.role} / {membership.status}
+              </code>) : <code>登录后由可信 Claims 首次登记，撤权后不会被请求自动恢复。</code>}
             </div>
             <div className="dataset-cards">
               {datasets.length ? datasets.map((dataset) => <button
@@ -1062,6 +1147,13 @@ export default function Home() {
                 <p>{dataset.description}</p>
                 <code>{dataset.id}</code>
               </button>) : <p>登录后，服务端只返回当前 Claims 可以访问的数据集目录。</p>}
+            </div>
+            <div className="dataset-create">
+              <div><span>TENANT ADMIN MUTATION</span><strong>创建持久化数据集</strong><small>服务端强制 owner_tenant，客户端不能替换归属。</small></div>
+              <label><span>NAME</span><input value={newDatasetName} onChange={(event) => setNewDatasetName(event.target.value)} /></label>
+              <label><span>SLUG</span><input value={newDatasetSlug} onChange={(event) => setNewDatasetSlug(event.target.value)} /></label>
+              <label><span>DESCRIPTION</span><input value={newDatasetDescription} onChange={(event) => setNewDatasetDescription(event.target.value)} /></label>
+              <button onClick={createDataset} disabled={datasetLoading || !authSession}>创建并写入 PostgreSQL</button>
             </div>
             <div className="dataset-query">
               <label><span>DATASET RESOURCE ID</span><input value={datasetID} onChange={(event) => setDatasetID(event.target.value)} /></label>

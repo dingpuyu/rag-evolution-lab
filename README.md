@@ -119,6 +119,16 @@ Phase 5 已完成首轮工程基线实验：
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 
+PostgreSQL 多租户控制面首版已完成：
+
+- Tenant、User、Membership、Dataset、Dataset Role与控制面审计表
+- Advisory Lock保护的幂等自动迁移和默认演示数据
+- Tenant Admin创建数据集时由服务端强制Owner、Product、Role和Status
+- Membership撤权后立即失去Dataset访问，后续请求不会自动恢复
+- PostgreSQL资源授权与Milvus Pre-ANN ACL组成两道隔离边界
+- 真实数据库集成测试覆盖创建、跨租户拒绝、撤权和审计
+- 设计与实测问题见 [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
+
 增量知识生命周期首版已完成：
 
 - `event_id`幂等、Pending/Completed持久化与安全重放
@@ -151,6 +161,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
 - [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
+- [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
 - [企业RAG异步导入任务状态机](docs/async-ingestion-jobs.md)
 - [商业化级企业RAG演进路线](docs/commercialization-roadmap.md)
@@ -186,6 +197,7 @@ go run ./cmd/raglab eval --pipeline v4-router --split v4-challenge
 go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
 go run ./cmd/raglab serve-embedding --backend hash
 make milvus-up
+make postgres-up
 make milvus-seed
 make serve-lab
 make web-dev

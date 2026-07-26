@@ -46,6 +46,9 @@ test("server-renders the RAG experiment dashboard", async () => {
   assert.match(html, /TRUSTED IDENTITY BOUNDARY/);
   assert.match(html, /签发演示 JWT/);
   assert.match(html, /SECURITY AUDIT TRAIL/);
+  assert.match(html, /POSTGRESQL CONTROL PLANE/);
+  assert.match(html, /创建并写入 PostgreSQL/);
+  assert.match(html, /TRUSTED MEMBERSHIP/);
   assert.match(html, /INCREMENTAL KNOWLEDGE LIFECYCLE/);
   assert.match(html, /UPSERT 当前版本/);
   assert.match(html, /DELETE 并验证/);

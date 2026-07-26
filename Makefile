@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus scale-10k scale-100k scale-bench serve-lab web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -48,6 +48,16 @@ milvus-status:
 
 milvus-seed:
 	go run ./cmd/raglab milvus-seed --model $${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+
+postgres-up:
+	$(DOCKER_COMPOSE) -f deploy/postgres/docker-compose.yml up -d
+
+postgres-down:
+	$(DOCKER_COMPOSE) -f deploy/postgres/docker-compose.yml down
+
+postgres-status:
+	$(DOCKER_COMPOSE) -f deploy/postgres/docker-compose.yml ps
+	@docker exec raglab-postgres pg_isready -U raglab -d raglab
 
 query-milvus:
 	RAGLAB_VECTOR_BACKEND=milvus go run ./cmd/raglab query --pipeline v5-milvus-rerank --query "$${QUERY:-当前版本如何配置企业单点登录？}" --tenant "$${TENANT:-tenant_a}" --role "$${ROLE:-admin}"

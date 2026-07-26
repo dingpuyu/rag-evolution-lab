@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 )
 
@@ -21,6 +22,7 @@ type EnterpriseOptions struct {
 	LocalAccounts *auth.AccountStore
 	Audit         *auth.AuditLog
 	IngestionJobs *ingestionjob.Service
+	DatasetStore  datasetaccess.Store
 }
 
 type authAPI struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
+	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
@@ -215,6 +216,7 @@ func runLabServer(args []string) {
 	authOIDCIssuer := flags.String("auth-oidc-issuer", os.Getenv("RAGLAB_AUTH_OIDC_ISSUER"), "enterprise OIDC issuer; enables RS256/JWKS mode")
 	authJWKSURL := flags.String("auth-jwks-url", os.Getenv("RAGLAB_AUTH_JWKS_URL"), "optional direct JWKS URL; otherwise OIDC discovery is used")
 	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
+	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
 	_ = flags.Parse(args)
 
 	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
@@ -260,6 +262,17 @@ func runLabServer(args []string) {
 	var verifier auth.Verifier
 	var devIssuer *auth.Manager
 	var localAccounts *auth.AccountStore
+	var datasetStore datasetaccess.Store = datasetaccess.Defaults()
+	if strings.TrimSpace(*postgresURL) != "" {
+		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancelControlPlane()
+		postgresStore, postgresErr := datasetaccess.OpenPostgres(controlPlaneContext, *postgresURL)
+		if postgresErr != nil {
+			fatal(postgresErr)
+		}
+		defer postgresStore.Close()
+		datasetStore = postgresStore
+	}
 	authMode := "local_hs256"
 	if strings.TrimSpace(*authOIDCIssuer) != "" || strings.TrimSpace(*authJWKSURL) != "" {
 		oidcVerifier, oidcErr := auth.NewOIDCVerifier(auth.OIDCConfig{
@@ -301,7 +314,7 @@ func runLabServer(args []string) {
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
-		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs,
+		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)
