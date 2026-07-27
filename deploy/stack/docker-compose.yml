@@ -1,0 +1,153 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: raglab
+      POSTGRES_USER: raglab
+      POSTGRES_PASSWORD: raglab-local
+    ports:
+      - "127.0.0.1:${RAGLAB_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - raglab_stack_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raglab -d raglab"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.25
+    restart: unless-stopped
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    volumes:
+      - raglab_stack_etcd_data:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio:RELEASE.2024-12-18T13-15-44Z
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - raglab_stack_minio_data:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  milvus:
+    image: milvusdb/milvus:v2.6.20
+    restart: unless-stopped
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MQ_TYPE: woodpecker
+    volumes:
+      - raglab_stack_milvus_data:/var/lib/milvus
+    ports:
+      - "${RAGLAB_MILVUS_PORT:-19530}:19530"
+      - "${RAGLAB_MILVUS_HEALTH_PORT:-9091}:9091"
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9091/healthz"]
+      interval: 15s
+      start_period: 90s
+      timeout: 10s
+      retries: 20
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  api:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      RAGLAB_EMBEDDING_BACKEND: ${RAGLAB_EMBEDDING_BACKEND:-hash}
+      RAGLAB_HASH_EMBEDDING_DIMENSIONS: ${RAGLAB_HASH_EMBEDDING_DIMENSIONS:-512}
+      RAGLAB_OLLAMA_URL: ${RAGLAB_OLLAMA_URL:-http://host.docker.internal:11434}
+      RAGLAB_OLLAMA_MODEL: ${RAGLAB_OLLAMA_MODEL:-qwen3-embedding:4b-local}
+      RAGLAB_QUERY_INSTRUCTION: ${RAGLAB_QUERY_INSTRUCTION:-}
+      RAGLAB_GENERATION_PROVIDER: ${RAGLAB_GENERATION_PROVIDER:-extractive}
+      RAGLAB_GENERATION_API_KEY: ${RAGLAB_GENERATION_API_KEY:-}
+      RAGLAB_GENERATION_BASE_URL: ${RAGLAB_GENERATION_BASE_URL:-https://api.deepseek.com}
+      RAGLAB_GENERATION_MODEL: ${RAGLAB_GENERATION_MODEL:-deepseek-v4-pro}
+      RAGLAB_AUTH_SECRET: ${RAGLAB_AUTH_SECRET:-change-this-local-secret}
+      RAGLAB_PLATFORM_ADMIN_PASSWORD: ${RAGLAB_PLATFORM_ADMIN_PASSWORD:-change-this-admin-password}
+      RAGLAB_AUTH_ISSUER: ${RAGLAB_AUTH_ISSUER:-raglab-local}
+      RAGLAB_AUTH_AUDIENCE: ${RAGLAB_AUTH_AUDIENCE:-raglab-api}
+      RAGLAB_MILVUS_URL: http://milvus:19530
+      RAGLAB_POSTGRES_URL: postgres://raglab:raglab-local@postgres:5432/raglab?sslmode=disable
+      RAGLAB_MILVUS_COLLECTION: raglab_chunks_qwen3
+      RAGLAB_LIFECYCLE_COLLECTION: raglab_lifecycle_v1
+      RAGLAB_LIFECYCLE_ALIAS: raglab_knowledge_active
+      RAGLAB_LIFECYCLE_STATE: /var/lib/raglab/lifecycle/state.json
+      RAGLAB_INGESTION_JOB_STATE: /var/lib/raglab/ingestion/jobs.json
+      RAGLAB_AUTH_ACCOUNTS: /var/lib/raglab/auth/accounts.json
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "${RAGLAB_API_PORT:-8080}:8080"
+    volumes:
+      - raglab_stack_api_data:/var/lib/raglab
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      start_period: 30s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      postgres:
+        condition: service_healthy
+      milvus:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ../../web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8080}
+    restart: unless-stopped
+    ports:
+      - "${RAGLAB_WEB_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      start_period: 30s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      api:
+        condition: service_healthy
+
+networks:
+  default:
+    name: raglab-stack
+
+volumes:
+  raglab_stack_postgres_data:
+  raglab_stack_etcd_data:
+  raglab_stack_minio_data:
+  raglab_stack_milvus_data:
+  raglab_stack_api_data:

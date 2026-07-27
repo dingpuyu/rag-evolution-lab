@@ -1,0 +1,6 @@
+node_modules/
+.next/
+.vinext/
+dist/
+.git/
+*.log

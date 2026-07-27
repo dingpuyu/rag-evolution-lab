@@ -4,6 +4,17 @@
 
 项目围绕同一套企业知识库、固定 Golden Dataset 和统一 Pipeline 接口，保留从关键词检索到高级检索系统的多个版本。每次演进都必须先复现问题，再通过自动化测试和量化指标证明优化有效。
 
+## 快速部署
+
+需要在一台机器上直接体验完整的 API、客服门户、PostgreSQL 控制面和 Milvus 向量库时：
+
+```bash
+cp .env.example .env
+make stack-up
+```
+
+然后打开 <http://localhost:3000/portal>。默认档位使用确定性 Hash Embedding 和抽取式回答，不依赖外部模型；接入本地 Ollama 与 DeepSeek 的配置、端口冲突处理、数据卷和清理方式见 [一键部署指南](docs/quick-deploy.md)。
+
 ## 项目目标
 
 - 系统探索 RAG 的核心原理、常见问题和工程实践。

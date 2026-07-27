@@ -70,6 +70,35 @@ func TestLabHandlerExposesMilvusStatusAndSearch(t *testing.T) {
 	}
 }
 
+func TestLabHandlerHealthzDoesNotRequireDependencies(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v2/vectordb/collections/describe" {
+			t.Fatalf("unexpected Milvus path %s", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+	client := milvus.NewClient(milvus.Config{BaseURL: server.URL})
+	embedder := retrieval.HashEmbedder{Dimensions: 8}
+	embedding, err := embeddinglab.New(embedder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vector, err := milvus.NewService(client, embedder, "chunks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler, err := NewLabHandler(embedding, vector)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || !strings.Contains(response.Body.String(), `"status":"ok"`) {
+		t.Fatalf("unexpected health response: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
 func TestSimilarityEndpoint(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/api/v1/embeddings/similarity", strings.NewReader(`{
 		"text_a":"企业单点登录", "text_b":"员工只登录一次", "preview_dimensions":4

@@ -1,0 +1,22 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+
+# Local databases, model files and generated benchmark artifacts.
+data/
+deploy/milvus/volumes/
+eval/reports/generated/
+*.gguf
+*.bin
+*.safetensors
+
+# Local tooling and build output.
+bin/
+dist/
+coverage/
+tmp/
+web/node_modules/
+web/.next/
+web/.vinext/

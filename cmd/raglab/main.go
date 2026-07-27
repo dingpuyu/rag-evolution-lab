@@ -212,6 +212,8 @@ func runLabServer(args []string) {
 	model := flags.String("model", environmentOr("RAGLAB_OLLAMA_MODEL", "qwen3-embedding:4b-local"), "Ollama embedding model")
 	ollamaURL := flags.String("ollama-url", os.Getenv("RAGLAB_OLLAMA_URL"), "Ollama base URL")
 	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "query-side retrieval instruction")
+	embeddingBackend := flags.String("embedding-backend", environmentOr("RAGLAB_EMBEDDING_BACKEND", "ollama"), "embedding backend: ollama or hash")
+	hashDimensions := flags.Int("hash-dimensions", environmentInt("RAGLAB_HASH_EMBEDDING_DIMENSIONS", 512), "dimensions for hash embedding backend")
 	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
 	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
 	scalePrefix := flags.String("scale-prefix", "raglab_bench_100k", "100K scale collection prefix")
@@ -245,7 +247,10 @@ func runLabServer(args []string) {
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
 	_ = flags.Parse(args)
 
-	embedder := retrieval.OllamaEmbedder{BaseURL: *ollamaURL, Model: *model, QueryInstruction: *queryInstruction}
+	embedder, err := newLabEmbedder(*embeddingBackend, *ollamaURL, *model, *queryInstruction, *hashDimensions)
+	if err != nil {
+		fatal(err)
+	}
 	embeddingService, err := embeddinglab.New(embedder)
 	if err != nil {
 		fatal(err)
@@ -426,8 +431,39 @@ func environmentBool(name string, fallback bool) bool {
 	return parsed
 }
 
+func environmentInt(name string, fallback int) int {
+	value := strings.TrimSpace(os.Getenv(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		fatal(fmt.Errorf("%s must be a positive integer", name))
+	}
+	return parsed
+}
+
+func newLabEmbedder(backend, ollamaURL, model, queryInstruction string, hashDimensions int) (retrieval.Embedder, error) {
+	switch strings.ToLower(strings.TrimSpace(backend)) {
+	case "ollama", "local":
+		if strings.TrimSpace(model) == "" {
+			return nil, fmt.Errorf("RAGLAB_OLLAMA_MODEL is required for the ollama embedding backend")
+		}
+		return retrieval.OllamaEmbedder{BaseURL: ollamaURL, Model: model, QueryInstruction: queryInstruction}, nil
+	case "hash", "deterministic":
+		if hashDimensions <= 0 {
+			return nil, fmt.Errorf("hash embedding dimensions must be positive")
+		}
+		return retrieval.HashEmbedder{Dimensions: hashDimensions}, nil
+	default:
+		return nil, fmt.Errorf("unsupported embedding backend %q; use ollama or hash", backend)
+	}
+}
+
 func newGenerationGenerator(provider, baseURL, apiKey, ollamaURL, model string, timeout time.Duration, maxTokens int) (generation.Generator, error) {
 	switch strings.ToLower(strings.TrimSpace(provider)) {
+	case "extractive", "baseline":
+		return generation.ExtractiveGenerator{}, nil
 	case "ollama", "local":
 		return generation.OllamaGenerator{BaseURL: ollamaURL, Model: model, Timeout: timeout, NumPredict: maxTokens}, nil
 	case "openai", "openai-compatible", "deepseek":
