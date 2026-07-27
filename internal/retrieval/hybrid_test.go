@@ -5,6 +5,7 @@ import (
 	"errors"
 	"math"
 	"testing"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 )
@@ -14,6 +15,24 @@ type stubRetriever struct {
 	results   []domain.RetrievedChunk
 	err       error
 	observedK int
+}
+
+type delayedRetriever struct {
+	name  string
+	delay time.Duration
+}
+
+func (r *delayedRetriever) Name() string { return r.name }
+
+func (r *delayedRetriever) Search(ctx context.Context, _ domain.QueryRequest) ([]domain.RetrievedChunk, error) {
+	timer := time.NewTimer(r.delay)
+	defer timer.Stop()
+	select {
+	case <-timer.C:
+		return []domain.RetrievedChunk{{Chunk: domain.Chunk{ID: r.name}}}, nil
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
 func (s *stubRetriever) Name() string { return s.name }
@@ -91,6 +110,44 @@ func TestRRFIdentifiesFailingRetriever(t *testing.T) {
 	)
 	if err == nil || err.Error() != "search with vector: model unavailable" {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRRFCanServeHealthySourceWhenPeerFails(t *testing.T) {
+	healthy := &stubRetriever{name: "keyword", results: []domain.RetrievedChunk{{Chunk: domain.Chunk{ID: "healthy"}}}}
+	failing := &stubRetriever{name: "vector", err: errors.New("vector unavailable")}
+	results, err := NewRRFWithOptions(RRFOptions{AllowPartialResults: true}, healthy, failing).Search(
+		context.Background(), domain.QueryRequest{Query: "query", TopK: 3},
+	)
+	if err != nil {
+		t.Fatalf("partial retrieval should not fail: %v", err)
+	}
+	if len(results) != 1 || results[0].Chunk.ID != "healthy" {
+		t.Fatalf("expected healthy source result, got %#v", results)
+	}
+	if results[0].Stage != "hybrid-rrf-partial" {
+		t.Fatalf("partial result must be observable in trace metadata, got %q", results[0].Stage)
+	}
+}
+
+func TestRRFBoundsSlowSourceAndKeepsFastSource(t *testing.T) {
+	fast := &stubRetriever{name: "keyword", results: []domain.RetrievedChunk{{Chunk: domain.Chunk{ID: "fast"}}}}
+	slow := &delayedRetriever{name: "vector", delay: time.Second}
+	started := time.Now()
+	results, err := NewRRFWithOptions(RRFOptions{
+		AllowPartialResults: true, SearchTimeout: 10 * time.Millisecond,
+	}, fast, slow).Search(context.Background(), domain.QueryRequest{Query: "query", TopK: 3})
+	if err != nil {
+		t.Fatalf("timed-out peer should degrade to fast source: %v", err)
+	}
+	if len(results) != 1 || results[0].Chunk.ID != "fast" {
+		t.Fatalf("expected fast source result, got %#v", results)
+	}
+	if results[0].Stage != "hybrid-rrf-partial" {
+		t.Fatalf("timed-out result must be observable in trace metadata, got %q", results[0].Stage)
+	}
+	if elapsed := time.Since(started); elapsed > 200*time.Millisecond {
+		t.Fatalf("shared retrieval budget was not enforced: %s", elapsed)
 	}
 }
 

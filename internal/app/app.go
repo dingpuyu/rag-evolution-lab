@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
@@ -56,8 +57,8 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 	}
 	vector := pipeline.New("v1-vector", hashIndex)
 	hashMetadata := hashIndex.WithOptions(retrieval.Options{UseMetadata: true})
-	hybridIndex := retrieval.NewRRF(keywordIndex, hashIndex)
-	hybridMetadataIndex := retrieval.NewRRF(metadataIndex, hashMetadata)
+	hybridIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, keywordIndex, hashIndex)
+	hybridMetadataIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, metadataIndex, hashMetadata)
 	hybridConsensusIndex := retrieval.NewRRFWithOptions(
 		retrieval.RRFOptions{MinSourceMatches: 2},
 		metadataIndex,
@@ -120,10 +121,10 @@ func registerOllamaMemoryPipelines(ctx context.Context, chunks []domain.Chunk, k
 	ollama := pipeline.New("v1-ollama", ollamaIndex)
 	pipelines[ollama.Name()] = ollama
 	ollamaMetadata := ollamaIndex.WithOptions(retrieval.Options{UseMetadata: true})
-	ollamaHybridIndex := retrieval.NewRRF(keywordIndex, ollamaIndex)
+	ollamaHybridIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, keywordIndex, ollamaIndex)
 	ollamaHybrid := pipeline.New("v3-ollama-hybrid", ollamaHybridIndex)
 	pipelines[ollamaHybrid.Name()] = ollamaHybrid
-	ollamaHybridMetadataIndex := retrieval.NewRRF(metadataIndex, ollamaMetadata)
+	ollamaHybridMetadataIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, metadataIndex, ollamaMetadata)
 	ollamaHybridMetadata := pipeline.New("v3-ollama-hybrid-metadata", ollamaHybridMetadataIndex)
 	pipelines[ollamaHybridMetadata.Name()] = ollamaHybridMetadata
 	ollamaHybridConsensusIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{MinSourceMatches: 2}, metadataIndex, ollamaMetadata)
@@ -148,10 +149,10 @@ func registerMilvusPipelines(keywordIndex, metadataIndex retrieval.Retriever, em
 	}
 	v1 := pipeline.New("v1-milvus", vectorIndex)
 	pipelines[v1.Name()] = v1
-	hybridIndex := retrieval.NewRRF(keywordIndex, vectorIndex)
+	hybridIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, keywordIndex, vectorIndex)
 	v3 := pipeline.New("v3-milvus-hybrid", hybridIndex)
 	pipelines[v3.Name()] = v3
-	hybridMetadataIndex := retrieval.NewRRF(metadataIndex, metadataVectorIndex)
+	hybridMetadataIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, metadataIndex, metadataVectorIndex)
 	v3Metadata := pipeline.New("v3-milvus-hybrid-metadata", hybridMetadataIndex)
 	pipelines[v3Metadata.Name()] = v3Metadata
 	hybridConsensusIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{MinSourceMatches: 2}, metadataIndex, metadataVectorIndex)

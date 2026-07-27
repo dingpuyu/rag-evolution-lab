@@ -9,6 +9,17 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 )
 
+type degradedRetriever struct{}
+
+func (degradedRetriever) Name() string { return "hybrid-rrf" }
+
+func (degradedRetriever) Search(context.Context, domain.QueryRequest) ([]domain.RetrievedChunk, error) {
+	return []domain.RetrievedChunk{{
+		Chunk: domain.Chunk{ID: "partial#1", DocumentID: "partial", Content: "fallback evidence", Status: "active", Visibility: "public"},
+		Stage: "hybrid-rrf-partial",
+	}}, nil
+}
+
 func TestPipelineReturnsCitationAndTrace(t *testing.T) {
 	index := retrieval.NewBM25([]domain.Chunk{{
 		ID: "doc#1", DocumentID: "doc", DocumentTitle: "文档", Content: "E1027 超过配额", Status: "active", Visibility: "public",
@@ -56,4 +67,25 @@ func TestAdvancedPipelineReranksCandidatesAndPacksContext(t *testing.T) {
 			t.Fatalf("missing trace event %q: %#v", expected, response.Trace.Events)
 		}
 	}
+}
+
+func TestPipelineTraceMarksDegradedRetrieval(t *testing.T) {
+	response, err := New("hybrid", degradedRetriever{}).Query(context.Background(), domain.QueryRequest{Query: "fallback", TopK: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, event := range response.Trace.Events {
+		if event.Name != "retrieval" {
+			continue
+		}
+		if degraded, ok := event.Attributes["degraded"].(bool); !ok || !degraded {
+			t.Fatalf("expected degraded retrieval trace, got %#v", event.Attributes)
+		}
+		stages, ok := event.Attributes["result_stages"].(map[string]int)
+		if !ok || stages["hybrid-rrf-partial"] != 1 {
+			t.Fatalf("expected partial stage counts, got %#v", event.Attributes["result_stages"])
+		}
+		return
+	}
+	t.Fatal("retrieval trace event not found")
 }

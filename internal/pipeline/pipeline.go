@@ -63,11 +63,21 @@ func (p *Pipeline) Query(ctx context.Context, request domain.QueryRequest) (*dom
 	}
 	started := time.Now()
 	results, err := p.retriever.Search(ctx, candidateRequest)
+	stageCounts := make(map[string]int)
+	degraded := false
+	for _, result := range results {
+		stageCounts[result.Stage]++
+		if strings.HasSuffix(result.Stage, "-partial") {
+			degraded = true
+		}
+	}
 	attributes := map[string]any{
 		"retriever":       p.retriever.Name(),
 		"result_count":    len(results),
 		"requested_top_k": request.TopK,
 		"candidate_top_n": candidateRequest.TopK,
+		"degraded":        degraded,
+		"result_stages":   stageCounts,
 	}
 	if provider, ok := p.retriever.(retrieval.TraceAttributesProvider); ok {
 		for key, value := range provider.TraceAttributes(request) {

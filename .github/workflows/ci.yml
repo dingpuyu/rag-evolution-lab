@@ -27,6 +27,8 @@ jobs:
         run: go run ./cmd/raglab validate
       - name: Run deterministic evaluation gate
         run: make eval-gate
+      - name: Verify retrieval degradation policy
+        run: make reliability-test
 
   web:
     runs-on: ubuntu-latest
