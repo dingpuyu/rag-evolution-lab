@@ -21,7 +21,26 @@ jobs:
         run: test -z "$(gofmt -l cmd internal)"
       - name: Run unit tests
         run: go test ./...
+      - name: Run race detector
+        run: go test -race ./internal/...
       - name: Validate datasets
         run: go run ./cmd/raglab validate
-      - name: Run baseline evaluation
-        run: go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector --split development
+      - name: Run deterministic evaluation gate
+        run: make eval-gate
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.x"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install web dependencies
+        run: npm ci
+      - name: Lint and test web portal
+        run: npm run lint && npm test

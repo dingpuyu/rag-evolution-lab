@@ -136,6 +136,26 @@ make regression-smoke
 数据集可见性、跨租户 404、Milvus Filter、资料导入读回校验、SSE 事件和审计权限。
 脚本的导入文档使用固定 ID + 当前时间修订号，可以重复执行而不会触发旧版本冲突。
 
+### 确定性评测门禁
+
+`compare` 默认只打印基线和候选结果，不改变原有本地工作流。CI 使用带门禁的目标：
+
+```bash
+make eval-gate
+```
+
+门禁默认比较 `v0-keyword` 与 `v1-vector`，要求候选 Hit@K ≥ 0.89、MRR ≥ 0.76、
+NDCG ≥ 0.78，且相对基线不能发生 Hit@K、MRR、Recall、NDCG、Answerability 退化，
+也不能增加越权召回或引用违规。Pipeline 演进时可通过 `BASELINE_PIPELINE`、
+`CANDIDATE_PIPELINE`、`MIN_HIT_RATE` 等环境变量调整策略。
+
+需要机器可读报告时：
+
+```bash
+go run ./cmd/raglab compare --baseline v0-keyword --candidate v1-vector \
+  --split development --fail-on-regression --json > /tmp/raglab-gate.json
+```
+
 Suite 位于 `datasets/search-harness/enterprise-search-v1.json`。它会幂等写入带稳定
 beacon 的公开、Tenant A、Tenant B 三份文档，验证：
 

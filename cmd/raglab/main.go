@@ -508,19 +508,68 @@ func runCompare(root string, runtime *app.Runtime, args []string) {
 	baseline := flags.String("baseline", "v0-keyword", "baseline pipeline")
 	candidate := flags.String("candidate", "v1-vector", "candidate pipeline")
 	split := flags.String("split", "development", "dataset split")
+	jsonOutput := flags.Bool("json", false, "print a machine-readable comparison report")
+	failOnRegression := flags.Bool("fail-on-regression", false, "fail when candidate quality or safety regresses against baseline")
+	minHitRate := flags.Float64("min-hit-rate", 0, "minimum candidate Hit@K; zero disables the threshold")
+	minMRR := flags.Float64("min-mrr", 0, "minimum candidate MRR; zero disables the threshold")
+	minRecall := flags.Float64("min-recall", 0, "minimum candidate document recall; zero disables the threshold")
+	minNDCG := flags.Float64("min-ndcg", 0, "minimum candidate NDCG; zero disables the threshold")
+	minAnswerability := flags.Float64("min-answerability", 0, "minimum candidate answerability accuracy; zero disables the threshold")
+	maxLatencyP95MS := flags.Float64("max-p95-ms", 0, "maximum candidate P95 latency in milliseconds; zero disables the threshold")
 	_ = flags.Parse(args)
 	baseReport := evaluate(root, runtime, *baseline, *split)
 	candidateReport := evaluate(root, runtime, *candidate, *split)
+	policy := evaluation.GatePolicy{
+		FailOnRegression: *failOnRegression,
+		MinHitRate:       *minHitRate,
+		MinMRR:           *minMRR,
+		MinRecall:        *minRecall,
+		MinNDCG:          *minNDCG,
+		MinAnswerability: *minAnswerability,
+		MaxLatencyP95MS:  *maxLatencyP95MS,
+	}
+	violations := evaluation.CheckGate(baseReport, candidateReport, policy)
+	comparison := struct {
+		Baseline   evaluation.Report          `json:"baseline"`
+		Candidate  evaluation.Report          `json:"candidate"`
+		Delta      map[string]float64         `json:"delta"`
+		Gate       evaluation.GatePolicy      `json:"gate_policy"`
+		Violations []evaluation.GateViolation `json:"violations,omitempty"`
+	}{
+		Baseline: baseReport, Candidate: candidateReport,
+		Delta: map[string]float64{
+			"hit_rate_at_k":        candidateReport.HitRate - baseReport.HitRate,
+			"mrr":                  candidateReport.MRR - baseReport.MRR,
+			"document_recall_at_k": candidateReport.Recall - baseReport.Recall,
+			"precision_at_k":       candidateReport.Precision - baseReport.Precision,
+			"ndcg_at_k":            candidateReport.NDCG - baseReport.NDCG,
+			"latency_p95_ms":       candidateReport.LatencyP95MS - baseReport.LatencyP95MS,
+		},
+		Gate: policy, Violations: violations,
+	}
+	if *jsonOutput {
+		writeJSON(comparison)
+		if len(violations) > 0 {
+			os.Exit(1)
+		}
+		return
+	}
 	printReport(baseReport)
 	printReport(candidateReport)
 	fmt.Printf("delta hit_rate=%+.3f mrr=%+.3f recall=%+.3f precision=%+.3f ndcg=%+.3f p95_ms=%+.3f\n",
-		candidateReport.HitRate-baseReport.HitRate,
-		candidateReport.MRR-baseReport.MRR,
-		candidateReport.Recall-baseReport.Recall,
-		candidateReport.Precision-baseReport.Precision,
-		candidateReport.NDCG-baseReport.NDCG,
-		candidateReport.LatencyP95MS-baseReport.LatencyP95MS,
+		comparison.Delta["hit_rate_at_k"], comparison.Delta["mrr"], comparison.Delta["document_recall_at_k"],
+		comparison.Delta["precision_at_k"], comparison.Delta["ndcg_at_k"], comparison.Delta["latency_p95_ms"],
 	)
+	if policy.Enabled() {
+		if len(violations) > 0 {
+			fmt.Printf("gate=failed violations=%d\n", len(violations))
+			for _, violation := range violations {
+				fmt.Printf("  %s: %s candidate=%.3f baseline=%.3f limit=%.3f\n", violation.Metric, violation.Reason, violation.Candidate, violation.Baseline, violation.Limit)
+			}
+			os.Exit(1)
+		}
+		fmt.Println("gate=passed")
+	}
 }
 
 func runDatasetEval(root string, args []string) {

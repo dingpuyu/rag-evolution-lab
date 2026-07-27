@@ -118,13 +118,16 @@ Golden Evaluation 不是传统单测，不要求每次本地开发都运行全�
 ## 9. CI 阶段
 
 ```text
-lint
-  → unit-test
+Go format / unit-test / race
   → schema-validation
-  → integration-test
-  → fast-eval
-  → security-regression
+  → deterministic-eval-gate
+  → web lint / rendered-page test
+  → integration-test / security-regression（按环境启用）
 ```
+
+GitHub Actions 的确定性门禁通过 `make eval-gate` 执行。它不依赖 Milvus、Ollama
+或外部 LLM，适合阻塞 Pull Request；真实模型答案评测和业务 API 回归仍通过隔离
+环境按发布或定时任务运行。
 
 真实模型 Full Evaluation 不阻塞普通 Pull Request，但发布实验报告前必须运行。
 

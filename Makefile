@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev
 
 DOCKER_COMPOSE ?= docker-compose
 
@@ -31,6 +31,9 @@ compare-routing:
 
 compare-rerank:
 	go run ./cmd/raglab compare --baseline v4-router --candidate v5-rerank --split development
+
+eval-gate:
+	go run ./cmd/raglab compare --baseline $${BASELINE_PIPELINE:-v0-keyword} --candidate $${CANDIDATE_PIPELINE:-v1-vector} --split $${SPLIT:-development} --fail-on-regression --min-hit-rate $${MIN_HIT_RATE:-0.89} --min-mrr $${MIN_MRR:-0.76} --min-ndcg $${MIN_NDCG:-0.78}
 
 dataset-eval:
 	go run ./cmd/raglab dataset-eval

@@ -137,6 +137,8 @@ Phase 5 已完成首轮工程基线实验：
   [Dataset Search Harness 报告](eval/reports/dataset-search-latest.md)
 - 隔离环境的 DeepSeek 答案评测见
   [Grounded Answer 隔离报告](eval/reports/grounded-answer-blind-isolated-latest.md)
+- 确定性 Pipeline 的质量门禁可运行 `make eval-gate`；它会检查候选版本相对基线的
+  Hit@K、MRR、NDCG 和安全指标，适合接入 CI
 
 PostgreSQL 多租户控制面首版已完成：
 
