@@ -321,7 +321,7 @@ func (service *LifecycleService) ValidateCollection(ctx context.Context, collect
 		"chunk_id": false, "document_id": false, "title": false, "content": false,
 		"tenant_id": false, "allowed_tenants": false, "allowed_roles": false,
 		"product": false, "version": false, "status": false, "visibility": false,
-		"embedding": false,
+		"embedding": false, "embedding_model": false, "embedding_version": false,
 	}
 	for _, field := range description.Fields {
 		if _, required := requiredFields[field.Name]; required {

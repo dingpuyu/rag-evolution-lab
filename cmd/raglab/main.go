@@ -18,6 +18,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/answereval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/app"
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
@@ -25,13 +26,17 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/httpapi"
+	"github.com/dingpuyu/rag-evolution-lab/internal/indexbuild"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
+	"github.com/dingpuyu/rag-evolution-lab/internal/telemetry"
+	"go.opentelemetry.io/otel/trace"
 )
 
 func main() {
@@ -246,7 +251,22 @@ func runLabServer(args []string) {
 	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
 	platformAdminPassword := flags.String("platform-admin-password", environmentOr("RAGLAB_PLATFORM_ADMIN_PASSWORD", "RagLab-Platform-2026!"), "local-lab platform administrator password")
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
+	otelEndpoint := flags.String("otel-endpoint", os.Getenv("RAGLAB_OTEL_ENDPOINT"), "OTLP HTTP endpoint, e.g. localhost:4318")
+	otelServiceName := flags.String("otel-service-name", environmentOr("RAGLAB_OTEL_SERVICE_NAME", "rag-evolution-lab"), "OpenTelemetry service name")
+	rateRPM := flags.Int("rate-limit-rpm", environmentInt("RAGLAB_RATE_LIMIT_RPM", 120), "per-tenant/application requests per minute")
+	rateBurst := flags.Int("rate-limit-burst", environmentInt("RAGLAB_RATE_LIMIT_BURST", 30), "per-tenant/application burst capacity")
+	tokenQuota := flags.Int("token-quota-per-minute", environmentInt("RAGLAB_TOKEN_QUOTA_PER_MINUTE", 100000), "per-tenant/application token quota per minute")
+	costInput := flags.Float64("cost-input-usd-per-1m", environmentFloat("RAGLAB_COST_INPUT_USD_PER_1M", 0), "input token cost in USD per million")
+	costOutput := flags.Float64("cost-output-usd-per-1m", environmentFloat("RAGLAB_COST_OUTPUT_USD_PER_1M", 0), "output token cost in USD per million")
 	_ = flags.Parse(args)
+	telemetryProvider, telemetryErr := telemetry.Setup(context.Background(), telemetry.Config{Enabled: strings.TrimSpace(*otelEndpoint) != "", Endpoint: *otelEndpoint, ServiceName: *otelServiceName})
+	if telemetryErr != nil {
+		fatal(telemetryErr)
+	}
+	defer telemetryProvider.Shutdown(context.Background())
+	var gatewayTracer trace.Tracer = telemetry.Tracer("raglab.knowledge-gateway")
+	gatewayCost := &cost.Calculator{InputPerMillion: *costInput, OutputPerMillion: *costOutput}
+	gatewayLimiter := ratelimit.New(ratelimit.Policy{RequestsPerMinute: *rateRPM, Burst: *rateBurst, TokensPerMinute: *tokenQuota})
 
 	embedder, err := newLabEmbedder(*embeddingBackend, *ollamaURL, *model, *queryInstruction, *hashDimensions)
 	if err != nil {
@@ -272,6 +292,7 @@ func runLabServer(args []string) {
 	var applicationStore datasetaccess.ApplicationStore
 	var indexStore datasetaccess.IndexStore
 	var queryTraceStore querytrace.Store
+	var indexBuildStore indexbuild.Store
 	var ingestionRepository ingestionjob.Repository
 	if strings.TrimSpace(*postgresURL) != "" {
 		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
@@ -285,7 +306,19 @@ func runLabServer(args []string) {
 		applicationStore = postgresStore
 		indexStore = postgresStore
 		queryTraceStore = postgresStore
+		indexBuildStore = postgresStore
 		ingestionRepository = postgresStore.IngestionRepository()
+	}
+	var indexBuilds *indexbuild.Service
+	if indexBuildStore != nil {
+		indexBuilds, err = indexbuild.New(indexBuildStore, milvus.NewIndexBuilder(lifecycleService), indexbuild.Config{Workers: 1, QueueCapacity: 128, MaxAttempts: 3})
+		if err != nil {
+			fatal(err)
+		}
+		if err := indexBuilds.Start(context.Background()); err != nil {
+			fatal(err)
+		}
+		defer indexBuilds.Close()
 	}
 	ingestionJobs, err := ingestionjob.New(lifecycleService, ingestionjob.Config{
 		StatePath: *ingestionJobState, Workers: *ingestionWorkers, QueueCapacity: 1_024, MaxAttempts: 3,
@@ -375,8 +408,22 @@ func runLabServer(args []string) {
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
+		CredentialVerifier: func() auth.CredentialVerifier {
+			if postgresStore, ok := datasetStore.(*datasetaccess.PostgresStore); ok {
+				return postgresStore
+			}
+			return nil
+		}(),
 		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore, ApplicationStore: applicationStore,
 		IndexStore: indexStore, QueryTraceStore: queryTraceStore,
+		IndexBuilds: indexBuilds,
+		CredentialStore: func() datasetaccess.CredentialStore {
+			if postgresStore, ok := datasetStore.(*datasetaccess.PostgresStore); ok {
+				return postgresStore
+			}
+			return nil
+		}(),
+		Tracer: gatewayTracer, Cost: gatewayCost, Limiter: gatewayLimiter,
 		Generator: generationGenerator,
 	}, lifecycleService)
 	if err != nil {

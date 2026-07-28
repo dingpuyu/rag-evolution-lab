@@ -45,19 +45,40 @@ type OIDCVerifier struct {
 }
 
 type oidcTokenClaims struct {
-	Subject     string        `json:"sub"`
-	TenantID    string        `json:"tenant_id"`
-	Roles       []string      `json:"roles"`
-	RealmAccess realmAccess   `json:"realm_access"`
-	Issuer      string        `json:"iss"`
-	Audience    audienceClaim `json:"aud"`
-	IssuedAt    int64         `json:"iat"`
-	NotBefore   int64         `json:"nbf"`
-	Expires     int64         `json:"exp"`
+	Subject         string        `json:"sub"`
+	TenantID        string        `json:"tenant_id"`
+	ApplicationID   string        `json:"app_id"`
+	ClientID        string        `json:"client_id"`
+	AuthorizedParty string        `json:"azp"`
+	Scope           scopeClaim    `json:"scope"`
+	SCP             []string      `json:"scp"`
+	Roles           []string      `json:"roles"`
+	RealmAccess     realmAccess   `json:"realm_access"`
+	Issuer          string        `json:"iss"`
+	Audience        audienceClaim `json:"aud"`
+	IssuedAt        int64         `json:"iat"`
+	NotBefore       int64         `json:"nbf"`
+	Expires         int64         `json:"exp"`
 }
 
 type realmAccess struct {
 	Roles []string `json:"roles"`
+}
+
+type scopeClaim []string
+
+func (claim *scopeClaim) UnmarshalJSON(data []byte) error {
+	var value string
+	if err := json.Unmarshal(data, &value); err == nil {
+		*claim = strings.Fields(value)
+		return nil
+	}
+	var values []string
+	if err := json.Unmarshal(data, &values); err != nil {
+		return fmt.Errorf("scope must be a string or string array")
+	}
+	*claim = scopeClaim(values)
+	return nil
 }
 
 type audienceClaim []string
@@ -204,7 +225,18 @@ func (verifier *OIDCVerifier) validateClaims(claims oidcTokenClaims) (Identity, 
 	return Identity{
 		Subject: claims.Subject, TenantID: claims.TenantID, Roles: roles,
 		Issuer: claims.Issuer, Audience: verifier.config.Audience, Expires: claims.Expires,
+		ApplicationID: firstNonEmpty(claims.ApplicationID, claims.ClientID, claims.AuthorizedParty),
+		Scopes:        uniqueNonEmpty(append(append([]string(nil), claims.Scope...), claims.SCP...)),
 	}, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
 }
 
 func (verifier *OIDCVerifier) keyFor(ctx context.Context, kid string) (*rsa.PublicKey, error) {

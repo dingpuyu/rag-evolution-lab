@@ -70,7 +70,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	var authenticator *authAPI
 	if enterprise.Verifier != nil {
 		authenticator = &authAPI{
-			verifier: enterprise.Verifier, devIssuer: enterprise.DevIssuer,
+			verifier: enterprise.Verifier, credentials: enterprise.CredentialVerifier, devIssuer: enterprise.DevIssuer,
 			accounts: enterprise.LocalAccounts, audit: enterprise.Audit,
 		}
 		if enterprise.DevIssuer != nil {
@@ -127,8 +127,15 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			mux.Handle("POST /api/v1/apps/{app_id}/environments", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createEnvironment)))
 			mux.Handle("GET /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.bindings)))
 			mux.Handle("POST /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createBinding)))
+			if enterprise.CredentialStore != nil {
+				credentialAPI := &CredentialAPI{store: enterprise.CredentialStore}
+				mux.Handle("GET /api/v1/apps/{app_id}/credentials", authenticator.requireIdentity(http.HandlerFunc(credentialAPI.list)))
+				mux.Handle("POST /api/v1/apps/{app_id}/credentials", authenticator.requireIdentity(http.HandlerFunc(credentialAPI.create)))
+				mux.Handle("POST /api/v1/apps/{app_id}/credentials/{credential_id}/revoke", authenticator.requireIdentity(http.HandlerFunc(credentialAPI.revoke)))
+			}
 			gateway, gatewayErr := knowledgegateway.NewWithOptions(lifecycleService, datasetStore, enterprise.ApplicationStore, generator, knowledgegateway.Options{
-				IndexStore: enterprise.IndexStore, TraceStore: enterprise.QueryTraceStore,
+				IndexStore: enterprise.IndexStore, TraceStore: enterprise.QueryTraceStore, Tracer: enterprise.Tracer,
+				Cost: enterprise.Cost, Limiter: enterprise.Limiter,
 			})
 			if gatewayErr != nil {
 				return nil, gatewayErr
@@ -146,6 +153,12 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 				mux.Handle("GET /api/v1/apps/{app_id}/environments/{environment_id}/indexes", authenticator.requireIdentity(http.HandlerFunc(indexAPI.list)))
 				mux.Handle("POST /api/v1/apps/{app_id}/environments/{environment_id}/indexes/publish", authenticator.requireIdentity(http.HandlerFunc(indexAPI.publish)))
 				mux.Handle("POST /api/v1/apps/{app_id}/environments/{environment_id}/indexes/rollback", authenticator.requireIdentity(http.HandlerFunc(indexAPI.rollback)))
+			}
+			if enterprise.IndexBuilds != nil {
+				buildAPI := &IndexBuildAPI{service: enterprise.IndexBuilds}
+				mux.Handle("GET /api/v1/apps/{app_id}/environments/{environment_id}/index-builds", authenticator.requireIdentity(http.HandlerFunc(buildAPI.list)))
+				mux.Handle("POST /api/v1/apps/{app_id}/environments/{environment_id}/index-builds", authenticator.requireIdentity(http.HandlerFunc(buildAPI.submit)))
+				mux.Handle("GET /api/v1/apps/{app_id}/index-builds/{build_id}", authenticator.requireIdentity(http.HandlerFunc(buildAPI.detail)))
 			}
 		}
 	}

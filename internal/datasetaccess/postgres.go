@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/indexbuild"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
@@ -57,8 +58,9 @@ func (store *PostgresStore) UpsertQueryTrace(ctx context.Context, record querytr
 			index_version, index_collection, embedding_model, generator, model, prompt_version,
 			top_k, candidate_count, hit_count, rerank_applied, rewrite_applied, answerable,
 			refusal_reason, embedding_ms, retrieval_ms, generation_ms, total_ms, prompt_tokens,
-			output_tokens, error, metadata, started_at, completed_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+			output_tokens, trace_parent, span_id, provider, input_cost_usd, output_cost_usd, total_cost_usd,
+			error, metadata, started_at, completed_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37)
 		ON CONFLICT (trace_id) DO UPDATE SET
 			status=EXCLUDED.status, rewritten_query=EXCLUDED.rewritten_query,
 			index_version=EXCLUDED.index_version, index_collection=EXCLUDED.index_collection,
@@ -70,13 +72,17 @@ func (store *PostgresStore) UpsertQueryTrace(ctx context.Context, record querytr
 			embedding_ms=EXCLUDED.embedding_ms, retrieval_ms=EXCLUDED.retrieval_ms,
 			generation_ms=EXCLUDED.generation_ms, total_ms=EXCLUDED.total_ms,
 			prompt_tokens=EXCLUDED.prompt_tokens, output_tokens=EXCLUDED.output_tokens,
+			trace_parent=EXCLUDED.trace_parent, span_id=EXCLUDED.span_id, provider=EXCLUDED.provider,
+			input_cost_usd=EXCLUDED.input_cost_usd, output_cost_usd=EXCLUDED.output_cost_usd,
+			total_cost_usd=EXCLUDED.total_cost_usd,
 			error=EXCLUDED.error, metadata=EXCLUDED.metadata, completed_at=EXCLUDED.completed_at`,
 		record.TraceID, record.AppID, record.EnvironmentID, record.TenantID, record.Subject,
 		record.Query, record.RewrittenQuery, record.Status, record.IndexVersion, record.IndexCollection,
 		record.EmbeddingModel, record.Generator, record.Model, record.PromptVersion, record.TopK,
 		record.CandidateCount, record.HitCount, record.RerankApplied, record.RewriteApplied, record.Answerable,
 		record.RefusalReason, record.EmbeddingMS, record.RetrievalMS, record.GenerationMS, record.TotalMS,
-		record.PromptTokens, record.OutputTokens, record.Error, metadata, record.StartedAt, record.CompletedAt)
+		record.PromptTokens, record.OutputTokens, record.TraceParent, record.SpanID, record.Provider,
+		record.InputCostUSD, record.OutputCostUSD, record.TotalCostUSD, record.Error, metadata, record.StartedAt, record.CompletedAt)
 	return err
 }
 
@@ -93,14 +99,16 @@ func (store *PostgresStore) GetQueryTrace(ctx context.Context, identity auth.Ide
 		       index_version, index_collection, embedding_model, generator, model, prompt_version,
 		       top_k, candidate_count, hit_count, rerank_applied, rewrite_applied, answerable,
 		       refusal_reason, embedding_ms, retrieval_ms, generation_ms, total_ms, prompt_tokens,
-		       output_tokens, error, metadata, started_at, completed_at
+		       output_tokens, trace_parent, span_id, provider, input_cost_usd, output_cost_usd, total_cost_usd,
+		       error, metadata, started_at, completed_at
 		FROM query_traces WHERE trace_id=$1 AND app_id=$2`, traceID, appID).Scan(
 		&record.TraceID, &record.AppID, &record.EnvironmentID, &record.TenantID, &record.Subject,
 		&record.Query, &record.RewrittenQuery, &record.Status, &record.IndexVersion, &record.IndexCollection,
 		&record.EmbeddingModel, &record.Generator, &record.Model, &record.PromptVersion, &record.TopK,
 		&record.CandidateCount, &record.HitCount, &record.RerankApplied, &record.RewriteApplied, &answerable,
 		&record.RefusalReason, &record.EmbeddingMS, &record.RetrievalMS, &record.GenerationMS, &record.TotalMS,
-		&record.PromptTokens, &record.OutputTokens, &record.Error, &metadata, &record.StartedAt, &completedAt)
+		&record.PromptTokens, &record.OutputTokens, &record.TraceParent, &record.SpanID, &record.Provider,
+		&record.InputCostUSD, &record.OutputCostUSD, &record.TotalCostUSD, &record.Error, &metadata, &record.StartedAt, &completedAt)
 	if err == sql.ErrNoRows {
 		return querytrace.Record{}, querytrace.ErrNotFound
 	}
@@ -203,6 +211,20 @@ func (store *PostgresStore) Visible(ctx context.Context, identity auth.Identity)
 }
 
 func (store *PostgresStore) Authorize(ctx context.Context, id string, identity auth.Identity) (Dataset, error) {
+	if identity.ApplicationID != "" {
+		var dataset Dataset
+		var roles string
+		err := store.db.QueryRowContext(ctx, `
+			SELECT d.id,d.name,d.description,d.product,d.visibility,d.tenant_id,d.status,d.created_by,
+			COALESCE(string_agg(dr.role, ',' ORDER BY dr.role), '')
+			FROM datasets d LEFT JOIN dataset_roles dr ON dr.dataset_id=d.id
+			WHERE d.id=$1 AND d.status='active' AND d.tenant_id=$2 AND EXISTS (
+				SELECT 1 FROM knowledge_bindings b WHERE b.app_id=$3 AND b.dataset_id=d.id AND b.status='active')
+			GROUP BY d.id`, strings.TrimSpace(id), identity.TenantID, identity.ApplicationID).Scan(
+			&dataset.ID,&dataset.Name,&dataset.Description,&dataset.Product,&dataset.Visibility,&dataset.OwnerTenant,&dataset.Status,&dataset.CreatedBy,&roles)
+		if err == nil { if roles != "" { dataset.AllowedRoles = strings.Split(roles, ",") }; return dataset, nil }
+		if err != sql.ErrNoRows { return Dataset{}, err }
+	}
 	datasets, err := store.Visible(ctx, identity)
 	if err != nil {
 		return Dataset{}, err
@@ -545,13 +567,19 @@ CREATE TABLE IF NOT EXISTS index_releases (
 	version text NOT NULL,
 	collection text NOT NULL,
 	alias text NOT NULL DEFAULT '',
-	state text NOT NULL CHECK (state IN ('published','superseded')),
+	state text NOT NULL CHECK (state IN ('published','canary','superseded')),
+	channel text NOT NULL DEFAULT 'stable',
+	rollout_percent integer NOT NULL DEFAULT 100,
 	published_by text NOT NULL,
 	published_at timestamptz NOT NULL DEFAULT now(),
 	created_at timestamptz NOT NULL DEFAULT now(),
 	UNIQUE (app_id, environment_id, version)
 );
 CREATE INDEX IF NOT EXISTS index_releases_environment_state_idx ON index_releases(app_id, environment_id, state, published_at DESC);
+ALTER TABLE index_releases DROP CONSTRAINT IF EXISTS index_releases_state_check;
+ALTER TABLE index_releases ADD CONSTRAINT index_releases_state_check CHECK (state IN ('published','canary','superseded'));
+ALTER TABLE index_releases ADD COLUMN IF NOT EXISTS channel text NOT NULL DEFAULT 'stable';
+ALTER TABLE index_releases ADD COLUMN IF NOT EXISTS rollout_percent integer NOT NULL DEFAULT 100;
 CREATE TABLE IF NOT EXISTS query_traces (
 	trace_id text PRIMARY KEY,
 	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
@@ -580,6 +608,12 @@ CREATE TABLE IF NOT EXISTS query_traces (
 	total_ms double precision NOT NULL DEFAULT 0,
 	prompt_tokens integer NOT NULL DEFAULT 0,
 	output_tokens integer NOT NULL DEFAULT 0,
+	trace_parent text NOT NULL DEFAULT '',
+	span_id text NOT NULL DEFAULT '',
+	provider text NOT NULL DEFAULT '',
+	input_cost_usd double precision NOT NULL DEFAULT 0,
+	output_cost_usd double precision NOT NULL DEFAULT 0,
+	total_cost_usd double precision NOT NULL DEFAULT 0,
 	error text NOT NULL DEFAULT '',
 	metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
 	started_at timestamptz NOT NULL DEFAULT now(),
@@ -624,6 +658,52 @@ CREATE TABLE IF NOT EXISTS ingestion_job_events (
 	occurred_at timestamptz NOT NULL
 );
 CREATE INDEX IF NOT EXISTS ingestion_job_events_job_idx ON ingestion_job_events(job_id, occurred_at);
+CREATE TABLE IF NOT EXISTS application_credentials (
+	credential_id text PRIMARY KEY,
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	tenant_id text NOT NULL REFERENCES tenants(id),
+	name text NOT NULL,
+	secret_hash text NOT NULL UNIQUE,
+	scopes jsonb NOT NULL DEFAULT '[]'::jsonb,
+	status text NOT NULL CHECK (status IN ('active','revoked')),
+	created_by text NOT NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	expires_at timestamptz,
+	last_used_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS application_credentials_app_idx ON application_credentials(app_id, status);
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS trace_parent text NOT NULL DEFAULT '';
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS span_id text NOT NULL DEFAULT '';
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT '';
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS input_cost_usd double precision NOT NULL DEFAULT 0;
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS output_cost_usd double precision NOT NULL DEFAULT 0;
+ALTER TABLE query_traces ADD COLUMN IF NOT EXISTS total_cost_usd double precision NOT NULL DEFAULT 0;
+CREATE TABLE IF NOT EXISTS index_builds (
+	build_id text PRIMARY KEY,
+	idempotency_key text NOT NULL UNIQUE,
+	request_hash text NOT NULL,
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	environment_id text NOT NULL REFERENCES app_environments(environment_id) ON DELETE CASCADE,
+	version text NOT NULL,
+	collection text NOT NULL,
+	alias text NOT NULL DEFAULT '',
+	embedding_model text NOT NULL DEFAULT '',
+	embedding_version text NOT NULL DEFAULT '',
+	chunker_version text NOT NULL DEFAULT '',
+	source_revision bigint NOT NULL DEFAULT 0,
+	status text NOT NULL CHECK (status IN ('queued','running','completed','failed','cancelled')),
+	stage text NOT NULL,
+	attempts integer NOT NULL DEFAULT 0,
+	last_error text NOT NULL DEFAULT '',
+	manifest jsonb,
+	created_by text NOT NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	completed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS index_builds_scope_idx ON index_builds(app_id, environment_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS index_builds_pending_idx ON index_builds(status, created_at);
 `
 
 var _ Store = (*PostgresStore)(nil)
+var _ indexbuild.Store = (*PostgresStore)(nil)

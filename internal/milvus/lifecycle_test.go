@@ -265,6 +265,7 @@ func TestLifecycleValidatesIndexStateBeforeAliasSwitch(t *testing.T) {
 					{"name": "chunk_id"}, {"name": "document_id"}, {"name": "title"}, {"name": "content"},
 					{"name": "tenant_id"}, {"name": "allowed_tenants"}, {"name": "allowed_roles"}, {"name": "product"},
 					{"name": "version"}, {"name": "status"}, {"name": "visibility"},
+					{"name": "embedding_model"}, {"name": "embedding_version"},
 					{"name": "embedding", "params": []map[string]string{{"key": "dim", "value": "8"}}},
 				},
 				"indexes": []map[string]any{{"fieldName": "embedding", "indexName": "embedding_hnsw"}},

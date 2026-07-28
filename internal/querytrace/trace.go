@@ -44,6 +44,12 @@ type Record struct {
 	TotalMS         float64        `json:"total_ms"`
 	PromptTokens    int            `json:"prompt_tokens"`
 	OutputTokens    int            `json:"output_tokens"`
+	TraceParent     string         `json:"trace_parent,omitempty"`
+	SpanID          string         `json:"span_id,omitempty"`
+	Provider        string         `json:"provider,omitempty"`
+	InputCostUSD    float64        `json:"input_cost_usd"`
+	OutputCostUSD   float64        `json:"output_cost_usd"`
+	TotalCostUSD    float64        `json:"total_cost_usd"`
 	Error           string         `json:"error,omitempty"`
 	Metadata        map[string]any `json:"metadata,omitempty"`
 	StartedAt       time.Time      `json:"started_at"`

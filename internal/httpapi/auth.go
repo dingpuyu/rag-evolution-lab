@@ -7,35 +7,49 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
+	"github.com/dingpuyu/rag-evolution-lab/internal/indexbuild"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type identityContextKey struct{}
 
 type EnterpriseOptions struct {
-	Verifier         auth.Verifier
-	DevIssuer        *auth.Manager
-	LocalAccounts    *auth.AccountStore
-	Audit            *auth.AuditLog
-	IngestionJobs    *ingestionjob.Service
-	DatasetStore     datasetaccess.Store
-	ApplicationStore datasetaccess.ApplicationStore
-	IndexStore       datasetaccess.IndexStore
-	QueryTraceStore  querytrace.Store
-	Generator        generation.Generator
+	Verifier           auth.Verifier
+	CredentialVerifier auth.CredentialVerifier
+	CredentialStore    datasetaccess.CredentialStore
+	DevIssuer          *auth.Manager
+	LocalAccounts      *auth.AccountStore
+	Audit              *auth.AuditLog
+	IngestionJobs      *ingestionjob.Service
+	DatasetStore       datasetaccess.Store
+	ApplicationStore   datasetaccess.ApplicationStore
+	IndexStore         datasetaccess.IndexStore
+	QueryTraceStore    querytrace.Store
+	IndexBuilds        *indexbuild.Service
+	Generator          generation.Generator
+	Tracer             trace.Tracer
+	Cost               *cost.Calculator
+	Limiter            *ratelimit.Limiter
 }
 
 type authAPI struct {
-	verifier  auth.Verifier
-	devIssuer *auth.Manager
-	accounts  *auth.AccountStore
-	audit     *auth.AuditLog
+	verifier    auth.Verifier
+	credentials auth.CredentialVerifier
+	devIssuer   *auth.Manager
+	accounts    *auth.AccountStore
+	audit       *auth.AuditLog
 }
 
 type statusRecorder struct {
@@ -66,17 +80,30 @@ func (recorder *statusRecorder) Flush() {
 
 func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		request = request.WithContext(otel.GetTextMapPropagator().Extract(request.Context(), propagation.HeaderCarrier(request.Header)))
 		started := time.Now()
 		requestID := newRequestID()
 		writer.Header().Set("X-Request-ID", requestID)
 		writer.Header().Set("Cache-Control", "no-store")
-		identity, err := api.verifier.VerifyAuthorization(request.Header.Get("Authorization"))
+		authorization := strings.TrimSpace(request.Header.Get("Authorization"))
+		var identity auth.Identity
+		var err error
+		scheme, credentialValue, hasScheme := strings.Cut(authorization, " ")
+		if hasScheme && strings.EqualFold(scheme, "AppCredential") && api.credentials != nil {
+			identity, err = api.credentials.VerifyApplicationCredential(request.Context(), strings.TrimSpace(credentialValue))
+		} else {
+			identity, err = api.verifier.VerifyAuthorization(authorization)
+		}
 		if err != nil {
 			writeError(writer, http.StatusUnauthorized, "authentication_required", "a valid Bearer token is required")
 			api.audit.Append(auth.AuditEvent{
 				RequestID: requestID, Timestamp: time.Now().UTC(), Method: request.Method, Path: request.URL.Path,
 				Decision: "denied", Reason: err.Error(), Status: http.StatusUnauthorized, DurationMS: elapsedMS(started),
 			})
+			return
+		}
+		if identity.ApplicationID != "" && !strings.Contains(request.URL.Path, "/apps/"+identity.ApplicationID+"/") {
+			writeError(writer, http.StatusForbidden, "credential_scope_violation", "application credential cannot access this resource")
 			return
 		}
 		recorder := &statusRecorder{ResponseWriter: writer}

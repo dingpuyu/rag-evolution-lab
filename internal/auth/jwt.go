@@ -11,12 +11,14 @@ import (
 )
 
 type Identity struct {
-	Subject  string   `json:"subject"`
-	TenantID string   `json:"tenant_id"`
-	Roles    []string `json:"roles"`
-	Issuer   string   `json:"issuer"`
-	Audience string   `json:"audience"`
-	Expires  int64    `json:"expires_at"`
+	Subject       string   `json:"subject"`
+	TenantID      string   `json:"tenant_id"`
+	Roles         []string `json:"roles"`
+	Issuer        string   `json:"issuer"`
+	Audience      string   `json:"audience"`
+	ApplicationID string   `json:"application_id,omitempty"`
+	Scopes        []string `json:"scopes,omitempty"`
+	Expires       int64    `json:"expires_at"`
 }
 
 // Verifier is the trust boundary between HTTP authentication and an identity
@@ -28,6 +30,15 @@ type Verifier interface {
 func (identity Identity) HasRole(role string) bool {
 	for _, candidate := range identity.Roles {
 		if candidate == role {
+			return true
+		}
+	}
+	return false
+}
+
+func (identity Identity) HasScope(scope string) bool {
+	for _, candidate := range identity.Scopes {
+		if candidate == scope || candidate == "*" {
 			return true
 		}
 	}
@@ -56,13 +67,15 @@ type Manager struct {
 }
 
 type tokenClaims struct {
-	Subject  string   `json:"sub"`
-	TenantID string   `json:"tenant_id"`
-	Roles    []string `json:"roles"`
-	Issuer   string   `json:"iss"`
-	Audience string   `json:"aud"`
-	IssuedAt int64    `json:"iat"`
-	Expires  int64    `json:"exp"`
+	Subject       string   `json:"sub"`
+	TenantID      string   `json:"tenant_id"`
+	Roles         []string `json:"roles"`
+	Issuer        string   `json:"iss"`
+	Audience      string   `json:"aud"`
+	ApplicationID string   `json:"app_id,omitempty"`
+	Scopes        []string `json:"scope,omitempty"`
+	IssuedAt      int64    `json:"iat"`
+	Expires       int64    `json:"exp"`
 }
 
 func NewManager(config Config) (*Manager, error) {
@@ -89,6 +102,7 @@ func (manager *Manager) Issue(identity Identity) (string, error) {
 	claims := tokenClaims{
 		Subject: identity.Subject, TenantID: identity.TenantID, Roles: append([]string(nil), identity.Roles...),
 		Issuer: manager.config.Issuer, Audience: manager.config.Audience,
+		ApplicationID: identity.ApplicationID, Scopes: append([]string(nil), identity.Scopes...),
 		IssuedAt: now.Unix(), Expires: now.Add(manager.config.TTL).Unix(),
 	}
 	header, _ := json.Marshal(map[string]string{"alg": "HS256", "typ": "JWT"})
@@ -148,6 +162,7 @@ func (manager *Manager) VerifyAuthorization(value string) (Identity, error) {
 	return Identity{
 		Subject: claims.Subject, TenantID: claims.TenantID, Roles: append([]string(nil), claims.Roles...),
 		Issuer: claims.Issuer, Audience: claims.Audience, Expires: claims.Expires,
+		ApplicationID: claims.ApplicationID, Scopes: append([]string(nil), claims.Scopes...),
 	}, nil
 }
 

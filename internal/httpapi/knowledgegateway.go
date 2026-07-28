@@ -140,6 +140,16 @@ func decodeGatewayQuery(writer http.ResponseWriter, request *http.Request) (gate
 }
 
 func writeGatewayError(writer http.ResponseWriter, err error) {
+	var limited *knowledgegateway.RateLimitError
+	if errors.As(err, &limited) {
+		seconds := int(limited.RetryAfter.Seconds())
+		if seconds < 1 {
+			seconds = 1
+		}
+		writer.Header().Set("Retry-After", fmt.Sprint(seconds))
+		writeError(writer, http.StatusTooManyRequests, "rate_limit_exceeded", err.Error())
+		return
+	}
 	if errors.Is(err, datasetaccess.ErrDatasetNotFound) || errors.Is(err, datasetaccess.ErrDatasetDenied) {
 		writeError(writer, http.StatusNotFound, "application_not_found", "application was not found or is not accessible")
 		return

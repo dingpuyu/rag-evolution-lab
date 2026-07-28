@@ -8,23 +8,27 @@ import (
 )
 
 type IndexRelease struct {
-	ReleaseID     string    `json:"release_id"`
-	ApplicationID string    `json:"app_id"`
-	EnvironmentID string    `json:"environment_id"`
-	Version       string    `json:"version"`
-	Collection    string    `json:"collection"`
-	Alias         string    `json:"alias"`
-	State         string    `json:"state"`
-	PublishedBy   string    `json:"published_by"`
-	PublishedAt   time.Time `json:"published_at"`
-	CreatedAt     time.Time `json:"created_at"`
+	ReleaseID      string    `json:"release_id"`
+	ApplicationID  string    `json:"app_id"`
+	EnvironmentID  string    `json:"environment_id"`
+	Version        string    `json:"version"`
+	Collection     string    `json:"collection"`
+	Alias          string    `json:"alias"`
+	State          string    `json:"state"`
+	Channel        string    `json:"channel"`
+	RolloutPercent int       `json:"rollout_percent"`
+	PublishedBy    string    `json:"published_by"`
+	PublishedAt    time.Time `json:"published_at"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type PublishIndex struct {
-	EnvironmentID string `json:"environment_id"`
-	Version       string `json:"version"`
-	Collection    string `json:"collection"`
-	Alias         string `json:"alias,omitempty"`
+	EnvironmentID  string `json:"environment_id"`
+	Version        string `json:"version"`
+	Collection     string `json:"collection"`
+	Alias          string `json:"alias,omitempty"`
+	Channel        string `json:"channel,omitempty"`
+	RolloutPercent int    `json:"rollout_percent,omitempty"`
 }
 
 type IndexStore interface {

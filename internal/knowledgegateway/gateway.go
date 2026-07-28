@@ -11,10 +11,16 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Searcher is the small part of the retrieval service needed by the gateway.
@@ -77,6 +83,9 @@ type Service struct {
 	traceStore querytrace.Store
 	rewriter   QueryRewriter
 	reranker   HitReranker
+	tracer     trace.Tracer
+	cost       *cost.Calculator
+	limiter    *ratelimit.Limiter
 }
 
 type Options struct {
@@ -84,6 +93,9 @@ type Options struct {
 	TraceStore querytrace.Store
 	Rewriter   QueryRewriter
 	Reranker   HitReranker
+	Tracer     trace.Tracer
+	Cost       *cost.Calculator
+	Limiter    *ratelimit.Limiter
 }
 
 func New(searcher Searcher, datasets datasetaccess.Store, apps datasetaccess.ApplicationStore, generator generation.Generator) (*Service, error) {
@@ -100,8 +112,12 @@ func NewWithOptions(searcher Searcher, datasets datasetaccess.Store, apps datase
 	if options.Reranker == nil {
 		options.Reranker = NewHeuristicReranker()
 	}
+	if options.Tracer == nil {
+		options.Tracer = otel.Tracer("raglab.knowledge-gateway")
+	}
 	return &Service{searcher: searcher, datasets: datasets, apps: apps, generator: generator,
-		indexStore: options.IndexStore, traceStore: options.TraceStore, rewriter: options.Rewriter, reranker: options.Reranker}, nil
+		indexStore: options.IndexStore, traceStore: options.TraceStore, rewriter: options.Rewriter, reranker: options.Reranker,
+		tracer: options.Tracer, cost: options.Cost, limiter: options.Limiter}, nil
 }
 
 func (service *Service) Search(ctx context.Context, identity auth.Identity, request Request) (SearchResponse, error) {
@@ -109,9 +125,35 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 	if appID == "" {
 		return SearchResponse{}, fmt.Errorf("app_id is required")
 	}
+	if identity.ApplicationID != "" && identity.ApplicationID != appID {
+		return SearchResponse{}, fmt.Errorf("application credential is scoped to a different app")
+	}
+	if len(identity.Scopes) > 0 && !identity.HasScope("rag:query") {
+		return SearchResponse{}, fmt.Errorf("credential scope rag:query is required")
+	}
 	text := strings.TrimSpace(request.Query)
 	if text == "" {
 		return SearchResponse{}, fmt.Errorf("query must not be empty")
+	}
+	ctx, span := service.tracer.Start(ctx, "rag.search", trace.WithAttributes(
+		attribute.String("rag.app_id", appID), attribute.String("rag.tenant_id", identity.TenantID),
+		attribute.String("rag.subject", identity.Subject), attribute.String("rag.operation", "search")))
+	defer span.End()
+	limitKey := strings.Join([]string{"tenant", identity.TenantID, "app", appID, "subject", identity.Subject}, ":")
+	if service.limiter != nil {
+		// Admission is deliberately conservative: reserve a small prompt
+		// budget before retrieval, then the trace records the exact LLM usage.
+		quotaTokens := 1024
+		if request.TopK > 0 {
+			quotaTokens += request.TopK * 256
+		}
+		decision := service.limiter.Allow(limitKey, quotaTokens)
+		span.SetAttributes(attribute.Int("rate.remaining", decision.Remaining))
+		if !decision.Allowed {
+			span.SetStatus(codes.Error, "rate limit exceeded")
+			return SearchResponse{}, &RateLimitError{RetryAfter: decision.RetryAfter}
+		}
+		defer service.limiter.Release(limitKey)
 	}
 	environmentID := strings.TrimSpace(request.EnvironmentID)
 	if environmentID == "" {
@@ -145,8 +187,10 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 		effectiveQuery := text
 		rewrite := RewriteResult{Query: text, Rewriter: "disabled", Reason: "policy_disabled"}
 		if binding.Policy.QueryRewrite {
+			rewriteCtx, rewriteSpan := service.tracer.Start(ctx, "rag.query_rewrite", trace.WithAttributes(attribute.String("rag.dataset_id", binding.DatasetID)))
 			var rewriteErr error
-			rewrite, rewriteErr = service.rewriter.Rewrite(ctx, text)
+			rewrite, rewriteErr = service.rewriter.Rewrite(rewriteCtx, text)
+			rewriteSpan.End()
 			if rewriteErr != nil {
 				if binding.Policy.AllowFallback {
 					rewrite = RewriteResult{Query: text, Rewriter: service.rewriterName(), Reason: "fallback_after_rewriter_error"}
@@ -175,13 +219,18 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 		}
 		query := buildQuery(dataset, identity, effectiveQuery, limit)
 		query.Collection = indexRelease.Collection
-		result, err := service.searcher.Search(ctx, query)
+		retrievalCtx, retrievalSpan := service.tracer.Start(ctx, "rag.retrieval", trace.WithAttributes(attribute.String("rag.dataset_id", binding.DatasetID), attribute.Int("rag.candidate_k", limit)))
+		result, err := service.searcher.Search(retrievalCtx, query)
+		retrievalSpan.SetAttributes(attribute.Int("rag.hit_count", len(result.Hits)))
+		retrievalSpan.End()
 		if err != nil {
 			return SearchResponse{}, fmt.Errorf("search bound dataset %q: %w", binding.DatasetID, err)
 		}
 		rerankTrace := RerankTrace{Candidates: len(result.Hits)}
 		if binding.Policy.Rerank && len(result.Hits) > 1 {
-			ranked, rerankErr := service.reranker.Rerank(ctx, effectiveQuery, result.Hits)
+			rerankCtx, rerankSpan := service.tracer.Start(ctx, "rag.rerank", trace.WithAttributes(attribute.String("rag.dataset_id", binding.DatasetID), attribute.Int("rag.candidates", len(result.Hits))))
+			ranked, rerankErr := service.reranker.Rerank(rerankCtx, effectiveQuery, result.Hits)
+			rerankSpan.End()
 			if rerankErr != nil {
 				if !binding.Policy.AllowFallback {
 					return SearchResponse{}, fmt.Errorf("rerank bound dataset %q: %w", binding.DatasetID, rerankErr)
@@ -233,6 +282,14 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 		IndexCollection: firstIndexCollection(traces), IndexVersion: firstIndexVersion(traces), EmbeddingModel: merged.Embedder,
 		Metadata: map[string]any{"bindings": traces, "filter": merged.Filter}, StartedAt: started,
 	}
+	record.TraceParent = traceParent(span.SpanContext())
+	if span.SpanContext().IsValid() {
+		record.SpanID = span.SpanContext().SpanID().String()
+		record.TraceID = span.SpanContext().TraceID().String()
+	}
+	span.SetAttributes(attribute.Int("rag.candidate_count", record.CandidateCount), attribute.Int("rag.hit_count", record.HitCount),
+		attribute.Bool("rag.rerank_applied", record.RerankApplied), attribute.Bool("rag.query_rewrite_applied", record.RewriteApplied),
+		attribute.String("rag.index_version", record.IndexVersion), attribute.String("rag.index_collection", record.IndexCollection))
 	if service.traceStore != nil {
 		if err := service.traceStore.UpsertQueryTrace(ctx, record); err != nil {
 			return SearchResponse{}, fmt.Errorf("persist query trace: %w", err)
@@ -243,6 +300,11 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 }
 
 func (service *Service) Answer(ctx context.Context, identity auth.Identity, request Request) (AnswerResponse, error) {
+	if len(identity.Scopes) > 0 && !identity.HasScope("rag:answer") {
+		return AnswerResponse{}, fmt.Errorf("credential scope rag:answer is required")
+	}
+	ctx, span := service.tracer.Start(ctx, "rag.answer", trace.WithAttributes(attribute.String("rag.app_id", request.AppID), attribute.String("rag.operation", "answer")))
+	defer span.End()
 	search, err := service.Search(ctx, identity, request)
 	if err != nil {
 		return AnswerResponse{}, err
@@ -251,7 +313,9 @@ func (service *Service) Answer(ctx context.Context, identity auth.Identity, requ
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	result, err := answerService.Answer(ctx, milvus.Query{Text: request.Query, TopK: request.TopK})
+	generationCtx, generationSpan := service.tracer.Start(ctx, "rag.generation", trace.WithAttributes(attribute.String("rag.generator", service.generator.Name())))
+	result, err := answerService.Answer(generationCtx, milvus.Query{Text: request.Query, TopK: request.TopK})
+	generationSpan.End()
 	if err != nil {
 		service.persistFailedTrace(ctx, search.TraceRecord, err)
 		return AnswerResponse{}, err
@@ -259,10 +323,16 @@ func (service *Service) Answer(ctx context.Context, identity auth.Identity, requ
 	if err := service.persistCompletedTrace(ctx, search.TraceRecord, result); err != nil {
 		return AnswerResponse{}, err
 	}
+	service.setCostAttributes(span, result)
 	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, TraceID: search.TraceID, Bindings: search.Bindings, Result: result}, nil
 }
 
 func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Identity, request Request, sink generation.ProgressSink) (AnswerResponse, error) {
+	if len(identity.Scopes) > 0 && !identity.HasScope("rag:answer") {
+		return AnswerResponse{}, fmt.Errorf("credential scope rag:answer is required")
+	}
+	ctx, span := service.tracer.Start(ctx, "rag.answer.stream", trace.WithAttributes(attribute.String("rag.app_id", request.AppID), attribute.String("rag.operation", "answer_stream")))
+	defer span.End()
 	search, err := service.Search(ctx, identity, request)
 	if err != nil {
 		return AnswerResponse{}, err
@@ -271,7 +341,9 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	result, err := answerService.AnswerWithProgress(ctx, milvus.Query{Text: request.Query, TopK: request.TopK}, sink)
+	generationCtx, generationSpan := service.tracer.Start(ctx, "rag.generation.stream", trace.WithAttributes(attribute.String("rag.generator", service.generator.Name())))
+	result, err := answerService.AnswerWithProgress(generationCtx, milvus.Query{Text: request.Query, TopK: request.TopK}, sink)
+	generationSpan.End()
 	if err != nil {
 		service.persistFailedTrace(ctx, search.TraceRecord, err)
 		return AnswerResponse{}, err
@@ -279,7 +351,17 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	if err := service.persistCompletedTrace(ctx, search.TraceRecord, result); err != nil {
 		return AnswerResponse{}, err
 	}
+	service.setCostAttributes(span, result)
 	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, TraceID: search.TraceID, Bindings: search.Bindings, Result: result}, nil
+}
+
+func (service *Service) setCostAttributes(span trace.Span, result generation.Response) {
+	if service.cost == nil {
+		return
+	}
+	estimate := service.cost.Estimate(result.Generation.PromptTokens, result.Generation.OutputTokens)
+	span.SetAttributes(attribute.Int("llm.prompt_tokens", result.Generation.PromptTokens), attribute.Int("llm.output_tokens", result.Generation.OutputTokens),
+		attribute.Float64("llm.input_cost_usd", estimate.InputUSD), attribute.Float64("llm.output_cost_usd", estimate.OutputUSD), attribute.Float64("llm.total_cost_usd", estimate.TotalUSD), attribute.String("llm.provider", result.Generation.Generator), attribute.String("llm.model", result.Generation.Model))
 }
 
 func (service *Service) persistCompletedTrace(ctx context.Context, record querytrace.Record, result generation.Response) error {
@@ -291,6 +373,11 @@ func (service *Service) persistCompletedTrace(ctx context.Context, record queryt
 	record.Status, record.Answerable, record.RefusalReason = "completed", &answerable, result.RefusalReason
 	record.Generator, record.Model, record.PromptVersion = result.Generation.Generator, result.Generation.Model, result.Generation.PromptVersion
 	record.GenerationMS, record.PromptTokens, record.OutputTokens = result.Generation.LatencyMS, result.Generation.PromptTokens, result.Generation.OutputTokens
+	record.Provider = result.Generation.Generator
+	if service.cost != nil {
+		estimate := service.cost.Estimate(record.PromptTokens, record.OutputTokens)
+		record.InputCostUSD, record.OutputCostUSD, record.TotalCostUSD = estimate.InputUSD, estimate.OutputUSD, estimate.TotalUSD
+	}
 	record.TotalMS = result.Search.TotalLatencyMS + result.Generation.LatencyMS
 	record.CompletedAt = &now
 	if err := service.traceStore.UpsertQueryTrace(ctx, record); err != nil {

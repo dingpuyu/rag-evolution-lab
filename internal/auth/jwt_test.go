@@ -53,3 +53,12 @@ func TestJWTRejectsExpiredAndWrongAudience(t *testing.T) {
 		t.Fatal("wrong audience or expired token must be rejected")
 	}
 }
+
+func TestJWTPreservesApplicationScope(t *testing.T) {
+	manager, err := NewManager(Config{Secret: []byte("01234567890123456789012345678901"), Issuer: "raglab", Audience: "api"})
+	if err != nil { t.Fatal(err) }
+	token, err := manager.Issue(Identity{Subject: "app:demo", TenantID: "tenant_a", Roles: []string{"viewer"}, ApplicationID: "tenant_a-support-agent", Scopes: []string{"rag:query"}})
+	if err != nil { t.Fatal(err) }
+	identity, err := manager.VerifyAuthorization("Bearer " + token)
+	if err != nil || identity.ApplicationID != "tenant_a-support-agent" || !identity.HasScope("rag:query") || identity.HasScope("rag:answer") { t.Fatalf("unexpected scoped identity=%#v err=%v", identity, err) }
+}

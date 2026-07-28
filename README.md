@@ -27,6 +27,8 @@ make stack-up
 应用身份、环境、知识库绑定、检索策略和索引发布将成为独立的控制面资源，详细目标见
 [Agent 知识基础设施架构](docs/knowledge-platform-architecture.md)。
 
+当前生产运行面已包含异步 Index Build/Manifest、OTLP Trace 与 token 成本链路、应用 Credential/OIDC Scope、租户/应用限流配额，以及 stable/canary 灰度索引发布；设计与 API 说明见 [企业级运行面](docs/enterprise-runtime.md)。
+
 ## 演进路线
 
 | 版本 | 核心能力 | 主要解决的问题 |

@@ -2,6 +2,7 @@ package datasetaccess
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -374,7 +375,7 @@ func (store *PostgresStore) VisibleIndexReleases(ctx context.Context, identity a
 		return nil, err
 	}
 	rows, err := store.db.QueryContext(ctx, `
-		SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at
+		SELECT release_id, app_id, environment_id, version, collection, alias, state, channel, rollout_percent, published_by, published_at, created_at
 		FROM index_releases WHERE app_id=$1 AND environment_id=$2 ORDER BY published_at DESC`, application.ID, strings.TrimSpace(environmentID))
 	if err != nil {
 		return nil, fmt.Errorf("list index releases: %w", err)
@@ -384,7 +385,7 @@ func (store *PostgresStore) VisibleIndexReleases(ctx context.Context, identity a
 	for rows.Next() {
 		var release IndexRelease
 		if err := rows.Scan(&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version,
-			&release.Collection, &release.Alias, &release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
+			&release.Collection, &release.Alias, &release.State, &release.Channel, &release.RolloutPercent, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
 			return nil, err
 		}
 		releases = append(releases, release)
@@ -406,6 +407,20 @@ func (store *PostgresStore) PublishIndexRelease(ctx context.Context, identity au
 	if !datasetSlugPattern.MatchString(version) || len(version) > 64 || !indexCollectionPattern.MatchString(collection) {
 		return IndexRelease{}, fmt.Errorf("version must contain lowercase letters, numbers and single hyphens; collection must contain lowercase letters, numbers, underscores or hyphens")
 	}
+	channel := strings.ToLower(strings.TrimSpace(input.Channel))
+	if channel == "" {
+		channel = "stable"
+	}
+	if channel != "stable" && channel != "canary" {
+		return IndexRelease{}, fmt.Errorf("channel must be stable or canary")
+	}
+	rollout := input.RolloutPercent
+	if channel == "stable" {
+		rollout = 100
+	}
+	if rollout < 0 || rollout > 100 {
+		return IndexRelease{}, fmt.Errorf("rollout_percent must be between 0 and 100")
+	}
 	var environmentStatus string
 	if err := store.db.QueryRowContext(ctx, `SELECT status FROM app_environments WHERE environment_id=$1 AND app_id=$2`, environmentID, application.ID).Scan(&environmentStatus); err != nil {
 		if err == sql.ErrNoRows {
@@ -423,22 +438,25 @@ func (store *PostgresStore) PublishIndexRelease(ctx context.Context, identity au
 	release := IndexRelease{
 		ReleaseID:     application.ID + "-" + environmentName + "-" + version,
 		ApplicationID: application.ID, EnvironmentID: environmentID, Version: version, Collection: collection,
-		Alias: strings.TrimSpace(input.Alias), State: "published", PublishedBy: identity.Subject,
+		Alias: strings.TrimSpace(input.Alias), State: "published", Channel: channel, RolloutPercent: rollout, PublishedBy: identity.Subject,
+	}
+	if channel == "canary" {
+		release.State = "canary"
 	}
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return IndexRelease{}, err
 	}
 	defer tx.Rollback()
-	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND state='published'`, application.ID, environmentID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND channel=$3 AND state IN ('published','canary')`, application.ID, environmentID, channel); err != nil {
 		return IndexRelease{}, err
 	}
 	if _, err := tx.ExecContext(ctx, `
-		INSERT INTO index_releases (release_id, app_id, environment_id, version, collection, alias, state, published_by)
-		VALUES ($1,$2,$3,$4,$5,$6,'published',$7)
+		INSERT INTO index_releases (release_id, app_id, environment_id, version, collection, alias, state, channel, rollout_percent, published_by)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 		ON CONFLICT (app_id, environment_id, version) DO UPDATE SET collection=EXCLUDED.collection, alias=EXCLUDED.alias,
-			state='published', published_by=EXCLUDED.published_by, published_at=now()`, release.ReleaseID, release.ApplicationID,
-		release.EnvironmentID, release.Version, release.Collection, release.Alias, release.PublishedBy); err != nil {
+			state=EXCLUDED.state, channel=EXCLUDED.channel, rollout_percent=EXCLUDED.rollout_percent, published_by=EXCLUDED.published_by, published_at=now()`, release.ReleaseID, release.ApplicationID,
+		release.EnvironmentID, release.Version, release.Collection, release.Alias, release.State, release.Channel, release.RolloutPercent, release.PublishedBy); err != nil {
 		return IndexRelease{}, fmt.Errorf("persist index release: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -459,17 +477,23 @@ func (store *PostgresStore) RollbackIndexRelease(ctx context.Context, identity a
 	}
 	defer tx.Rollback()
 	var release IndexRelease
-	if err := tx.QueryRowContext(ctx, `SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at FROM index_releases WHERE release_id=$1 AND app_id=$2 AND environment_id=$3`, releaseID, application.ID, strings.TrimSpace(environmentID)).Scan(
-		&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version, &release.Collection, &release.Alias, &release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT release_id, app_id, environment_id, version, collection, alias, state, channel, rollout_percent, published_by, published_at, created_at FROM index_releases WHERE release_id=$1 AND app_id=$2 AND environment_id=$3`, releaseID, application.ID, strings.TrimSpace(environmentID)).Scan(
+		&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version, &release.Collection, &release.Alias, &release.State, &release.Channel, &release.RolloutPercent, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
 		if err == sql.ErrNoRows {
 			return IndexRelease{}, ErrDatasetNotFound
 		}
 		return IndexRelease{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND state='published'`, application.ID, environmentID); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND channel=$3 AND state IN ('published','canary')`, application.ID, environmentID, release.Channel); err != nil {
 		return IndexRelease{}, err
 	}
-	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='published', published_by=$1, published_at=now() WHERE release_id=$2`, identity.Subject, releaseID); err != nil {
+	state := release.State
+	if release.Channel == "stable" {
+		state = "published"
+	} else {
+		state = "canary"
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state=$1, published_by=$2, published_at=now() WHERE release_id=$3`, state, identity.Subject, releaseID); err != nil {
 		return IndexRelease{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -486,14 +510,31 @@ func (store *PostgresStore) ResolveIndexRelease(ctx context.Context, identity au
 	if err != nil {
 		return IndexRelease{}, err
 	}
-	var release IndexRelease
-	err = store.db.QueryRowContext(ctx, `
-		SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at
-		FROM index_releases WHERE app_id=$1 AND environment_id=$2 AND state='published' ORDER BY published_at DESC LIMIT 1`, application.ID, strings.TrimSpace(environmentID)).Scan(
-		&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version, &release.Collection, &release.Alias,
-		&release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt)
-	if err == sql.ErrNoRows {
-		return IndexRelease{}, nil
+	rows, err := store.db.QueryContext(ctx, `
+		SELECT release_id, app_id, environment_id, version, collection, alias, state, channel, rollout_percent, published_by, published_at, created_at
+		FROM index_releases WHERE app_id=$1 AND environment_id=$2 AND state IN ('published','canary') ORDER BY channel, published_at DESC`, application.ID, strings.TrimSpace(environmentID))
+	if err != nil {
+		return IndexRelease{}, err
 	}
-	return release, err
+	defer rows.Close()
+	var stable, canary IndexRelease
+	for rows.Next() {
+		var item IndexRelease
+		if err := rows.Scan(&item.ReleaseID, &item.ApplicationID, &item.EnvironmentID, &item.Version, &item.Collection, &item.Alias, &item.State, &item.Channel, &item.RolloutPercent, &item.PublishedBy, &item.PublishedAt, &item.CreatedAt); err != nil {
+			return IndexRelease{}, err
+		}
+		if item.Channel == "canary" && canary.ReleaseID == "" {
+			canary = item
+		}
+		if item.Channel == "stable" && stable.ReleaseID == "" {
+			stable = item
+		}
+	}
+	if canary.ReleaseID != "" && canary.RolloutPercent > 0 {
+		hash := sha256.Sum256([]byte(identity.Subject + "|" + application.ID + "|" + environmentID))
+		if int(hash[0])%100 < canary.RolloutPercent {
+			return canary, nil
+		}
+	}
+	return stable, nil
 }
