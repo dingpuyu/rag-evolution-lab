@@ -11,6 +11,10 @@
 - 检索与生成解耦，能够分别评测。
 - 外部模型、Embedding 和 Reranker 可替换。
 
+当前平台化方向是在上述 RAG Pipeline 之上增加 `Application → Knowledge Binding → Retrieval Policy` 控制面，
+使同一套检索能力可以服务多个隔离的 Agent 产品。资源层级、环境隔离和索引发布边界见
+[面向 Agent 应用的知识基础设施架构](knowledge-platform-architecture.md)。
+
 ## 2. 总体结构
 
 ```text

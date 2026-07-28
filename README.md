@@ -23,6 +23,10 @@ make stack-up
 - 同时评估质量、延迟、Token 和成本。
 - 为后续 InsightAgent 提供可复用的检索与评测模块。
 
+最终形态不是某个行业资料的后台，而是可被客服、招聘、运维和内部问答等多个 Agent 复用的知识基础设施。
+应用身份、环境、知识库绑定、检索策略和索引发布将成为独立的控制面资源，详细目标见
+[Agent 知识基础设施架构](docs/knowledge-platform-architecture.md)。
+
 ## 演进路线
 
 | 版本 | 核心能力 | 主要解决的问题 |
@@ -162,6 +166,13 @@ PostgreSQL 多租户控制面首版已完成：
 - PostgreSQL资源授权与Milvus Pre-ANN ACL组成两道隔离边界
 - 真实数据库集成测试覆盖创建、跨租户拒绝、撤权和审计
 - 设计与实测问题见 [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
+
+面向多 Agent 的平台化重构已定义下一阶段边界：
+
+- `Application` 表示一个可独立发布的 Agent 产品，和知识库解耦；
+- `Knowledge Binding` 表示应用对知识库的授权、范围和检索策略；
+- `Environment`、`Index Build`、`Published Index` 支持开发/生产隔离和可回滚发布；
+- 后续以统一 Knowledge Gateway 承接 Go Agent、Spring AI、LangChain 和 MCP 适配器。
 
 异步资料导入与人工运维闭环已完成首版：
 

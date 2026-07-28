@@ -167,6 +167,31 @@
 
 首轮以 Phase 0～3 为正式目标，即完成 V0～V5。V6/V7 保留接口和数据案例，但不阻塞第一版实验闭环。
 
+## Phase 5：多 Agent 知识平台化
+
+这是当前项目从“企业 RAG Demo”进入“可复用知识基础设施”的主线，不再以客服资料管理作为平台边界。
+
+### 任务
+
+- [ ] `Application`、`Environment`、`Knowledge Binding` 和 `Retrieval Policy` 控制面模型
+- [ ] 应用级 Credential/OIDC Scope 与服务端绑定解析
+- [ ] Knowledge Gateway：统一查询、回答、流式回答和 Trace Contract
+- [ ] 同一知识库被多个 Agent 复用时的策略隔离
+- [ ] Index Build / Published Index / Rollback 发布模型
+- [ ] 应用级配额、限流、成本和质量 SLO
+- [ ] Go、Spring AI、LangChain、MCP 的薄适配器示例
+
+### 完成条件
+
+1. 新建两个不同用途的 Agent 应用，不需要复制知识库即可使用同一份知识；
+2. 两个应用使用不同的 Top-K、过滤范围和重排策略，互不影响；
+3. 任意应用不能通过请求参数读取未绑定或其他租户知识；
+4. 开发环境发布的索引不会被生产应用读取；
+5. 查询 Trace 能说明应用、绑定、策略、索引版本、模型、耗时和安全决策；
+6. 上层 Agent 只依赖 Gateway Contract，不直接拼 Milvus Filter。
+
+平台化资源的正式边界见 [Agent 知识基础设施架构](knowledge-platform-architecture.md)。
+
 ## 每阶段 Git 约定
 
 推荐使用小提交：
