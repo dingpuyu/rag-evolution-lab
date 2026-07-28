@@ -25,7 +25,7 @@ npm run dev
 2. 智能客服：选择可见知识库，通过 `/answer/stream` 实时展示回答、召回数量、耗时、模型和引用。
 3. 只看检索：直接观察 Milvus Top-K、距离、版本、可见性和租户字段。
 4. 知识库：租户管理员创建租户知识库，并在创建时设置 `viewer` / `admin` 允许角色；平台管理员可创建公开库。
-5. 导入资料：租户管理员只能向自己拥有的租户知识库写入资料。服务端执行分块、Embedding、Milvus Upsert、读回验证和 source revision 冲突保护。
+5. 导入资料：租户管理员只能向自己拥有的租户知识库写入资料。提交后进入异步 Job，门户看板实时展示 validating → chunking → embedding → indexing → verifying、Worker 心跳、尝试次数和写后校验；失败任务可在页面重试，运行任务可人工取消。
 6. 权限与审计：显示当前 Claims、PostgreSQL membership、知识库策略和平台管理员的请求审计。
 
 ## 演示账号
@@ -40,10 +40,13 @@ npm run dev
 
 ## 后端接口
 
-门户新增的资料导入接口为：
+门户使用数据集级异步导入接口：
 
 ```text
-POST /api/v1/datasets/{dataset_id}/documents
+POST /api/v1/datasets/{dataset_id}/ingestion/jobs
+GET  /api/v1/datasets/{dataset_id}/ingestion/jobs
+POST /api/v1/datasets/{dataset_id}/ingestion/jobs/{job_id}/retry
+POST /api/v1/datasets/{dataset_id}/ingestion/jobs/{job_id}/cancel
 ```
 
-请求字段：`document_id`、`title`、`content`、`version`、`source_revision`、`event_id`，可选 `operation=upsert|delete`。服务端根据数据集策略构造 `product`、`visibility`、`allowed_tenants` 和 `allowed_roles`，客户端不能自行提交 ACL。
+请求字段位于 `change.document`：`document_id`、`title`、`content`、`version`、`source_revision`、`event_id`，并通过 `idempotency_key` 防止重复提交。服务端根据数据集策略构造 `product`、`visibility`、`allowed_tenants` 和 `allowed_roles`，客户端不能自行提交 ACL。PostgreSQL 启用时，Job 状态和事件写入 `ingestion_jobs` / `ingestion_job_events`，服务重启后仍可恢复任务看板。

@@ -82,3 +82,70 @@ func TestIngestionJobAPIRequiresPlatformAdminAndSupportsIdempotentSubmit(t *test
 		t.Fatalf("list status=%d body=%s", listed.Code, listed.Body.String())
 	}
 }
+
+func TestDatasetIngestionJobAPIScopesTenantAdminAndHidesCrossTenantJobs(t *testing.T) {
+	jobs, err := ingestionjob.New(ingestionAPIProcessor{}, ingestionjob.Config{StatePath: t.TempDir() + "/jobs.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := jobs.Start(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(jobs.Close)
+
+	var filter string
+	handler := newEnterpriseTestHandlerWithDevIssuer(t, &filter, true, jobs)
+	payload := `{
+		"idempotency_key":"dataset-job-1",
+		"change":{
+			"event_id":"dataset-event-1",
+			"operation":"upsert",
+			"source_revision":1,
+			"document":{"document_id":"tenant-a-doc","title":"Tenant A","content":"private body","visibility":"public"}
+		}
+	}`
+
+	alice := issueTestPersona(t, handler, "tenant_a_admin")
+	accepted := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/ingestion/jobs", strings.NewReader(payload))
+	request.Header.Set("Authorization", "Bearer "+alice)
+	handler.ServeHTTP(accepted, request)
+	if accepted.Code != http.StatusAccepted || !strings.Contains(accepted.Body.String(), `"dataset_id":"tenant-a-operations"`) {
+		t.Fatalf("tenant dataset job submit status=%d body=%s", accepted.Code, accepted.Body.String())
+	}
+
+	listed := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "/api/v1/datasets/tenant-a-operations/ingestion/jobs", nil)
+	request.Header.Set("Authorization", "Bearer "+alice)
+	handler.ServeHTTP(listed, request)
+	if listed.Code != http.StatusOK || !strings.Contains(listed.Body.String(), `"total":1`) {
+		t.Fatalf("tenant dataset job list status=%d body=%s", listed.Code, listed.Body.String())
+	}
+
+	platform := issueTestPersona(t, handler, "platform_admin")
+	platformListed := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "/api/v1/datasets/tenant-a-operations/ingestion/jobs", nil)
+	request.Header.Set("Authorization", "Bearer "+platform)
+	handler.ServeHTTP(platformListed, request)
+	if platformListed.Code != http.StatusOK || !strings.Contains(platformListed.Body.String(), `"job_id"`) {
+		t.Fatalf("platform dataset job list status=%d body=%s", platformListed.Code, platformListed.Body.String())
+	}
+
+	bob := issueTestPersona(t, handler, "tenant_b_admin")
+	crossTenant := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodGet, "/api/v1/datasets/tenant-a-operations/ingestion/jobs", nil)
+	request.Header.Set("Authorization", "Bearer "+bob)
+	handler.ServeHTTP(crossTenant, request)
+	if crossTenant.Code != http.StatusNotFound {
+		t.Fatalf("cross-tenant dataset job list status=%d body=%s", crossTenant.Code, crossTenant.Body.String())
+	}
+
+	viewer := issueTestPersona(t, handler, "public_viewer")
+	denied := httptest.NewRecorder()
+	request = httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/ingestion/jobs", strings.NewReader(payload))
+	request.Header.Set("Authorization", "Bearer "+viewer)
+	handler.ServeHTTP(denied, request)
+	if denied.Code != http.StatusForbidden {
+		t.Fatalf("viewer dataset job submit status=%d body=%s", denied.Code, denied.Body.String())
+	}
+}

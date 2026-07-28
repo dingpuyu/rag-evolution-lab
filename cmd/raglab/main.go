@@ -267,8 +267,22 @@ func runLabServer(args []string) {
 	if err != nil {
 		fatal(err)
 	}
+	var datasetStore datasetaccess.Store = datasetaccess.Defaults()
+	var ingestionRepository ingestionjob.Repository
+	if strings.TrimSpace(*postgresURL) != "" {
+		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
+		postgresStore, postgresErr := datasetaccess.OpenPostgres(controlPlaneContext, *postgresURL)
+		cancelControlPlane()
+		if postgresErr != nil {
+			fatal(postgresErr)
+		}
+		defer postgresStore.Close()
+		datasetStore = postgresStore
+		ingestionRepository = postgresStore.IngestionRepository()
+	}
 	ingestionJobs, err := ingestionjob.New(lifecycleService, ingestionjob.Config{
 		StatePath: *ingestionJobState, Workers: *ingestionWorkers, QueueCapacity: 1_024, MaxAttempts: 3,
+		Repository: ingestionRepository,
 	})
 	if err != nil {
 		fatal(err)
@@ -293,17 +307,6 @@ func runLabServer(args []string) {
 	var verifier auth.Verifier
 	var devIssuer *auth.Manager
 	var localAccounts *auth.AccountStore
-	var datasetStore datasetaccess.Store = datasetaccess.Defaults()
-	if strings.TrimSpace(*postgresURL) != "" {
-		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancelControlPlane()
-		postgresStore, postgresErr := datasetaccess.OpenPostgres(controlPlaneContext, *postgresURL)
-		if postgresErr != nil {
-			fatal(postgresErr)
-		}
-		defer postgresStore.Close()
-		datasetStore = postgresStore
-	}
 	provider := strings.ToLower(strings.TrimSpace(*generationProvider))
 	if strings.TrimSpace(*generationModel) == "" {
 		if provider == "deepseek" {

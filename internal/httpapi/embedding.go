@@ -58,6 +58,10 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		return nil, fmt.Errorf("Milvus service must not be nil")
 	}
 	mux := http.NewServeMux()
+	datasetStore := enterprise.DatasetStore
+	if datasetStore == nil {
+		datasetStore = datasetaccess.Defaults()
+	}
 	registerEmbeddingRoutes(mux, &EmbeddingAPI{service: embeddingService})
 	vectorAPI := &MilvusAPI{service: milvusService}
 	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
@@ -97,10 +101,6 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("GET /api/v1/milvus/lifecycle/status", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.status)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/apply", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.apply)))
 		mux.Handle("POST /api/v1/milvus/lifecycle/search", authenticator.requireIdentity(http.HandlerFunc(lifecycleAPI.search)))
-		datasetStore := enterprise.DatasetStore
-		if datasetStore == nil {
-			datasetStore = datasetaccess.Defaults()
-		}
 		generator := enterprise.Generator
 		if generator == nil {
 			generator = generation.ExtractiveGenerator{}
@@ -123,12 +123,17 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		if authenticator == nil {
 			return nil, fmt.Errorf("ingestion job API requires enterprise authentication")
 		}
-		ingestionAPI := &IngestionAPI{service: enterprise.IngestionJobs}
+		ingestionAPI := &IngestionAPI{service: enterprise.IngestionJobs, datasetStore: datasetStore}
 		mux.Handle("GET /api/v1/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.list)))
 		mux.Handle("POST /api/v1/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.submit)))
 		mux.Handle("GET /api/v1/ingestion/jobs/{job_id}", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.detail)))
 		mux.Handle("POST /api/v1/ingestion/jobs/{job_id}/retry", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.retry)))
 		mux.Handle("POST /api/v1/ingestion/jobs/{job_id}/cancel", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.cancel)))
+		mux.Handle("GET /api/v1/datasets/{dataset_id}/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.listDataset)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/ingestion/jobs", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.submitDataset)))
+		mux.Handle("GET /api/v1/datasets/{dataset_id}/ingestion/jobs/{job_id}", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.detailDataset)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/ingestion/jobs/{job_id}/retry", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.retryDataset)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/ingestion/jobs/{job_id}/cancel", authenticator.requireIdentity(http.HandlerFunc(ingestionAPI.cancelDataset)))
 	}
 	return localDevelopmentCORS(mux), nil
 }

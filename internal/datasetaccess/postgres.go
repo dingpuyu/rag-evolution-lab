@@ -392,6 +392,43 @@ CREATE TABLE IF NOT EXISTS control_plane_audit (
 CREATE INDEX IF NOT EXISTS memberships_subject_idx ON memberships(subject, status);
 CREATE INDEX IF NOT EXISTS datasets_tenant_status_idx ON datasets(tenant_id, status);
 ALTER TABLE datasets DROP CONSTRAINT IF EXISTS datasets_product_key;
+CREATE TABLE IF NOT EXISTS ingestion_jobs (
+	job_id text PRIMARY KEY,
+	idempotency_key text NOT NULL UNIQUE,
+	tenant_id text NOT NULL DEFAULT '',
+	dataset_id text NOT NULL DEFAULT '',
+	created_by text NOT NULL DEFAULT '',
+	status text NOT NULL,
+	stage text NOT NULL,
+	attempts integer NOT NULL DEFAULT 0,
+	max_attempts integer NOT NULL,
+	cancel_requested boolean NOT NULL DEFAULT false,
+	last_error text NOT NULL DEFAULT '',
+	result jsonb,
+	change jsonb NOT NULL,
+	created_at timestamptz NOT NULL,
+	updated_at timestamptz NOT NULL,
+	started_at timestamptz,
+	completed_at timestamptz,
+	worker_id text NOT NULL DEFAULT '',
+	lease_expires_at timestamptz,
+	last_heartbeat_at timestamptz,
+	payload_hash text NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ingestion_jobs_scope_idx ON ingestion_jobs(tenant_id, dataset_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS ingestion_jobs_status_idx ON ingestion_jobs(status, lease_expires_at);
+CREATE TABLE IF NOT EXISTS ingestion_job_events (
+	id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+	job_id text NOT NULL REFERENCES ingestion_jobs(job_id) ON DELETE CASCADE,
+	event_type text NOT NULL,
+	status text NOT NULL,
+	stage text NOT NULL,
+	attempt integer NOT NULL,
+	worker_id text NOT NULL DEFAULT '',
+	error text,
+	occurred_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ingestion_job_events_job_idx ON ingestion_job_events(job_id, occurred_at);
 `
 
 var _ Store = (*PostgresStore)(nil)

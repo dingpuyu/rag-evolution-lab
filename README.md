@@ -163,6 +163,15 @@ PostgreSQL 多租户控制面首版已完成：
 - 真实数据库集成测试覆盖创建、跨租户拒绝、撤权和审计
 - 设计与实测问题见 [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 
+异步资料导入与人工运维闭环已完成首版：
+
+- 导入请求进入带幂等键的 Job，按 validating、chunking、embedding、indexing、verifying 阶段执行
+- PostgreSQL 控制面保存 Job、载荷哈希、租户/数据集边界、Worker、Lease、Heartbeat 和事件审计
+- 数据集级 API 由服务端校验 membership；租户管理员不能读取或操作其他租户任务
+- `/portal` 导入页新增任务看板，支持阶段进度、失败原因、重试、取消和写后验证结果
+- 真实 Milvus 维度不匹配会进入可操作的 failed 状态，不会伪装成导入成功
+- 设计、边界和下一步分布式 Claim 计划见 [异步导入任务](docs/async-ingestion-jobs.md)
+
 Grounded Answering 首版已完成：
 
 - 独立 Dataset Answer API，复用 PostgreSQL 授权与 Milvus pre-ANN Filter

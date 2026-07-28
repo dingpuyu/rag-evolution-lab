@@ -18,6 +18,27 @@ type Dataset = {
   allowed_roles?: string[];
   status: string;
 };
+type IngestionJob = {
+  job_id: string;
+  idempotency_key: string;
+  tenant_id?: string;
+  dataset_id?: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  stage: string;
+  attempts: number;
+  max_attempts: number;
+  cancel_requested: boolean;
+  last_error?: string;
+  created_at: string;
+  updated_at: string;
+  started_at?: string;
+  completed_at?: string;
+  worker_id?: string;
+  lease_expires_at?: string;
+  last_heartbeat_at?: string;
+  result?: { current_chunks: number; verified: boolean; embedding_version?: string };
+};
+type IngestionSummary = { total: number; queued: number; running: number; completed: number; failed: number; cancelled: number; jobs: IngestionJob[] };
 type SearchHit = {
   chunk_id: string;
   document_id: string;
@@ -82,6 +103,9 @@ export default function CustomerPortal() {
   const [newDataset, setNewDataset] = useState({ name: "", slug: "", description: "", visibility: "tenant", allowed_roles: ["admin"] });
   const [document, setDocument] = useState({ document_id: "", title: "", content: "", version: "v1", source_revision: "1" });
   const [importing, setImporting] = useState(false);
+  const [ingestionSummary, setIngestionSummary] = useState<IngestionSummary | null>(null);
+  const [ingestionError, setIngestionError] = useState("");
+  const [ingestionRefreshing, setIngestionRefreshing] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -255,12 +279,43 @@ export default function CustomerPortal() {
     if (!selectedDataset) return;
     setImporting(true); setNotice("");
     try {
-      const response = await api(`/api/v1/datasets/${selectedDataset}/documents`, { method: "POST", body: JSON.stringify({ ...document, source_revision: Number(document.source_revision) || 1, event_id: uid("portal") }) });
-      const result = (await response.json()) as { result: { current_chunks: number; embedding_version: string } };
-      setNotice(`资料已入库并完成校验：${result.result.current_chunks} 个 chunks · ${result.result.embedding_version}`);
+      const eventID = `${document.document_id}-r${Number(document.source_revision) || 1}-portal`;
+      const response = await api(`/api/v1/datasets/${selectedDataset}/ingestion/jobs`, { method: "POST", body: JSON.stringify({
+        idempotency_key: `portal-${selectedDataset}-${document.document_id}-${Number(document.source_revision) || 1}`,
+        change: {
+          event_id: eventID,
+          operation: "upsert",
+          source_revision: Number(document.source_revision) || 1,
+          document: { document_id: document.document_id, title: document.title, content: document.content, version: document.version, status: "active" },
+        },
+      }) });
+      const body = (await response.json()) as { duplicate: boolean; job: IngestionJob };
+      setNotice(body.duplicate ? "相同资料任务已存在，已恢复显示原任务状态。" : `导入任务已创建：${body.job.job_id}，页面会实时刷新阶段进度。`);
       setDocument({ document_id: "", title: "", content: "", version: "v1", source_revision: "1" });
+      await refreshDatasetJobs(selectedDataset);
     } catch (error) { setNotice(error instanceof Error ? error.message : "资料导入失败"); }
     finally { setImporting(false); }
+  }
+
+  async function refreshDatasetJobs(datasetID = selectedDataset) {
+    if (!session || !datasetID) return;
+    setIngestionRefreshing(true);
+    try {
+      const response = await api(`/api/v1/datasets/${datasetID}/ingestion/jobs`);
+      setIngestionSummary((await response.json()) as IngestionSummary);
+      setIngestionError("");
+    } catch (error) {
+      setIngestionError(error instanceof Error ? error.message : "读取导入任务失败");
+    } finally { setIngestionRefreshing(false); }
+  }
+
+  async function mutateDatasetJob(jobID: string, action: "retry" | "cancel") {
+    if (!selectedDataset) return;
+    try {
+      await api(`/api/v1/datasets/${selectedDataset}/ingestion/jobs/${jobID}/${action}`, { method: "POST" });
+      setNotice(action === "retry" ? "任务已重新排队，正在继续处理。" : "已发送取消请求，等待 Worker 确认。" );
+      await refreshDatasetJobs(selectedDataset);
+    } catch (error) { setIngestionError(error instanceof Error ? error.message : `任务${action}失败`); }
   }
 
   function toggleRole(role: string) {
@@ -271,6 +326,15 @@ export default function CustomerPortal() {
     if (view === "access" && session) void loadAccessData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [view, session]);
+
+  useEffect(() => {
+    if (view !== "ingest" || !session || !selectedDataset) return;
+    void refreshDatasetJobs(selectedDataset);
+    const timer = window.setInterval(() => void refreshDatasetJobs(selectedDataset), 1800);
+    return () => window.clearInterval(timer);
+    // Polling is intentionally scoped to the visible import workspace.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, session, selectedDataset]);
 
   if (booting) return <main className="portal-loading"><div className="portal-loader" /><span>正在连接 RAG 服务…</span></main>;
   if (!session) return <LoginScreen mode={authMode} setMode={setAuthMode} email={email} password={password} organization={organization} setEmail={setEmail} setPassword={setPassword} setOrganization={setOrganization} error={authError} submit={() => void authenticate()} demo={(demo) => { setEmail(demo.email); setPassword(demo.password); setAuthMode("login"); void authenticate(demo.email, demo.password); }} />;
@@ -293,7 +357,7 @@ export default function CustomerPortal() {
         {notice && <div className="portal-notice">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {view === "chat" && <ChatView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} current={currentDataset} query={query} setQuery={setQuery} messages={messages} streaming={streaming} send={sendQuestion} runSearch={() => void runSearch()} searching={searching} searchHits={searchHits} />}
         {view === "knowledge" && <KnowledgeView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isAdmin={isAdmin} form={newDataset} setForm={setNewDataset} toggleRole={toggleRole} create={createKnowledgeBase} />}
-        {view === "ingest" && <IngestView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isPlatformAdmin={isPlatformAdmin} document={document} setDocument={setDocument} submit={importDocument} importing={importing} />}
+        {view === "ingest" && <><IngestView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isPlatformAdmin={isPlatformAdmin} document={document} setDocument={setDocument} submit={importDocument} importing={importing} /><IngestionTaskBoard summary={ingestionSummary} error={ingestionError} refreshing={ingestionRefreshing} refresh={() => void refreshDatasetJobs()} mutate={mutateDatasetJob} /></>}
         {view === "access" && <AccessView session={session} datasets={datasets} memberships={memberships} audit={audit} isPlatformAdmin={isPlatformAdmin} />}
       </section>
     </main>
@@ -323,6 +387,12 @@ function KnowledgeView(props: { datasets: Dataset[]; selected: string; setSelect
 function IngestView(props: { datasets: Dataset[]; selected: string; setSelected: (value: string) => void; isPlatformAdmin: boolean; document: { document_id: string; title: string; content: string; version: string; source_revision: string }; setDocument: (document: { document_id: string; title: string; content: string; version: string; source_revision: string }) => void; submit: (event: FormEvent) => void; importing: boolean }) {
   const writableDatasets = props.isPlatformAdmin ? props.datasets : props.datasets.filter((dataset) => dataset.visibility === "tenant");
   return <div className="content-page"><div className="page-intro"><div><span className="section-kicker">KNOWLEDGE LIFECYCLE</span><h2>导入一份新资料</h2><p>资料会经过分块、Embedding、Milvus Upsert 和读回校验；同一文档用 source revision 做幂等和版本保护。</p></div><span className="pipeline-pill"><i /> VALIDATE → EMBED → INDEX → VERIFY</span></div><form className="ingest-panel" onSubmit={props.submit}><div className="ingest-target"><div><span className="section-kicker">TARGET DATASET</span><strong>{writableDatasets.find((dataset) => dataset.id === props.selected)?.name ?? "选择知识库"}</strong></div><select value={props.selected} onChange={(event) => props.setSelected(event.target.value)} required>{writableDatasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}</select></div><div className="form-grid"><label>文档 ID<input value={props.document.document_id} onChange={(event) => props.setDocument({ ...props.document, document_id: event.target.value })} placeholder="support-sso-v1" required /></label><label>版本<input value={props.document.version} onChange={(event) => props.setDocument({ ...props.document, version: event.target.value })} placeholder="v1" /></label><label>源修订号<input type="number" min="1" value={props.document.source_revision} onChange={(event) => props.setDocument({ ...props.document, source_revision: event.target.value })} required /></label><label className="wide">标题<input value={props.document.title} onChange={(event) => props.setDocument({ ...props.document, title: event.target.value })} placeholder="企业单点登录接入指南" required /></label><label className="wide">正文<textarea value={props.document.content} onChange={(event) => props.setDocument({ ...props.document, content: event.target.value })} placeholder="粘贴 Markdown 或纯文本内容。建议包含清晰的小标题和步骤…" rows={12} required /></label></div><div className="ingest-actions"><span>最大 64 KB · 当前导入会写入当前知识库的 ACL</span><button className="primary-button" disabled={props.importing || writableDatasets.length === 0}>{props.importing ? "正在入库…" : "导入并验证"}<span>↑</span></button></div></form></div>;
+}
+
+function IngestionTaskBoard(props: { summary: IngestionSummary | null; error: string; refreshing: boolean; refresh: () => void; mutate: (jobID: string, action: "retry" | "cancel") => void }) {
+  const jobs = props.summary?.jobs ?? [];
+  const stages = ["validating", "chunking", "embedding", "indexing", "verifying"];
+  return <section className="content-page task-page"><div className="page-intro"><div><span className="section-kicker">INGESTION OPERATIONS</span><h2>任务进度与人工控制</h2><p>导入已经进入异步队列。你可以观察 Worker 心跳、阶段进度和最终校验结果；失败或取消的任务可以在这里重新处理。</p></div><button type="button" className="ghost-button task-refresh" onClick={props.refresh} disabled={props.refreshing}>{props.refreshing ? "刷新中…" : "刷新任务"}</button></div>{props.error && <div className="form-error task-error" role="alert">{props.error}</div>}<div className="task-summary" aria-live="polite"><div><span>排队</span><strong>{props.summary?.queued ?? 0}</strong></div><div><span>处理中</span><strong>{props.summary?.running ?? 0}</strong></div><div><span>已完成</span><strong>{props.summary?.completed ?? 0}</strong></div><div><span>失败/取消</span><strong>{(props.summary?.failed ?? 0) + (props.summary?.cancelled ?? 0)}</strong></div></div><div className="task-list" aria-live="polite">{jobs.length ? jobs.slice(0, 12).map((job) => { const activeIndex = stages.indexOf(job.stage); return <article className="task-card" key={job.job_id}><div className="task-card-head"><div><span className={`task-status ${job.status}`}>{job.status === "running" ? "处理中" : job.status === "queued" ? "排队中" : job.status === "completed" ? "已完成" : job.status === "failed" ? "失败" : "已取消"}</span><strong title={job.idempotency_key}>{job.job_id}</strong></div><small>{new Date(job.updated_at).toLocaleTimeString()}</small></div><div className="task-stage-row">{stages.map((stage, index) => <div className={index <= activeIndex || job.status === "completed" ? "done" : ""} key={stage}><i /><span>{stage}</span></div>)}</div><div className="task-card-meta"><span>尝试 {job.attempts}/{job.max_attempts}</span><span>{job.worker_id ? `Worker ${job.worker_id}` : "等待 Worker"}</span>{job.last_heartbeat_at && <span>心跳 {new Date(job.last_heartbeat_at).toLocaleTimeString()}</span>}{job.result?.verified && <span className="verified">✓ 已校验 · {job.result.current_chunks} chunks</span>}</div>{job.last_error && <div className="task-error-text" role="alert">{job.last_error}</div>}{(job.status === "failed" || job.status === "cancelled" || job.status === "queued" || job.status === "running") && <div className="task-actions">{(job.status === "failed" || job.status === "cancelled") && job.attempts < job.max_attempts && <button type="button" onClick={() => props.mutate(job.job_id, "retry")}>重新处理</button>}{(job.status === "queued" || job.status === "running") && <button type="button" className="danger" onClick={() => { if (window.confirm(`确认取消任务 ${job.job_id}？正在执行的任务会请求 Worker 停止。`)) props.mutate(job.job_id, "cancel"); }}>取消任务</button>}</div>}</article>; }) : <div className="task-empty"><strong>还没有导入任务</strong><span>提交第一份资料后，这里会显示队列、Worker 和分阶段进度。</span></div>}</div></section>;
 }
 
 function AccessView(props: { session: Session; datasets: Dataset[]; memberships: Membership[]; audit: AuditEvent[]; isPlatformAdmin: boolean }) {

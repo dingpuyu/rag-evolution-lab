@@ -28,6 +28,14 @@ const (
 	StageCompleted = "completed"
 	StageFailed    = "failed"
 	StageCancelled = "cancelled"
+
+	EventSubmitted  = "submitted"
+	EventStarted    = "started"
+	EventProgressed = "progressed"
+	EventRetried    = "retried"
+	EventCancelled  = "cancelled"
+	EventCompleted  = "completed"
+	EventFailed     = "failed"
 )
 
 var (
@@ -42,21 +50,31 @@ type Processor interface {
 }
 
 type Config struct {
-	StatePath     string
-	Workers       int
-	QueueCapacity int
-	MaxAttempts   int
-	Now           func() time.Time
+	StatePath         string
+	Workers           int
+	QueueCapacity     int
+	MaxAttempts       int
+	WorkerID          string
+	LeaseDuration     time.Duration
+	HeartbeatInterval time.Duration
+	Repository        Repository
+	Now               func() time.Time
 }
 
 type SubmitRequest struct {
 	IdempotencyKey string                 `json:"idempotency_key"`
+	TenantID       string                 `json:"tenant_id,omitempty"`
+	DatasetID      string                 `json:"dataset_id,omitempty"`
+	CreatedBy      string                 `json:"created_by,omitempty"`
 	Change         milvus.LifecycleChange `json:"change"`
 }
 
 type Job struct {
 	ID              string                  `json:"job_id"`
 	IdempotencyKey  string                  `json:"idempotency_key"`
+	TenantID        string                  `json:"tenant_id,omitempty"`
+	DatasetID       string                  `json:"dataset_id,omitempty"`
+	CreatedBy       string                  `json:"created_by,omitempty"`
 	Status          string                  `json:"status"`
 	Stage           string                  `json:"stage"`
 	Attempts        int                     `json:"attempts"`
@@ -68,6 +86,9 @@ type Job struct {
 	UpdatedAt       time.Time               `json:"updated_at"`
 	StartedAt       *time.Time              `json:"started_at,omitempty"`
 	CompletedAt     *time.Time              `json:"completed_at,omitempty"`
+	WorkerID        string                  `json:"worker_id,omitempty"`
+	LeaseExpiresAt  *time.Time              `json:"lease_expires_at,omitempty"`
+	LastHeartbeatAt *time.Time              `json:"last_heartbeat_at,omitempty"`
 }
 
 type Summary struct {
@@ -80,25 +101,13 @@ type Summary struct {
 	Jobs      []Job `json:"jobs"`
 }
 
-type storedJob struct {
-	Job
-	PayloadHash string                 `json:"payload_hash"`
-	Change      milvus.LifecycleChange `json:"change"`
-}
-
-type persistedState struct {
-	SchemaVersion int                   `json:"schema_version"`
-	Jobs          map[string]*storedJob `json:"jobs"`
-	Keys          map[string]string     `json:"idempotency_keys"`
-}
-
 type Service struct {
 	processor Processor
 	config    Config
 	queue     chan string
 
 	mu      sync.Mutex
-	state   persistedState
+	state   PersistedState
 	started bool
 	closed  bool
 	ctx     context.Context
@@ -123,6 +132,15 @@ func New(processor Processor, config Config) (*Service, error) {
 	if config.MaxAttempts <= 0 {
 		config.MaxAttempts = 3
 	}
+	if strings.TrimSpace(config.WorkerID) == "" {
+		config.WorkerID = defaultWorkerID()
+	}
+	if config.LeaseDuration <= 0 {
+		config.LeaseDuration = 2 * time.Minute
+	}
+	if config.HeartbeatInterval <= 0 {
+		config.HeartbeatInterval = 15 * time.Second
+	}
 	if config.Now == nil {
 		config.Now = time.Now
 	}
@@ -130,9 +148,9 @@ func New(processor Processor, config Config) (*Service, error) {
 		processor: processor,
 		config:    config,
 		queue:     make(chan string, config.QueueCapacity),
-		state: persistedState{
+		state: PersistedState{
 			SchemaVersion: 1,
-			Jobs:          make(map[string]*storedJob),
+			Jobs:          make(map[string]*StoredJob),
 			Keys:          make(map[string]string),
 		},
 		running: make(map[string]context.CancelFunc),
@@ -163,7 +181,11 @@ func (service *Service) Start(parent context.Context) error {
 			job.Stage = StageQueued
 			job.CancelRequested = false
 			job.LastError = "worker interrupted before completion; job recovered after restart"
+			job.WorkerID = ""
+			job.LeaseExpiresAt = nil
+			job.LastHeartbeatAt = nil
 			job.UpdatedAt = now
+			service.appendEventLocked(Event{JobID: id, EventType: EventFailed, Status: job.Status, Stage: job.Stage, Attempt: job.Attempts, Error: job.LastError, OccurredAt: now})
 		}
 		if job.Status == StatusQueued {
 			queued = append(queued, id)
@@ -211,7 +233,7 @@ func (service *Service) Submit(request SubmitRequest) (Job, bool, error) {
 	if key == "" || len(key) > 128 {
 		return Job{}, false, fmt.Errorf("idempotency_key is required and must not exceed 128 characters")
 	}
-	hash, err := hashPayload(request.Change)
+	hash, err := hashPayload(request)
 	if err != nil {
 		return Job{}, false, err
 	}
@@ -233,9 +255,10 @@ func (service *Service) Submit(request SubmitRequest) (Job, bool, error) {
 	}
 	now := service.now()
 	id := jobID(key)
-	record := &storedJob{
+	record := &StoredJob{
 		Job: Job{
 			ID: id, IdempotencyKey: key, Status: StatusQueued, Stage: StageQueued,
+			TenantID: strings.TrimSpace(request.TenantID), DatasetID: strings.TrimSpace(request.DatasetID), CreatedBy: strings.TrimSpace(request.CreatedBy),
 			MaxAttempts: service.config.MaxAttempts, CreatedAt: now, UpdatedAt: now,
 		},
 		PayloadHash: hash,
@@ -250,6 +273,7 @@ func (service *Service) Submit(request SubmitRequest) (Job, bool, error) {
 		return Job{}, false, fmt.Errorf("persist queued ingestion job: %w", err)
 	}
 	job := record.Job
+	service.appendEventLocked(Event{JobID: id, EventType: EventSubmitted, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, OccurredAt: now})
 	service.mu.Unlock()
 
 	if err := service.enqueue(id); err != nil {
@@ -270,11 +294,25 @@ func (service *Service) Get(id string) (Job, error) {
 }
 
 func (service *Service) List() Summary {
+	return service.listFor("", "")
+}
+
+func (service *Service) ListFor(tenantID, datasetID string) Summary {
+	return service.listFor(strings.TrimSpace(tenantID), strings.TrimSpace(datasetID))
+}
+
+func (service *Service) listFor(tenantID, datasetID string) Summary {
 	service.mu.Lock()
 	defer service.mu.Unlock()
 	summary := Summary{Jobs: make([]Job, 0, len(service.state.Jobs))}
 	for _, record := range service.state.Jobs {
 		job := record.Job
+		if tenantID != "" && job.TenantID != tenantID {
+			continue
+		}
+		if datasetID != "" && job.DatasetID != datasetID {
+			continue
+		}
 		summary.Jobs = append(summary.Jobs, job)
 		switch job.Status {
 		case StatusQueued:
@@ -322,12 +360,16 @@ func (service *Service) Retry(id string) (Job, error) {
 	record.Result = nil
 	record.StartedAt = nil
 	record.CompletedAt = nil
+	record.WorkerID = ""
+	record.LeaseExpiresAt = nil
+	record.LastHeartbeatAt = nil
 	record.UpdatedAt = now
 	if err := service.persistLocked(); err != nil {
 		service.mu.Unlock()
 		return Job{}, fmt.Errorf("persist ingestion retry: %w", err)
 	}
 	job := record.Job
+	service.appendEventLocked(Event{JobID: record.ID, EventType: EventRetried, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, OccurredAt: now})
 	service.mu.Unlock()
 	if err := service.enqueue(record.ID); err != nil {
 		service.failQueuedJob(record.ID, err)
@@ -366,6 +408,9 @@ func (service *Service) Cancel(id string) (Job, error) {
 		return Job{}, fmt.Errorf("persist ingestion cancellation: %w", err)
 	}
 	job := record.Job
+	if job.Status == StatusCancelled {
+		service.appendEventLocked(Event{JobID: record.ID, EventType: EventCancelled, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, OccurredAt: now})
+	}
 	service.mu.Unlock()
 	return job, nil
 }
@@ -409,14 +454,22 @@ func (service *Service) process(id string) {
 	record.StartedAt = &now
 	record.UpdatedAt = now
 	record.CompletedAt = nil
+	record.WorkerID = service.config.WorkerID
+	leaseExpires := now.Add(service.config.LeaseDuration)
+	record.LeaseExpiresAt = &leaseExpires
+	record.LastHeartbeatAt = &now
 	change := record.Change
 	_ = service.persistLocked()
+	service.appendEventLocked(Event{JobID: id, EventType: EventStarted, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, WorkerID: record.WorkerID, OccurredAt: now})
 	service.mu.Unlock()
+	heartbeatDone := make(chan struct{})
+	go service.heartbeat(id, heartbeatDone)
 
 	result, err := service.processor.ApplyWithObserver(jobContext, change, func(stage string) {
 		service.updateStage(id, stage)
 	})
 	cancel()
+	close(heartbeatDone)
 
 	service.mu.Lock()
 	delete(service.running, id)
@@ -441,7 +494,19 @@ func (service *Service) process(id string) {
 		record.Result = &result
 		record.Change = lifecycleReference(record.Change, result.DocumentID)
 	}
+	record.LastHeartbeatAt = &finished
+	record.LeaseExpiresAt = nil
+	workerID := record.WorkerID
+	record.WorkerID = ""
 	_ = service.persistLocked()
+	eventType := EventCompleted
+	if err != nil {
+		eventType = EventFailed
+		if record.Status == StatusCancelled {
+			eventType = EventCancelled
+		}
+	}
+	service.appendEventLocked(Event{JobID: id, EventType: eventType, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, WorkerID: workerID, Error: record.LastError, OccurredAt: finished})
 	service.mu.Unlock()
 }
 
@@ -454,7 +519,35 @@ func (service *Service) updateStage(id, stage string) {
 	}
 	record.Stage = stage
 	record.UpdatedAt = service.now()
+	now := record.UpdatedAt
+	record.LastHeartbeatAt = &now
 	_ = service.persistLocked()
+	service.appendEventLocked(Event{JobID: id, EventType: EventProgressed, Status: record.Status, Stage: stage, Attempt: record.Attempts, WorkerID: record.WorkerID, OccurredAt: now})
+}
+
+func (service *Service) heartbeat(id string, done <-chan struct{}) {
+	ticker := time.NewTicker(service.config.HeartbeatInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-done:
+			return
+		case <-ticker.C:
+			service.mu.Lock()
+			record, ok := service.state.Jobs[id]
+			if !ok || record.Status != StatusRunning {
+				service.mu.Unlock()
+				return
+			}
+			now := service.now()
+			expires := now.Add(service.config.LeaseDuration)
+			record.LastHeartbeatAt = &now
+			record.LeaseExpiresAt = &expires
+			record.UpdatedAt = now
+			_ = service.persistLocked()
+			service.mu.Unlock()
+		}
+	}
 }
 
 func (service *Service) enqueue(id string) error {
@@ -490,9 +583,30 @@ func (service *Service) failQueuedJob(id string, cause error) {
 	record.UpdatedAt = now
 	record.CompletedAt = &now
 	_ = service.persistLocked()
+	service.appendEventLocked(Event{JobID: id, EventType: EventFailed, Status: record.Status, Stage: record.Stage, Attempt: record.Attempts, Error: record.LastError, OccurredAt: now})
 }
 
 func (service *Service) load() error {
+	if service.config.Repository != nil {
+		state, err := service.config.Repository.Load(context.Background())
+		if err != nil {
+			return fmt.Errorf("load ingestion job repository: %w", err)
+		}
+		if state.SchemaVersion == 0 {
+			state.SchemaVersion = 1
+		}
+		if state.SchemaVersion != 1 {
+			return fmt.Errorf("unsupported ingestion job state schema version %d", state.SchemaVersion)
+		}
+		if state.Jobs == nil {
+			state.Jobs = make(map[string]*StoredJob)
+		}
+		if state.Keys == nil {
+			state.Keys = make(map[string]string)
+		}
+		service.state = state
+		return nil
+	}
 	data, err := os.ReadFile(service.config.StatePath)
 	if os.IsNotExist(err) {
 		return nil
@@ -507,7 +621,7 @@ func (service *Service) load() error {
 		return fmt.Errorf("unsupported ingestion job state schema version %d", service.state.SchemaVersion)
 	}
 	if service.state.Jobs == nil {
-		service.state.Jobs = make(map[string]*storedJob)
+		service.state.Jobs = make(map[string]*StoredJob)
 	}
 	if service.state.Keys == nil {
 		service.state.Keys = make(map[string]string)
@@ -516,6 +630,9 @@ func (service *Service) load() error {
 }
 
 func (service *Service) persistLocked() error {
+	if service.config.Repository != nil {
+		return service.config.Repository.Save(context.Background(), service.state)
+	}
 	data, err := json.MarshalIndent(service.state, "", "  ")
 	if err != nil {
 		return err
@@ -552,8 +669,22 @@ func (service *Service) now() time.Time {
 	return service.config.Now().UTC()
 }
 
-func hashPayload(change milvus.LifecycleChange) (string, error) {
-	data, err := json.Marshal(change)
+func (service *Service) appendEventLocked(event Event) {
+	if service.config.Repository == nil {
+		return
+	}
+	if event.OccurredAt.IsZero() {
+		event.OccurredAt = service.now()
+	}
+	_ = service.config.Repository.AppendEvent(context.Background(), event)
+}
+
+func hashPayload(request SubmitRequest) (string, error) {
+	data, err := json.Marshal(struct {
+		TenantID  string                 `json:"tenant_id,omitempty"`
+		DatasetID string                 `json:"dataset_id,omitempty"`
+		Change    milvus.LifecycleChange `json:"change"`
+	}{TenantID: strings.TrimSpace(request.TenantID), DatasetID: strings.TrimSpace(request.DatasetID), Change: request.Change})
 	if err != nil {
 		return "", fmt.Errorf("encode ingestion payload: %w", err)
 	}
@@ -570,4 +701,12 @@ func lifecycleReference(change milvus.LifecycleChange, documentID string) milvus
 	return milvus.LifecycleChange{
 		EventID: change.EventID, Operation: change.Operation, Revision: change.Revision, DocumentID: documentID,
 	}
+}
+
+func defaultWorkerID() string {
+	host, err := os.Hostname()
+	if err != nil || strings.TrimSpace(host) == "" {
+		host = "unknown-host"
+	}
+	return fmt.Sprintf("%s-%d", host, os.Getpid())
 }
