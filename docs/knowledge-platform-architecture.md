@@ -134,7 +134,14 @@ POST /api/v1/apps/{app_id}/bindings
 ```
 
 这些接口已经写入 PostgreSQL 的 `applications`、`app_environments` 和 `knowledge_bindings`，并复用现有 Tenant/Dataset 授权。
-它们暂时是管理面，尚未替代 `/api/v1/datasets/{dataset_id}/search`；下一步会把查询逻辑下沉到统一 Knowledge Gateway。
+应用级查询入口已经接入统一 Knowledge Gateway：
+
+```http
+POST /api/v1/apps/{app_id}/query
+POST /api/v1/apps/{app_id}/answer
+```
+
+请求只需提交 `environment_id`、`query` 和可选 `top_k`。Gateway 会解析绑定，重新校验 Dataset ACL，按绑定策略 fan-out 到检索服务，并在服务端合并、去重和截断结果。原有 `/api/v1/datasets/{dataset_id}/search` 与 `/answer` 继续保留，作为单数据集兼容入口；上层 Agent 应优先使用应用级 Gateway。
 
 ## 6. 存储职责
 
@@ -158,10 +165,11 @@ POST /api/v1/apps/{app_id}/bindings
 - 现有 Dataset API 保持兼容，新增应用级只读查询入口；
 - 回归：跨租户、跨应用、跨环境不能越权。
 
-### P2：检索网关
+### P2：检索网关（进行中）
 
-- 把 `DatasetAPI.search/answer` 下沉到统一 `KnowledgeGateway`；
-- 应用绑定解析成服务端 Retrieval Policy；
+- 已实现应用级 `query/answer` Gateway；
+- 已把应用绑定解析成服务端 Retrieval Policy，并支持多个 Dataset fan-out、结果去重与全局 Top-K；
+- 已在每个绑定进入 Milvus 前重新执行 Dataset ACL，撤权后 fail-closed；
 - 统一 Query Trace、成本、模型和索引版本记录；
 - Agent SDK 只依赖 Gateway Contract。
 
@@ -183,4 +191,4 @@ POST /api/v1/apps/{app_id}/bindings
 
 当前已完成的是 P0/P1 之前的可靠性基础：Tenant/Dataset ACL、Milvus 生命周期、异步导入、PostgreSQL Job 持久化、门户人工运维和评测闭环。
 
-当前还不能宣称已经是完整的多应用知识平台，因为 Application、Binding、Environment 和统一 Gateway 尚未落成。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。
+当前仍不能宣称已经是完整的商业化多应用知识平台：Gateway 已落地核心路由，但 Query Trace、检索重排、索引发布版本、限流与配额仍在后续阶段。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。

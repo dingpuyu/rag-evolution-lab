@@ -336,6 +336,36 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			}
 		}
 	}
+	// Seed one realistic application per demo tenant so a fresh deployment can
+	// exercise the application-facing Gateway immediately. ON CONFLICT keeps
+	// operator-created names, policies and bindings untouched on later boots.
+	for _, application := range []struct {
+		id, tenant, name, slug, dataset string
+	}{
+		{"tenant_a-support-agent", "tenant_a", "Tenant A Support Agent", "support-agent", "tenant-a-operations"},
+		{"tenant_b-support-agent", "tenant_b", "Tenant B Support Agent", "support-agent", "tenant-b-operations"},
+	} {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO applications (app_id,tenant_id,name,slug,description,status,created_by)
+			VALUES ($1,$2,$3,$4,$5,'active','system')
+			ON CONFLICT (app_id) DO NOTHING`, application.id, application.tenant, application.name, application.slug,
+			"Demo application for the application-level Knowledge Gateway"); err != nil {
+			return err
+		}
+		environmentID := application.id + "-dev"
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO app_environments (environment_id,app_id,name,config_version,status)
+			VALUES ($1,$2,'dev','v1','active') ON CONFLICT (environment_id) DO NOTHING`, environmentID, application.id); err != nil {
+			return err
+		}
+		policy, _ := json.Marshal(RetrievalPolicy{TopK: 5, CandidateK: 20, TokenBudget: 4000})
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO knowledge_bindings (app_id,environment_id,dataset_id,purpose,priority,status,policy,created_by)
+			VALUES ($1,$2,$3,'tenant support knowledge',10,'active',$4,'system')
+			ON CONFLICT (app_id,environment_id,dataset_id) DO NOTHING`, application.id, environmentID, application.dataset, policy); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 

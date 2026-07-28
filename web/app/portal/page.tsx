@@ -18,6 +18,9 @@ type Dataset = {
   allowed_roles?: string[];
   status: string;
 };
+type AgentApplication = { app_id: string; tenant_id: string; name: string; slug: string; description: string; status: string };
+type AppEnvironment = { environment_id: string; app_id: string; name: string; config_version: string; status: string };
+type GatewayBinding = { dataset_id: string; dataset_name: string; purpose?: string; priority: number; hits: number; policy: { top_k: number; candidate_k: number; rerank: boolean; query_rewrite: boolean; token_budget: number } };
 type IngestionJob = {
   job_id: string;
   idempotency_key: string;
@@ -59,6 +62,7 @@ type AnswerResponse = {
   search: { hits: SearchHit[]; total_latency_ms: number; embedding_latency_ms: number; search_latency_ms: number; filter: string };
   generation: { generator: string; model: string; prompt_version: string; latency_ms: number; ttft_ms?: number; token_rate_tps?: number; prompt_tokens: number; output_tokens: number };
 };
+type GatewayAnswerResponse = { app_id: string; environment_id: string; bindings: GatewayBinding[]; result: AnswerResponse };
 type ChatMessage = { id: string; role: "user" | "assistant"; text: string; response?: AnswerResponse; pending?: boolean };
 type Membership = { tenant_id: string; subject: string; role: string; status: string };
 type AuditEvent = { timestamp: string; subject?: string; tenant_id?: string; method: string; path: string; decision: string; status: number; reason?: string };
@@ -91,7 +95,7 @@ export default function CustomerPortal() {
   const [password, setPassword] = useState("");
   const [organization, setOrganization] = useState("我的团队");
   const [authError, setAuthError] = useState("");
-  const [view, setView] = useState<"chat" | "knowledge" | "ingest" | "access">("chat");
+  const [view, setView] = useState<"chat" | "knowledge" | "ingest" | "access" | "apps">("chat");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [selectedDataset, setSelectedDataset] = useState("");
   const [query, setQuery] = useState("");
@@ -108,12 +112,20 @@ export default function CustomerPortal() {
   const [ingestionRefreshing, setIngestionRefreshing] = useState(false);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [audit, setAudit] = useState<AuditEvent[]>([]);
+  const [applications, setApplications] = useState<AgentApplication[]>([]);
+  const [selectedApplication, setSelectedApplication] = useState("");
+  const [environments, setEnvironments] = useState<AppEnvironment[]>([]);
+  const [selectedEnvironment, setSelectedEnvironment] = useState("");
+  const [appQuery, setAppQuery] = useState("");
+  const [appAnswer, setAppAnswer] = useState<GatewayAnswerResponse | null>(null);
+  const [appBusy, setAppBusy] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const streamAbort = useRef<AbortController | null>(null);
 
   const isAdmin = Boolean(session?.identity.roles.some((role) => role === "admin" || role === "platform_admin"));
   const isPlatformAdmin = Boolean(session?.identity.roles.includes("platform_admin"));
   const currentDataset = useMemo(() => datasets.find((dataset) => dataset.id === selectedDataset), [datasets, selectedDataset]);
+  const currentApplication = useMemo(() => applications.find((application) => application.app_id === selectedApplication), [applications, selectedApplication]);
 
   useEffect(() => {
     const raw = window.localStorage.getItem("raglab-portal-session");
@@ -171,8 +183,37 @@ export default function CustomerPortal() {
       const body = (await response.json()) as { datasets: Dataset[] };
       setDatasets(body.datasets ?? []);
       if (body.datasets?.length) setSelectedDataset((current) => current || body.datasets[0].id);
+      if (active.identity.roles.some((role) => role === "admin" || role === "platform_admin")) await loadApplications(active.access_token);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "无法加载知识库");
+    }
+  }
+
+  async function loadApplications(token = session?.access_token) {
+    if (!token) return;
+    try {
+      const response = await api("/api/v1/apps", {}, token);
+      const body = (await response.json()) as { applications: AgentApplication[] };
+      setApplications(body.applications ?? []);
+      const first = body.applications?.[0];
+      if (first) {
+        setSelectedApplication((current) => current || first.app_id);
+        await loadApplicationEnvironments(first.app_id, token);
+      }
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "应用空间加载失败");
+    }
+  }
+
+  async function loadApplicationEnvironments(applicationID: string, token = session?.access_token) {
+    if (!token || !applicationID) return;
+    try {
+      const response = await api(`/api/v1/apps/${encodeURIComponent(applicationID)}/environments`, {}, token);
+      const body = (await response.json()) as { environments: AppEnvironment[] };
+      setEnvironments(body.environments ?? []);
+      if (body.environments?.length) setSelectedEnvironment((current) => current || body.environments[0].environment_id);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "应用环境加载失败");
     }
   }
 
@@ -192,8 +233,30 @@ export default function CustomerPortal() {
   function logout() {
     streamAbort.current?.abort();
     window.localStorage.removeItem("raglab-portal-session");
-    setSession(null); setMessages([]); setDatasets([]); setSelectedDataset("");
+    setSession(null); setMessages([]); setDatasets([]); setSelectedDataset(""); setApplications([]); setSelectedApplication(""); setEnvironments([]); setSelectedEnvironment(""); setAppAnswer(null);
   }
+
+  async function askApplication() {
+    const text = appQuery.trim();
+    if (!text || !selectedApplication || appBusy) return;
+    setAppBusy(true); setNotice(""); setAppAnswer(null);
+    try {
+      const response = await api(`/api/v1/apps/${encodeURIComponent(selectedApplication)}/answer`, {
+        method: "POST", body: JSON.stringify({ environment_id: selectedEnvironment, query: text, top_k: 5 }),
+      });
+      setAppAnswer((await response.json()) as GatewayAnswerResponse);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "应用级回答失败");
+    } finally { setAppBusy(false); }
+  }
+
+  useEffect(() => {
+    if (!selectedApplication || !session) return;
+    setSelectedEnvironment("");
+    void loadApplicationEnvironments(selectedApplication);
+    // Application changes intentionally reload server-side environments.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApplication, session]);
 
   async function sendQuestion(event?: FormEvent) {
     event?.preventDefault();
@@ -346,6 +409,7 @@ export default function CustomerPortal() {
         <div className="tenant-chip"><span className="status-dot" />{session.identity.tenant_id}<small>{session.identity.roles.join(" · ")}</small></div>
         <nav className="portal-nav">
           <button className={view === "chat" ? "active" : ""} onClick={() => { setView("chat"); setSidebarOpen(false); }}><span>⌁</span>智能客服<em>LIVE</em></button>
+          {isAdmin && <button className={view === "apps" ? "active" : ""} onClick={() => { setView("apps"); setSidebarOpen(false); }}><span>◇</span>Agent 应用<em>GATEWAY</em></button>}
           <button className={view === "knowledge" ? "active" : ""} onClick={() => { setView("knowledge"); setSidebarOpen(false); }}><span>▦</span>知识库</button>
           {isAdmin && <button className={view === "ingest" ? "active" : ""} onClick={() => { setView("ingest"); setSelectedDataset(datasets.find((dataset) => dataset.visibility === "tenant")?.id ?? datasets[0]?.id ?? ""); setSidebarOpen(false); }}><span>↑</span>导入资料</button>}
           {isAdmin && <button className={view === "access" ? "active" : ""} onClick={() => { setView("access"); setSidebarOpen(false); }}><span>◈</span>权限与审计</button>}
@@ -353,9 +417,10 @@ export default function CustomerPortal() {
         <div className="sidebar-bottom"><a href="/" target="_blank" rel="noreferrer">打开工程实验室 ↗</a><button onClick={logout}>退出登录</button></div>
       </aside>
       <section className="portal-main">
-        <header className="portal-header"><button className="mobile-menu" onClick={() => setSidebarOpen((open) => !open)}>☰</button><div><p className="eyebrow">CUSTOMER OPERATIONS / RAG</p><h1>{view === "chat" ? "智能客服" : view === "knowledge" ? "知识库" : view === "ingest" ? "导入资料" : "权限与审计"}</h1></div><div className="header-actions"><span className="api-status"><i />API 在线</span><button className="avatar" title={session.identity.subject}>{session.identity.subject.slice(-2).toUpperCase()}</button></div></header>
+        <header className="portal-header"><button className="mobile-menu" onClick={() => setSidebarOpen((open) => !open)}>☰</button><div><p className="eyebrow">CUSTOMER OPERATIONS / RAG</p><h1>{view === "chat" ? "智能客服" : view === "apps" ? "Agent 应用" : view === "knowledge" ? "知识库" : view === "ingest" ? "导入资料" : "权限与审计"}</h1></div><div className="header-actions"><span className="api-status"><i />API 在线</span><button className="avatar" title={session.identity.subject}>{session.identity.subject.slice(-2).toUpperCase()}</button></div></header>
         {notice && <div className="portal-notice">{notice}<button onClick={() => setNotice("")}>×</button></div>}
         {view === "chat" && <ChatView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} current={currentDataset} query={query} setQuery={setQuery} messages={messages} streaming={streaming} send={sendQuestion} runSearch={() => void runSearch()} searching={searching} searchHits={searchHits} />}
+        {view === "apps" && <ApplicationView applications={applications} environments={environments} selectedApplication={selectedApplication} setSelectedApplication={setSelectedApplication} selectedEnvironment={selectedEnvironment} setSelectedEnvironment={setSelectedEnvironment} current={currentApplication} query={appQuery} setQuery={setAppQuery} answer={appAnswer} busy={appBusy} ask={() => void askApplication()} />}
         {view === "knowledge" && <KnowledgeView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isAdmin={isAdmin} form={newDataset} setForm={setNewDataset} toggleRole={toggleRole} create={createKnowledgeBase} />}
         {view === "ingest" && <><IngestView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isPlatformAdmin={isPlatformAdmin} document={document} setDocument={setDocument} submit={importDocument} importing={importing} /><IngestionTaskBoard summary={ingestionSummary} error={ingestionError} refreshing={ingestionRefreshing} refresh={() => void refreshDatasetJobs()} mutate={mutateDatasetJob} /></>}
         {view === "access" && <AccessView session={session} datasets={datasets} memberships={memberships} audit={audit} isPlatformAdmin={isPlatformAdmin} />}
@@ -370,6 +435,10 @@ function LoginScreen(props: { mode: "login" | "register"; setMode: (mode: "login
 
 function ChatView(props: { datasets: Dataset[]; selected: string; setSelected: (value: string) => void; current?: Dataset; query: string; setQuery: (value: string) => void; messages: ChatMessage[]; streaming: boolean; send: (event?: FormEvent) => void; runSearch: () => void; searching: boolean; searchHits: SearchHit[] }) {
   return <div className="chat-layout"><div className="chat-column"><div className="workspace-strip"><div><span className="section-kicker">KNOWLEDGE SCOPE</span><strong>{props.current?.name ?? "请选择知识库"}</strong><small>{props.current?.description ?? "当前身份没有可见知识库"}</small></div><select value={props.selected} onChange={(event) => props.setSelected(event.target.value)}>{props.datasets.map((dataset) => <option key={dataset.id} value={dataset.id}>{dataset.name}</option>)}</select></div><div className="conversation"><div className="welcome-card"><div className="spark">✦</div><h2>你好，我是你的知识助手</h2><p>我会先检索 <b>{props.current?.name ?? "当前知识库"}</b>，再基于命中的资料回答。每个结论都会保留来源引用。</p><div className="suggestions"><button onClick={() => props.setQuery("如何申请企业单点登录？")}>如何申请企业单点登录？</button><button onClick={() => props.setQuery("导出报表需要什么权限？")}>导出报表需要什么权限？</button><button onClick={() => props.setQuery("服务故障时的升级流程是什么？")}>服务故障时的升级流程？</button></div></div>{props.messages.map((message) => <div className={`message-row ${message.role}`} key={message.id}><div className="message-avatar">{message.role === "user" ? "我" : "R"}</div><div className="message-body"><div className="message-meta">{message.role === "user" ? "你" : "RAG Desk"}<span>{message.role === "assistant" && message.pending ? "实时生成中" : ""}</span></div><div className={`message-bubble ${message.pending ? "pending" : ""}`}>{message.text}{message.pending && <i className="typing" />}</div>{message.response && <AnswerMeta response={message.response} />}</div></div>)}</div><form className="composer" onSubmit={props.send}><textarea value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="向知识库提问…" rows={2} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); props.send(); } }} /><div className="composer-bottom"><span>↗ Enter 发送 · Shift + Enter 换行</span><div><button type="button" className="ghost-button" onClick={props.runSearch} disabled={props.searching || !props.query.trim()}>只看检索</button><button className="send-button" disabled={props.streaming || !props.query.trim()}>发送 <span>↑</span></button></div></div></form></div><aside className="evidence-panel"><div className="panel-heading"><div><span className="section-kicker">RETRIEVAL PREVIEW</span><h3>检索证据</h3></div><span className="count-badge">{props.searchHits.length || "—"}</span></div>{props.searchHits.length ? props.searchHits.map((hit) => <EvidenceCard key={hit.chunk_id} hit={hit} />) : <div className="empty-evidence"><div>⌁</div><strong>等待一次检索</strong><p>点击“只看检索”，或发送问题后查看召回的 chunks、距离和租户过滤器。</p></div>}<div className="panel-footnote"><span>●</span> 只展示当前身份可见的证据</div></aside></div>;
+}
+
+function ApplicationView(props: { applications: AgentApplication[]; environments: AppEnvironment[]; selectedApplication: string; setSelectedApplication: (value: string) => void; selectedEnvironment: string; setSelectedEnvironment: (value: string) => void; current?: AgentApplication; query: string; setQuery: (value: string) => void; answer: GatewayAnswerResponse | null; busy: boolean; ask: () => void }) {
+  return <div className="content-page application-page"><div className="page-intro"><div><span className="section-kicker">APPLICATION KNOWLEDGE GATEWAY</span><h2>Agent 应用知识入口</h2><p>上层 Agent 只选择应用和环境。服务端会解析绑定、租户权限与检索策略，不把 Milvus Filter 暴露给调用方。</p></div><span className="secure-pill">✓ SERVER POLICY</span></div>{props.applications.length ? <><div className="create-panel app-selector"><div className="form-grid"><label>应用<select value={props.selectedApplication} onChange={(event) => props.setSelectedApplication(event.target.value)}>{props.applications.map((application) => <option key={application.app_id} value={application.app_id}>{application.name} · {application.tenant_id}</option>)}</select></label><label>环境<select value={props.selectedEnvironment} onChange={(event) => props.setSelectedEnvironment(event.target.value)}>{props.environments.map((environment) => <option key={environment.environment_id} value={environment.environment_id}>{environment.name} · {environment.config_version}</option>)}</select></label></div><small className="gateway-contract">POST /api/v1/apps/{props.selectedApplication || "{app_id}"}/answer</small></div><div className="create-panel gateway-query"><div className="panel-heading"><div><span className="section-kicker">GATEWAY ANSWER</span><h3>{props.current?.name ?? "选择一个应用"}</h3></div><span className="lock-badge">BINDING ACL</span></div><textarea value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="向当前 Agent 应用提问…" rows={3} /><div className="ingest-actions"><span>应用级多知识库聚合 · Citation Allowlist · Environment 隔离</span><button className="primary-button compact" onClick={props.ask} disabled={props.busy || !props.query.trim() || !props.selectedEnvironment}>{props.busy ? "检索与生成中…" : "调用 Gateway →"}</button></div></div>{props.answer && <div className="gateway-result"><div className="result-answer"><div className="section-kicker">GROUNDED ANSWER</div><h3>{props.answer.result.answer}</h3><div className="answer-stats"><span>召回 {props.answer.result.search.hits.length} 条</span><span>{Math.round(props.answer.result.search.total_latency_ms)} ms</span><span>{props.answer.result.generation.model || props.answer.result.generation.generator}</span></div></div><div className="binding-proof"><div className="section-kicker">RESOLVED BINDINGS</div>{props.answer.bindings.map((binding) => <div className="binding-proof-row" key={binding.dataset_id}><strong>{binding.dataset_name || binding.dataset_id}</strong><span>{binding.hits} hits · top_k {binding.policy.top_k} · candidate {binding.policy.candidate_k}</span></div>)}<code>{props.answer.result.search.filter}</code></div></div>}</> : <div className="empty-evidence app-empty"><div>◇</div><strong>还没有可用的 Agent 应用</strong><p>先通过控制面创建 Application 并绑定一个或多个知识库，门户会在这里展示可体验的 Gateway。</p></div>}</div>;
 }
 
 function AnswerMeta({ response }: { response: AnswerResponse }) {

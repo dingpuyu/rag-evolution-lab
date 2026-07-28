@@ -170,6 +170,22 @@ Content-Type: application/json
 
 同一 Dataset 可以被多个 Application 绑定；绑定策略存储在控制面，不会修改其他应用的策略。
 
+### 通过 Knowledge Gateway 查询
+
+上层 Agent 不需要知道 Dataset 的 `product`、租户或 Milvus Filter：
+
+```http
+POST /api/v1/apps/tenant_a-support-agent/query
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{"environment_id":"tenant_a-support-agent-dev","query":"如何处理单点登录故障？","top_k":5}
+```
+
+服务端会按 Application + Environment 读取所有 active Binding，并对每个 Dataset 再做一次当前身份授权。多个知识库的召回结果会按距离合并、按 `chunk_id` 去重并截断到全局 `top_k`。跨租户访问、已撤权 Dataset 或没有绑定的环境均不会静默降级。
+
+回答入口为 `POST /api/v1/apps/{app_id}/answer`，返回与旧 Dataset Answer 相同的引用校验结构，并额外附带 `app_id`、`environment_id` 和每个 Binding 的策略/命中数，便于 Agent harness 做观测与回归。
+
 ## 已验证问题
 
 ### Product 不能错误地全局唯一

@@ -11,6 +11,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
+	"github.com/dingpuyu/rag-evolution-lab/internal/knowledgegateway"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 )
@@ -126,6 +127,13 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			mux.Handle("POST /api/v1/apps/{app_id}/environments", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createEnvironment)))
 			mux.Handle("GET /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.bindings)))
 			mux.Handle("POST /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createBinding)))
+			gateway, gatewayErr := knowledgegateway.New(lifecycleService, datasetStore, enterprise.ApplicationStore, generator)
+			if gatewayErr != nil {
+				return nil, gatewayErr
+			}
+			gatewayAPI := &KnowledgeGatewayAPI{service: gateway}
+			mux.Handle("POST /api/v1/apps/{app_id}/query", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.query)))
+			mux.Handle("POST /api/v1/apps/{app_id}/answer", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.answer)))
 		}
 	}
 	if enterprise.IngestionJobs != nil {
