@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-down stack-status
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status
 
 DOCKER_COMPOSE ?= docker-compose
 STACK_COMPOSE = $(DOCKER_COMPOSE) -f deploy/stack/docker-compose.yml
@@ -130,6 +130,9 @@ web-dev:
 
 stack-up:
 	$(STACK_COMPOSE) up -d --build
+
+stack-smoke:
+	./scripts/stack_smoke.sh
 
 stack-down:
 	$(STACK_COMPOSE) down

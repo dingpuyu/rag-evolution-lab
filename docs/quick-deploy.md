@@ -14,6 +14,7 @@
 cp .env.example .env
 make stack-up
 make stack-status
+make stack-smoke
 ```
 
 启动完成后访问：
@@ -23,6 +24,8 @@ make stack-status
 - Milvus 健康检查：<http://localhost:9091/healthz>
 
 首次启动 Milvus 可能需要 1–3 分钟。可以用 `docker-compose -f deploy/stack/docker-compose.yml logs -f milvus api` 查看启动过程。
+
+`make stack-smoke` 会等待 API 和门户健康检查，然后使用默认管理员验证登录、数据集目录和 Agent Application 控制面。它不写入业务资料，适合部署后快速验收；需要验证索引构建、Credential Scope 和回滚链路时，再执行 `make enterprise-eval` 或 `make enterprise-eval-build`。
 
 ## 2. 默认体验档
 
