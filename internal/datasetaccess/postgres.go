@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
+	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -44,6 +45,84 @@ func OpenPostgres(ctx context.Context, databaseURL string) (*PostgresStore, erro
 }
 
 func (store *PostgresStore) Close() error { return store.db.Close() }
+
+func (store *PostgresStore) UpsertQueryTrace(ctx context.Context, record querytrace.Record) error {
+	metadata, err := json.Marshal(record.Metadata)
+	if err != nil {
+		return fmt.Errorf("encode query trace metadata: %w", err)
+	}
+	_, err = store.db.ExecContext(ctx, `
+		INSERT INTO query_traces (
+			trace_id, app_id, environment_id, tenant_id, subject, query, rewritten_query, status,
+			index_version, index_collection, embedding_model, generator, model, prompt_version,
+			top_k, candidate_count, hit_count, rerank_applied, rewrite_applied, answerable,
+			refusal_reason, embedding_ms, retrieval_ms, generation_ms, total_ms, prompt_tokens,
+			output_tokens, error, metadata, started_at, completed_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31)
+		ON CONFLICT (trace_id) DO UPDATE SET
+			status=EXCLUDED.status, rewritten_query=EXCLUDED.rewritten_query,
+			index_version=EXCLUDED.index_version, index_collection=EXCLUDED.index_collection,
+			embedding_model=EXCLUDED.embedding_model, generator=EXCLUDED.generator,
+			model=EXCLUDED.model, prompt_version=EXCLUDED.prompt_version,
+			top_k=EXCLUDED.top_k, candidate_count=EXCLUDED.candidate_count, hit_count=EXCLUDED.hit_count,
+			rerank_applied=EXCLUDED.rerank_applied, rewrite_applied=EXCLUDED.rewrite_applied,
+			answerable=EXCLUDED.answerable, refusal_reason=EXCLUDED.refusal_reason,
+			embedding_ms=EXCLUDED.embedding_ms, retrieval_ms=EXCLUDED.retrieval_ms,
+			generation_ms=EXCLUDED.generation_ms, total_ms=EXCLUDED.total_ms,
+			prompt_tokens=EXCLUDED.prompt_tokens, output_tokens=EXCLUDED.output_tokens,
+			error=EXCLUDED.error, metadata=EXCLUDED.metadata, completed_at=EXCLUDED.completed_at`,
+		record.TraceID, record.AppID, record.EnvironmentID, record.TenantID, record.Subject,
+		record.Query, record.RewrittenQuery, record.Status, record.IndexVersion, record.IndexCollection,
+		record.EmbeddingModel, record.Generator, record.Model, record.PromptVersion, record.TopK,
+		record.CandidateCount, record.HitCount, record.RerankApplied, record.RewriteApplied, record.Answerable,
+		record.RefusalReason, record.EmbeddingMS, record.RetrievalMS, record.GenerationMS, record.TotalMS,
+		record.PromptTokens, record.OutputTokens, record.Error, metadata, record.StartedAt, record.CompletedAt)
+	return err
+}
+
+func (store *PostgresStore) GetQueryTrace(ctx context.Context, identity auth.Identity, appID, traceID string) (querytrace.Record, error) {
+	if err := store.EnsureIdentity(ctx, identity); err != nil {
+		return querytrace.Record{}, err
+	}
+	var record querytrace.Record
+	var answerable sql.NullBool
+	var completedAt sql.NullTime
+	var metadata []byte
+	err := store.db.QueryRowContext(ctx, `
+		SELECT trace_id, app_id, environment_id, tenant_id, subject, query, rewritten_query, status,
+		       index_version, index_collection, embedding_model, generator, model, prompt_version,
+		       top_k, candidate_count, hit_count, rerank_applied, rewrite_applied, answerable,
+		       refusal_reason, embedding_ms, retrieval_ms, generation_ms, total_ms, prompt_tokens,
+		       output_tokens, error, metadata, started_at, completed_at
+		FROM query_traces WHERE trace_id=$1 AND app_id=$2`, traceID, appID).Scan(
+		&record.TraceID, &record.AppID, &record.EnvironmentID, &record.TenantID, &record.Subject,
+		&record.Query, &record.RewrittenQuery, &record.Status, &record.IndexVersion, &record.IndexCollection,
+		&record.EmbeddingModel, &record.Generator, &record.Model, &record.PromptVersion, &record.TopK,
+		&record.CandidateCount, &record.HitCount, &record.RerankApplied, &record.RewriteApplied, &answerable,
+		&record.RefusalReason, &record.EmbeddingMS, &record.RetrievalMS, &record.GenerationMS, &record.TotalMS,
+		&record.PromptTokens, &record.OutputTokens, &record.Error, &metadata, &record.StartedAt, &completedAt)
+	if err == sql.ErrNoRows {
+		return querytrace.Record{}, querytrace.ErrNotFound
+	}
+	if err != nil {
+		return querytrace.Record{}, err
+	}
+	if record.TenantID != identity.TenantID && !identity.HasRole("platform_admin") {
+		return querytrace.Record{}, querytrace.ErrDenied
+	}
+	if answerable.Valid {
+		record.Answerable = &answerable.Bool
+	}
+	if completedAt.Valid {
+		record.CompletedAt = &completedAt.Time
+	}
+	if len(metadata) > 0 && string(metadata) != "null" {
+		if err := json.Unmarshal(metadata, &record.Metadata); err != nil {
+			return querytrace.Record{}, err
+		}
+	}
+	return record, nil
+}
 
 func (store *PostgresStore) EnsureIdentity(ctx context.Context, identity auth.Identity) error {
 	if strings.TrimSpace(identity.Subject) == "" || strings.TrimSpace(identity.TenantID) == "" || identity.PrimaryRole() == "" {
@@ -358,7 +437,7 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			VALUES ($1,$2,'dev','v1','active') ON CONFLICT (environment_id) DO NOTHING`, environmentID, application.id); err != nil {
 			return err
 		}
-		policy, _ := json.Marshal(RetrievalPolicy{TopK: 5, CandidateK: 20, TokenBudget: 4000})
+		policy, _ := json.Marshal(RetrievalPolicy{TopK: 5, CandidateK: 20, Rerank: true, QueryRewrite: true, TokenBudget: 4000})
 		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO knowledge_bindings (app_id,environment_id,dataset_id,purpose,priority,status,policy,created_by)
 			VALUES ($1,$2,$3,'tenant support knowledge',10,'active',$4,'system')
@@ -459,6 +538,54 @@ CREATE TABLE IF NOT EXISTS knowledge_bindings (
 	updated_at timestamptz NOT NULL DEFAULT now(),
 	PRIMARY KEY (app_id, environment_id, dataset_id)
 );
+CREATE TABLE IF NOT EXISTS index_releases (
+	release_id text PRIMARY KEY,
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	environment_id text NOT NULL REFERENCES app_environments(environment_id) ON DELETE CASCADE,
+	version text NOT NULL,
+	collection text NOT NULL,
+	alias text NOT NULL DEFAULT '',
+	state text NOT NULL CHECK (state IN ('published','superseded')),
+	published_by text NOT NULL,
+	published_at timestamptz NOT NULL DEFAULT now(),
+	created_at timestamptz NOT NULL DEFAULT now(),
+	UNIQUE (app_id, environment_id, version)
+);
+CREATE INDEX IF NOT EXISTS index_releases_environment_state_idx ON index_releases(app_id, environment_id, state, published_at DESC);
+CREATE TABLE IF NOT EXISTS query_traces (
+	trace_id text PRIMARY KEY,
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	environment_id text NOT NULL REFERENCES app_environments(environment_id) ON DELETE CASCADE,
+	tenant_id text NOT NULL REFERENCES tenants(id),
+	subject text NOT NULL,
+	query text NOT NULL,
+	rewritten_query text NOT NULL DEFAULT '',
+	status text NOT NULL CHECK (status IN ('retrieved','completed','failed')),
+	index_version text NOT NULL DEFAULT '',
+	index_collection text NOT NULL DEFAULT '',
+	embedding_model text NOT NULL DEFAULT '',
+	generator text NOT NULL DEFAULT '',
+	model text NOT NULL DEFAULT '',
+	prompt_version text NOT NULL DEFAULT '',
+	top_k integer NOT NULL DEFAULT 0,
+	candidate_count integer NOT NULL DEFAULT 0,
+	hit_count integer NOT NULL DEFAULT 0,
+	rerank_applied boolean NOT NULL DEFAULT false,
+	rewrite_applied boolean NOT NULL DEFAULT false,
+	answerable boolean,
+	refusal_reason text NOT NULL DEFAULT '',
+	embedding_ms double precision NOT NULL DEFAULT 0,
+	retrieval_ms double precision NOT NULL DEFAULT 0,
+	generation_ms double precision NOT NULL DEFAULT 0,
+	total_ms double precision NOT NULL DEFAULT 0,
+	prompt_tokens integer NOT NULL DEFAULT 0,
+	output_tokens integer NOT NULL DEFAULT 0,
+	error text NOT NULL DEFAULT '',
+	metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+	started_at timestamptz NOT NULL DEFAULT now(),
+	completed_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS query_traces_app_started_idx ON query_traces(app_id, environment_id, started_at DESC);
 CREATE INDEX IF NOT EXISTS knowledge_bindings_dataset_idx ON knowledge_bindings(dataset_id, status);
 CREATE TABLE IF NOT EXISTS ingestion_jobs (
 	job_id text PRIMARY KEY,

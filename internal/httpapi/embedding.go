@@ -127,13 +127,26 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			mux.Handle("POST /api/v1/apps/{app_id}/environments", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createEnvironment)))
 			mux.Handle("GET /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.bindings)))
 			mux.Handle("POST /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createBinding)))
-			gateway, gatewayErr := knowledgegateway.New(lifecycleService, datasetStore, enterprise.ApplicationStore, generator)
+			gateway, gatewayErr := knowledgegateway.NewWithOptions(lifecycleService, datasetStore, enterprise.ApplicationStore, generator, knowledgegateway.Options{
+				IndexStore: enterprise.IndexStore, TraceStore: enterprise.QueryTraceStore,
+			})
 			if gatewayErr != nil {
 				return nil, gatewayErr
 			}
 			gatewayAPI := &KnowledgeGatewayAPI{service: gateway}
 			mux.Handle("POST /api/v1/apps/{app_id}/query", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.query)))
 			mux.Handle("POST /api/v1/apps/{app_id}/answer", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.answer)))
+			mux.Handle("POST /api/v1/apps/{app_id}/answer/stream", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.answerStream)))
+			if enterprise.QueryTraceStore != nil {
+				gatewayAPI.traces = enterprise.QueryTraceStore
+				mux.Handle("GET /api/v1/apps/{app_id}/traces/{trace_id}", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.trace)))
+			}
+			if enterprise.IndexStore != nil {
+				indexAPI := &IndexAPI{store: enterprise.IndexStore, service: lifecycleService}
+				mux.Handle("GET /api/v1/apps/{app_id}/environments/{environment_id}/indexes", authenticator.requireIdentity(http.HandlerFunc(indexAPI.list)))
+				mux.Handle("POST /api/v1/apps/{app_id}/environments/{environment_id}/indexes/publish", authenticator.requireIdentity(http.HandlerFunc(indexAPI.publish)))
+				mux.Handle("POST /api/v1/apps/{app_id}/environments/{environment_id}/indexes/rollback", authenticator.requireIdentity(http.HandlerFunc(indexAPI.rollback)))
+			}
 		}
 	}
 	if enterprise.IngestionJobs != nil {

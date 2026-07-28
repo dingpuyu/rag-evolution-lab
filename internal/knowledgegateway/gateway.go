@@ -14,6 +14,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
+	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 )
 
 // Searcher is the small part of the retrieval service needed by the gateway.
@@ -31,40 +32,76 @@ type Request struct {
 }
 
 type BindingTrace struct {
-	DatasetID   string                        `json:"dataset_id"`
-	DatasetName string                        `json:"dataset_name"`
-	Purpose     string                        `json:"purpose,omitempty"`
-	Priority    int                           `json:"priority"`
-	Hits        int                           `json:"hits"`
-	Policy      datasetaccess.RetrievalPolicy `json:"policy"`
+	DatasetID       string                        `json:"dataset_id"`
+	DatasetName     string                        `json:"dataset_name"`
+	Purpose         string                        `json:"purpose,omitempty"`
+	Priority        int                           `json:"priority"`
+	Hits            int                           `json:"hits"`
+	Policy          datasetaccess.RetrievalPolicy `json:"policy"`
+	IndexVersion    string                        `json:"index_version,omitempty"`
+	IndexCollection string                        `json:"index_collection,omitempty"`
+	Rewrite         RewriteResult                 `json:"rewrite"`
+	Rerank          RerankTrace                   `json:"rerank"`
+}
+
+type RerankTrace struct {
+	Applied    bool   `json:"applied"`
+	Model      string `json:"model,omitempty"`
+	Candidates int    `json:"candidates"`
 }
 
 type SearchResponse struct {
-	AppID         string              `json:"app_id"`
-	EnvironmentID string              `json:"environment_id"`
-	Bindings      []BindingTrace      `json:"bindings"`
-	Result        milvus.SearchResult `json:"result"`
+	AppID          string              `json:"app_id"`
+	EnvironmentID  string              `json:"environment_id"`
+	TraceID        string              `json:"trace_id,omitempty"`
+	RewrittenQuery string              `json:"rewritten_query,omitempty"`
+	Bindings       []BindingTrace      `json:"bindings"`
+	Result         milvus.SearchResult `json:"result"`
+	TraceRecord    querytrace.Record   `json:"-"`
 }
 
 type AnswerResponse struct {
 	AppID         string              `json:"app_id"`
 	EnvironmentID string              `json:"environment_id"`
+	TraceID       string              `json:"trace_id,omitempty"`
 	Bindings      []BindingTrace      `json:"bindings"`
 	Result        generation.Response `json:"result"`
 }
 
 type Service struct {
-	searcher  Searcher
-	datasets  datasetaccess.Store
-	apps      datasetaccess.ApplicationStore
-	generator generation.Generator
+	searcher   Searcher
+	datasets   datasetaccess.Store
+	apps       datasetaccess.ApplicationStore
+	generator  generation.Generator
+	indexStore datasetaccess.IndexStore
+	traceStore querytrace.Store
+	rewriter   QueryRewriter
+	reranker   HitReranker
+}
+
+type Options struct {
+	IndexStore datasetaccess.IndexStore
+	TraceStore querytrace.Store
+	Rewriter   QueryRewriter
+	Reranker   HitReranker
 }
 
 func New(searcher Searcher, datasets datasetaccess.Store, apps datasetaccess.ApplicationStore, generator generation.Generator) (*Service, error) {
+	return NewWithOptions(searcher, datasets, apps, generator, Options{})
+}
+
+func NewWithOptions(searcher Searcher, datasets datasetaccess.Store, apps datasetaccess.ApplicationStore, generator generation.Generator, options Options) (*Service, error) {
 	if searcher == nil || datasets == nil || apps == nil || generator == nil {
 		return nil, fmt.Errorf("knowledge gateway requires searcher, dataset store, application store and generator")
 	}
-	return &Service{searcher: searcher, datasets: datasets, apps: apps, generator: generator}, nil
+	if options.Rewriter == nil {
+		options.Rewriter = SemanticRewriter{}
+	}
+	if options.Reranker == nil {
+		options.Reranker = NewHeuristicReranker()
+	}
+	return &Service{searcher: searcher, datasets: datasets, apps: apps, generator: generator,
+		indexStore: options.IndexStore, traceStore: options.TraceStore, rewriter: options.Rewriter, reranker: options.Reranker}, nil
 }
 
 func (service *Service) Search(ctx context.Context, identity auth.Identity, request Request) (SearchResponse, error) {
@@ -105,6 +142,20 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 			// silently fall back to another dataset and change the app's contract.
 			return SearchResponse{}, err
 		}
+		effectiveQuery := text
+		rewrite := RewriteResult{Query: text, Rewriter: "disabled", Reason: "policy_disabled"}
+		if binding.Policy.QueryRewrite {
+			var rewriteErr error
+			rewrite, rewriteErr = service.rewriter.Rewrite(ctx, text)
+			if rewriteErr != nil {
+				if binding.Policy.AllowFallback {
+					rewrite = RewriteResult{Query: text, Rewriter: service.rewriterName(), Reason: "fallback_after_rewriter_error"}
+				} else {
+					return SearchResponse{}, fmt.Errorf("rewrite bound dataset %q: %w", binding.DatasetID, rewriteErr)
+				}
+			}
+			effectiveQuery = rewrite.Query
+		}
 		limit := binding.Policy.CandidateK
 		if limit <= 0 {
 			limit = globalTopK
@@ -115,9 +166,32 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 		if limit > 20 {
 			limit = 20
 		}
-		result, err := service.searcher.Search(ctx, buildQuery(dataset, identity, text, limit))
+		indexRelease := datasetaccess.IndexRelease{}
+		if service.indexStore != nil {
+			indexRelease, err = service.indexStore.ResolveIndexRelease(ctx, identity, appID, environmentID)
+			if err != nil {
+				return SearchResponse{}, err
+			}
+		}
+		query := buildQuery(dataset, identity, effectiveQuery, limit)
+		query.Collection = indexRelease.Collection
+		result, err := service.searcher.Search(ctx, query)
 		if err != nil {
 			return SearchResponse{}, fmt.Errorf("search bound dataset %q: %w", binding.DatasetID, err)
+		}
+		rerankTrace := RerankTrace{Candidates: len(result.Hits)}
+		if binding.Policy.Rerank && len(result.Hits) > 1 {
+			ranked, rerankErr := service.reranker.Rerank(ctx, effectiveQuery, result.Hits)
+			if rerankErr != nil {
+				if !binding.Policy.AllowFallback {
+					return SearchResponse{}, fmt.Errorf("rerank bound dataset %q: %w", binding.DatasetID, rerankErr)
+				}
+			} else {
+				result.Hits = ranked
+				result.RerankApplied = true
+				rerankTrace.Applied = true
+				rerankTrace.Model = service.reranker.Name()
+			}
 		}
 		// CandidateK controls how much evidence enters the merge; TopK is the
 		// binding's published output budget. Enforce it before merging so one
@@ -136,13 +210,36 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 		traces = append(traces, BindingTrace{
 			DatasetID: binding.DatasetID, DatasetName: dataset.Name, Purpose: binding.Purpose,
 			Priority: binding.Priority, Hits: len(result.Hits), Policy: binding.Policy,
+			IndexVersion: indexRelease.Version, IndexCollection: indexRelease.Collection,
+			Rewrite: rewrite, Rerank: rerankTrace,
 		})
 	}
 	if len(results) == 0 {
 		return SearchResponse{}, fmt.Errorf("no active knowledge bindings for application environment")
 	}
 	merged := mergeResults(text, appID, environmentID, results, globalTopK, time.Since(started))
-	return SearchResponse{AppID: appID, EnvironmentID: environmentID, Bindings: traces, Result: merged}, nil
+	rewrittenQuery := text
+	for _, trace := range traces {
+		if trace.Rewrite.Applied {
+			rewrittenQuery = trace.Rewrite.Query
+			break
+		}
+	}
+	record := querytrace.Record{
+		TraceID: newTraceID(), AppID: appID, EnvironmentID: environmentID, TenantID: identity.TenantID, Subject: identity.Subject,
+		Query: text, RewrittenQuery: rewrittenQuery, Status: "retrieved", TopK: globalTopK,
+		CandidateCount: candidateCount(traces), HitCount: len(merged.Hits), EmbeddingMS: merged.EmbeddingLatencyMS,
+		RetrievalMS: merged.SearchLatencyMS, TotalMS: merged.TotalLatencyMS, RerankApplied: hasRerank(traces), RewriteApplied: hasRewrite(traces),
+		IndexCollection: firstIndexCollection(traces), IndexVersion: firstIndexVersion(traces), EmbeddingModel: merged.Embedder,
+		Metadata: map[string]any{"bindings": traces, "filter": merged.Filter}, StartedAt: started,
+	}
+	if service.traceStore != nil {
+		if err := service.traceStore.UpsertQueryTrace(ctx, record); err != nil {
+			return SearchResponse{}, fmt.Errorf("persist query trace: %w", err)
+		}
+	}
+	return SearchResponse{AppID: appID, EnvironmentID: environmentID, TraceID: record.TraceID, RewrittenQuery: rewrittenQuery,
+		Bindings: traces, Result: merged, TraceRecord: record}, nil
 }
 
 func (service *Service) Answer(ctx context.Context, identity auth.Identity, request Request) (AnswerResponse, error) {
@@ -156,9 +253,13 @@ func (service *Service) Answer(ctx context.Context, identity auth.Identity, requ
 	}
 	result, err := answerService.Answer(ctx, milvus.Query{Text: request.Query, TopK: request.TopK})
 	if err != nil {
+		service.persistFailedTrace(ctx, search.TraceRecord, err)
 		return AnswerResponse{}, err
 	}
-	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, Bindings: search.Bindings, Result: result}, nil
+	if err := service.persistCompletedTrace(ctx, search.TraceRecord, result); err != nil {
+		return AnswerResponse{}, err
+	}
+	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, TraceID: search.TraceID, Bindings: search.Bindings, Result: result}, nil
 }
 
 func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Identity, request Request, sink generation.ProgressSink) (AnswerResponse, error) {
@@ -172,9 +273,39 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	}
 	result, err := answerService.AnswerWithProgress(ctx, milvus.Query{Text: request.Query, TopK: request.TopK}, sink)
 	if err != nil {
+		service.persistFailedTrace(ctx, search.TraceRecord, err)
 		return AnswerResponse{}, err
 	}
-	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, Bindings: search.Bindings, Result: result}, nil
+	if err := service.persistCompletedTrace(ctx, search.TraceRecord, result); err != nil {
+		return AnswerResponse{}, err
+	}
+	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, TraceID: search.TraceID, Bindings: search.Bindings, Result: result}, nil
+}
+
+func (service *Service) persistCompletedTrace(ctx context.Context, record querytrace.Record, result generation.Response) error {
+	if service.traceStore == nil {
+		return nil
+	}
+	answerable := result.Answerable
+	now := time.Now().UTC()
+	record.Status, record.Answerable, record.RefusalReason = "completed", &answerable, result.RefusalReason
+	record.Generator, record.Model, record.PromptVersion = result.Generation.Generator, result.Generation.Model, result.Generation.PromptVersion
+	record.GenerationMS, record.PromptTokens, record.OutputTokens = result.Generation.LatencyMS, result.Generation.PromptTokens, result.Generation.OutputTokens
+	record.TotalMS = result.Search.TotalLatencyMS + result.Generation.LatencyMS
+	record.CompletedAt = &now
+	if err := service.traceStore.UpsertQueryTrace(ctx, record); err != nil {
+		return fmt.Errorf("persist answer trace: %w", err)
+	}
+	return nil
+}
+
+func (service *Service) persistFailedTrace(ctx context.Context, record querytrace.Record, generationErr error) {
+	if service.traceStore == nil {
+		return
+	}
+	now := time.Now().UTC()
+	record.Status, record.Error, record.CompletedAt = "failed", generationErr.Error(), &now
+	_ = service.traceStore.UpsertQueryTrace(ctx, record)
 }
 
 type staticSearcher struct{ result milvus.SearchResult }
@@ -216,7 +347,9 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 			hits = append(hits, hit)
 		}
 	}
-	sort.SliceStable(hits, func(i, j int) bool { return hits[i].Distance < hits[j].Distance })
+	if !hasRerankedResults(results) {
+		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Distance < hits[j].Distance })
+	}
 	if len(hits) > topK {
 		hits = hits[:topK]
 	}
@@ -228,4 +361,66 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 	return merged
 }
 
+func hasRerankedResults(results []milvus.SearchResult) bool {
+	for _, result := range results {
+		if result.RerankApplied {
+			return true
+		}
+	}
+	return false
+}
+
 func milliseconds(duration time.Duration) float64 { return float64(duration.Microseconds()) / 1000 }
+
+func (service *Service) rewriterName() string {
+	if _, ok := service.rewriter.(SemanticRewriter); ok {
+		return "semantic-alias-v1"
+	}
+	return "query-rewriter"
+}
+
+func newTraceID() string { return fmt.Sprintf("gw_trace_%d", time.Now().UTC().UnixNano()) }
+
+func candidateCount(traces []BindingTrace) int {
+	total := 0
+	for _, trace := range traces {
+		total += trace.Rerank.Candidates
+	}
+	return total
+}
+
+func hasRerank(traces []BindingTrace) bool {
+	for _, trace := range traces {
+		if trace.Rerank.Applied {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRewrite(traces []BindingTrace) bool {
+	for _, trace := range traces {
+		if trace.Rewrite.Applied {
+			return true
+		}
+	}
+	return false
+}
+
+func firstIndexCollection(traces []BindingTrace) string {
+	for _, trace := range traces {
+		if trace.IndexCollection != "" {
+			return trace.IndexCollection
+		}
+	}
+	return ""
+}
+
+func firstIndexVersion(traces []BindingTrace) string {
+	for _, trace := range traces {
+		if trace.IndexVersion != "" {
+			return trace.IndexVersion
+		}
+	}
+	return ""
+}

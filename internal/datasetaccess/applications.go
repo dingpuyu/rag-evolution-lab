@@ -5,11 +5,14 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 )
+
+var indexCollectionPattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,127}$`)
 
 // Application is an independently deployable Agent product. It is deliberately
 // separate from Dataset so one knowledge base can be reused by many products.
@@ -362,3 +365,135 @@ func normalizeRetrievalPolicy(policy RetrievalPolicy) RetrievalPolicy {
 }
 
 var _ ApplicationStore = (*PostgresStore)(nil)
+
+var _ IndexStore = (*PostgresStore)(nil)
+
+func (store *PostgresStore) VisibleIndexReleases(ctx context.Context, identity auth.Identity, applicationID, environmentID string) ([]IndexRelease, error) {
+	application, err := store.authorizeApplication(ctx, identity, applicationID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := store.db.QueryContext(ctx, `
+		SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at
+		FROM index_releases WHERE app_id=$1 AND environment_id=$2 ORDER BY published_at DESC`, application.ID, strings.TrimSpace(environmentID))
+	if err != nil {
+		return nil, fmt.Errorf("list index releases: %w", err)
+	}
+	defer rows.Close()
+	var releases []IndexRelease
+	for rows.Next() {
+		var release IndexRelease
+		if err := rows.Scan(&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version,
+			&release.Collection, &release.Alias, &release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
+			return nil, err
+		}
+		releases = append(releases, release)
+	}
+	return releases, rows.Err()
+}
+
+func (store *PostgresStore) PublishIndexRelease(ctx context.Context, identity auth.Identity, applicationID string, input PublishIndex) (IndexRelease, error) {
+	application, err := store.authorizeApplication(ctx, identity, applicationID)
+	if err != nil {
+		return IndexRelease{}, err
+	}
+	environmentID := strings.TrimSpace(input.EnvironmentID)
+	version := strings.TrimSpace(input.Version)
+	collection := strings.TrimSpace(input.Collection)
+	if environmentID == "" || version == "" || collection == "" {
+		return IndexRelease{}, fmt.Errorf("environment_id, version and collection are required")
+	}
+	if !datasetSlugPattern.MatchString(version) || len(version) > 64 || !indexCollectionPattern.MatchString(collection) {
+		return IndexRelease{}, fmt.Errorf("version must contain lowercase letters, numbers and single hyphens; collection must contain lowercase letters, numbers, underscores or hyphens")
+	}
+	var environmentStatus string
+	if err := store.db.QueryRowContext(ctx, `SELECT status FROM app_environments WHERE environment_id=$1 AND app_id=$2`, environmentID, application.ID).Scan(&environmentStatus); err != nil {
+		if err == sql.ErrNoRows {
+			return IndexRelease{}, ErrDatasetNotFound
+		}
+		return IndexRelease{}, err
+	}
+	if environmentStatus != "active" {
+		return IndexRelease{}, fmt.Errorf("application environment is not active")
+	}
+	environmentName := strings.TrimPrefix(environmentID, application.ID+"-")
+	if environmentName == "" {
+		environmentName = environmentID
+	}
+	release := IndexRelease{
+		ReleaseID:     application.ID + "-" + environmentName + "-" + version,
+		ApplicationID: application.ID, EnvironmentID: environmentID, Version: version, Collection: collection,
+		Alias: strings.TrimSpace(input.Alias), State: "published", PublishedBy: identity.Subject,
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return IndexRelease{}, err
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND state='published'`, application.ID, environmentID); err != nil {
+		return IndexRelease{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO index_releases (release_id, app_id, environment_id, version, collection, alias, state, published_by)
+		VALUES ($1,$2,$3,$4,$5,$6,'published',$7)
+		ON CONFLICT (app_id, environment_id, version) DO UPDATE SET collection=EXCLUDED.collection, alias=EXCLUDED.alias,
+			state='published', published_by=EXCLUDED.published_by, published_at=now()`, release.ReleaseID, release.ApplicationID,
+		release.EnvironmentID, release.Version, release.Collection, release.Alias, release.PublishedBy); err != nil {
+		return IndexRelease{}, fmt.Errorf("persist index release: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return IndexRelease{}, err
+	}
+	err = store.db.QueryRowContext(ctx, `SELECT published_at, created_at FROM index_releases WHERE release_id=$1`, release.ReleaseID).Scan(&release.PublishedAt, &release.CreatedAt)
+	return release, err
+}
+
+func (store *PostgresStore) RollbackIndexRelease(ctx context.Context, identity auth.Identity, applicationID, environmentID, releaseID string) (IndexRelease, error) {
+	application, err := store.authorizeApplication(ctx, identity, applicationID)
+	if err != nil {
+		return IndexRelease{}, err
+	}
+	tx, err := store.db.BeginTx(ctx, nil)
+	if err != nil {
+		return IndexRelease{}, err
+	}
+	defer tx.Rollback()
+	var release IndexRelease
+	if err := tx.QueryRowContext(ctx, `SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at FROM index_releases WHERE release_id=$1 AND app_id=$2 AND environment_id=$3`, releaseID, application.ID, strings.TrimSpace(environmentID)).Scan(
+		&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version, &release.Collection, &release.Alias, &release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return IndexRelease{}, ErrDatasetNotFound
+		}
+		return IndexRelease{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='superseded' WHERE app_id=$1 AND environment_id=$2 AND state='published'`, application.ID, environmentID); err != nil {
+		return IndexRelease{}, err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE index_releases SET state='published', published_by=$1, published_at=now() WHERE release_id=$2`, identity.Subject, releaseID); err != nil {
+		return IndexRelease{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return IndexRelease{}, err
+	}
+	if err := store.db.QueryRowContext(ctx, `SELECT state, published_by, published_at FROM index_releases WHERE release_id=$1`, releaseID).Scan(&release.State, &release.PublishedBy, &release.PublishedAt); err != nil {
+		return IndexRelease{}, err
+	}
+	return release, nil
+}
+
+func (store *PostgresStore) ResolveIndexRelease(ctx context.Context, identity auth.Identity, applicationID, environmentID string) (IndexRelease, error) {
+	application, err := store.authorizeApplication(ctx, identity, applicationID)
+	if err != nil {
+		return IndexRelease{}, err
+	}
+	var release IndexRelease
+	err = store.db.QueryRowContext(ctx, `
+		SELECT release_id, app_id, environment_id, version, collection, alias, state, published_by, published_at, created_at
+		FROM index_releases WHERE app_id=$1 AND environment_id=$2 AND state='published' ORDER BY published_at DESC LIMIT 1`, application.ID, strings.TrimSpace(environmentID)).Scan(
+		&release.ReleaseID, &release.ApplicationID, &release.EnvironmentID, &release.Version, &release.Collection, &release.Alias,
+		&release.State, &release.PublishedBy, &release.PublishedAt, &release.CreatedAt)
+	if err == sql.ErrNoRows {
+		return IndexRelease{}, nil
+	}
+	return release, err
+}

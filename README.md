@@ -191,6 +191,14 @@ P2 Knowledge Gateway 已接入查询链路：
 Gateway 的调用契约、真实本地 API 验证和下一阶段边界见
 [Knowledge Gateway 设计与验证](docs/knowledge-gateway.md)。
 
+应用级生产闭环已完成首版：
+
+- PostgreSQL `query_traces` 持久化检索 → 生成全链路，支持按应用读取并做租户隔离；
+- `POST /api/v1/apps/{app_id}/answer/stream` 提供应用级 SSE，固定事件顺序和最终 `gateway_completed` 答案；
+- Binding 级 `semantic-alias-v1` Query Rewrite、`heuristic-evidence-reranker` Rerank 与显式 fallback；
+- `index_releases` + Milvus readiness gate 支持环境级索引发布、supersede 和 rollback；
+- 真实 PostgreSQL、Milvus、Ollama 回归记录见 [Knowledge Gateway 生产闭环实验](docs/gateway-production-loop.md)。
+
 异步资料导入与人工运维闭环已完成首版：
 
 - 导入请求进入带幂等键的 Job，按 validating、chunking、embedding、indexing、verifying 阶段执行

@@ -250,6 +250,15 @@ func (service *LifecycleService) Status() LifecycleStatus {
 	}
 }
 
+// ConfiguredAlias is the stable compatibility alias used by the legacy
+// Dataset API. Application Gateway traffic uses the published physical
+// collection, while this alias keeps the migration/compatibility route safe.
+func (service *LifecycleService) ConfiguredAlias() string {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return service.config.Alias
+}
+
 func (service *LifecycleService) Search(ctx context.Context, query Query) (SearchResult, error) {
 	query.Text = strings.TrimSpace(query.Text)
 	if query.Text == "" {
@@ -268,8 +277,11 @@ func (service *LifecycleService) Search(ctx context.Context, query Query) (Searc
 	filter := buildFilter(query) +
 		` and embedding_model == "` + escapeFilter(service.embedder.Name()) + `"` +
 		` and embedding_version == "` + escapeFilter(service.config.EmbeddingVersion) + `"`
-	collection := service.config.Collection
-	if service.config.Alias != "" {
+	collection := strings.TrimSpace(query.Collection)
+	if collection == "" {
+		collection = service.config.Collection
+	}
+	if collection == service.config.Collection && service.config.Alias != "" {
 		collection = service.config.Alias
 	}
 	searchStarted := time.Now()
@@ -284,6 +296,104 @@ func (service *LifecycleService) Search(ctx context.Context, query Query) (Searc
 		Metric: "COSINE", Filter: filter, EmbeddingLatencyMS: milliseconds(embedLatency),
 		SearchLatencyMS: milliseconds(time.Since(searchStarted)), TotalLatencyMS: milliseconds(time.Since(totalStarted)), Hits: hits,
 	}, nil
+}
+
+// ValidateCollection checks that a candidate physical index is query-ready
+// for the currently running embedding build before an alias/pointer switch.
+// It intentionally does not mutate Milvus.
+func (service *LifecycleService) ValidateCollection(ctx context.Context, collection string) error {
+	collection = strings.TrimSpace(collection)
+	if collection == "" {
+		return fmt.Errorf("index collection must not be empty")
+	}
+	collections, err := service.client.ListCollections(ctx)
+	if err != nil {
+		return err
+	}
+	if !contains(collections, collection) {
+		return fmt.Errorf("index collection %q does not exist", collection)
+	}
+	description, err := service.client.DescribeCollection(ctx, collection)
+	if err != nil {
+		return err
+	}
+	requiredFields := map[string]bool{
+		"chunk_id": false, "document_id": false, "title": false, "content": false,
+		"tenant_id": false, "allowed_tenants": false, "allowed_roles": false,
+		"product": false, "version": false, "status": false, "visibility": false,
+		"embedding": false,
+	}
+	for _, field := range description.Fields {
+		if _, required := requiredFields[field.Name]; required {
+			requiredFields[field.Name] = true
+		}
+		if field.Name != "embedding" {
+			continue
+		}
+		var dimensions int
+		for _, parameter := range field.Params {
+			if parameter.Key == "dim" {
+				_, _ = fmt.Sscan(parameter.Value, &dimensions)
+			}
+		}
+		vector, err := service.embedder.EmbedQuery(ctx, "index release readiness probe")
+		if err != nil {
+			return err
+		}
+		if dimensions != len(vector) {
+			return fmt.Errorf("index collection %q dimensions=%d current_model=%d", collection, dimensions, len(vector))
+		}
+		stats, err := service.client.CollectionStats(ctx, collection)
+		if err != nil {
+			return err
+		}
+		if int64(stats.RowCount) == 0 {
+			return fmt.Errorf("index collection %q is empty", collection)
+		}
+		for _, index := range description.Indexes {
+			if index.FieldName != "embedding" {
+				continue
+			}
+			state := index.IndexState
+			// collections/describe omits index state on some Milvus REST
+			// versions; ask the index endpoint for the authoritative state.
+			if state == "" && index.IndexName != "" {
+				indexes, indexErr := service.client.DescribeIndex(ctx, collection, index.IndexName)
+				if indexErr != nil {
+					return indexErr
+				}
+				for _, detail := range indexes {
+					if detail.FieldName == "embedding" || detail.IndexName == index.IndexName {
+						state = detail.IndexState
+						break
+					}
+				}
+			}
+			if state != "Finished" && state != "finished" {
+				return fmt.Errorf("index collection %q is not ready: state=%s", collection, state)
+			}
+		}
+		for field, present := range requiredFields {
+			if !present {
+				return fmt.Errorf("index collection %q is missing field %q", collection, field)
+			}
+		}
+		return nil
+	}
+	return fmt.Errorf("index collection %q is missing embedding field", collection)
+}
+
+// PublishCollection switches the configured Milvus alias after validation.
+// Gateway queries use the control-plane pointer, so rollback can be performed
+// without exposing an unvalidated collection to application traffic.
+func (service *LifecycleService) PublishCollection(ctx context.Context, collection string) error {
+	if strings.TrimSpace(service.config.Alias) == "" {
+		return fmt.Errorf("lifecycle alias is not configured")
+	}
+	if err := service.ValidateCollection(ctx, collection); err != nil {
+		return err
+	}
+	return service.client.AlterAlias(ctx, collection, service.config.Alias)
 }
 
 func (service *LifecycleService) applyUpsert(ctx context.Context, change LifecycleChange, documentID string, observer LifecycleObserver) (LifecycleResult, error) {

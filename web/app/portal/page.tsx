@@ -20,7 +20,7 @@ type Dataset = {
 };
 type AgentApplication = { app_id: string; tenant_id: string; name: string; slug: string; description: string; status: string };
 type AppEnvironment = { environment_id: string; app_id: string; name: string; config_version: string; status: string };
-type GatewayBinding = { dataset_id: string; dataset_name: string; purpose?: string; priority: number; hits: number; policy: { top_k: number; candidate_k: number; rerank: boolean; query_rewrite: boolean; token_budget: number } };
+type GatewayBinding = { dataset_id: string; dataset_name: string; purpose?: string; priority: number; hits: number; index_version?: string; index_collection?: string; rewrite?: { applied: boolean; query: string; rewriter?: string }; rerank?: { applied: boolean; model?: string; candidates: number }; policy: { top_k: number; candidate_k: number; rerank: boolean; query_rewrite: boolean; token_budget: number } };
 type IngestionJob = {
   job_id: string;
   idempotency_key: string;
@@ -62,7 +62,7 @@ type AnswerResponse = {
   search: { hits: SearchHit[]; total_latency_ms: number; embedding_latency_ms: number; search_latency_ms: number; filter: string };
   generation: { generator: string; model: string; prompt_version: string; latency_ms: number; ttft_ms?: number; token_rate_tps?: number; prompt_tokens: number; output_tokens: number };
 };
-type GatewayAnswerResponse = { app_id: string; environment_id: string; bindings: GatewayBinding[]; result: AnswerResponse };
+type GatewayAnswerResponse = { app_id: string; environment_id: string; trace_id?: string; bindings: GatewayBinding[]; result: AnswerResponse };
 type ChatMessage = { id: string; role: "user" | "assistant"; text: string; response?: AnswerResponse; pending?: boolean };
 type Membership = { tenant_id: string; subject: string; role: string; status: string };
 type AuditEvent = { timestamp: string; subject?: string; tenant_id?: string; method: string; path: string; decision: string; status: number; reason?: string };
@@ -241,10 +241,26 @@ export default function CustomerPortal() {
     if (!text || !selectedApplication || appBusy) return;
     setAppBusy(true); setNotice(""); setAppAnswer(null);
     try {
-      const response = await api(`/api/v1/apps/${encodeURIComponent(selectedApplication)}/answer`, {
+      const response = await api(`/api/v1/apps/${encodeURIComponent(selectedApplication)}/answer/stream`, {
         method: "POST", body: JSON.stringify({ environment_id: selectedEnvironment, query: text, top_k: 5 }),
       });
-      setAppAnswer((await response.json()) as GatewayAnswerResponse);
+      if (!response.body) throw new Error("服务端没有返回应用级流式响应");
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        buffer += decoder.decode(chunk.value, { stream: true });
+        const blocks = buffer.split("\n\n");
+        buffer = blocks.pop() ?? "";
+        for (const block of blocks) {
+          const dataLine = block.split("\n").find((line) => line.startsWith("data: "));
+          if (!dataLine) continue;
+          const payload = JSON.parse(dataLine.slice(6)) as { result?: GatewayAnswerResponse };
+          if (payload.result) setAppAnswer(payload.result);
+        }
+      }
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "应用级回答失败");
     } finally { setAppBusy(false); }
@@ -438,7 +454,7 @@ function ChatView(props: { datasets: Dataset[]; selected: string; setSelected: (
 }
 
 function ApplicationView(props: { applications: AgentApplication[]; environments: AppEnvironment[]; selectedApplication: string; setSelectedApplication: (value: string) => void; selectedEnvironment: string; setSelectedEnvironment: (value: string) => void; current?: AgentApplication; query: string; setQuery: (value: string) => void; answer: GatewayAnswerResponse | null; busy: boolean; ask: () => void }) {
-  return <div className="content-page application-page"><div className="page-intro"><div><span className="section-kicker">APPLICATION KNOWLEDGE GATEWAY</span><h2>Agent 应用知识入口</h2><p>上层 Agent 只选择应用和环境。服务端会解析绑定、租户权限与检索策略，不把 Milvus Filter 暴露给调用方。</p></div><span className="secure-pill">✓ SERVER POLICY</span></div>{props.applications.length ? <><div className="create-panel app-selector"><div className="form-grid"><label>应用<select value={props.selectedApplication} onChange={(event) => props.setSelectedApplication(event.target.value)}>{props.applications.map((application) => <option key={application.app_id} value={application.app_id}>{application.name} · {application.tenant_id}</option>)}</select></label><label>环境<select value={props.selectedEnvironment} onChange={(event) => props.setSelectedEnvironment(event.target.value)}>{props.environments.map((environment) => <option key={environment.environment_id} value={environment.environment_id}>{environment.name} · {environment.config_version}</option>)}</select></label></div><small className="gateway-contract">POST /api/v1/apps/{props.selectedApplication || "{app_id}"}/answer</small></div><div className="create-panel gateway-query"><div className="panel-heading"><div><span className="section-kicker">GATEWAY ANSWER</span><h3>{props.current?.name ?? "选择一个应用"}</h3></div><span className="lock-badge">BINDING ACL</span></div><textarea value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="向当前 Agent 应用提问…" rows={3} /><div className="ingest-actions"><span>应用级多知识库聚合 · Citation Allowlist · Environment 隔离</span><button className="primary-button compact" onClick={props.ask} disabled={props.busy || !props.query.trim() || !props.selectedEnvironment}>{props.busy ? "检索与生成中…" : "调用 Gateway →"}</button></div></div>{props.answer && <div className="gateway-result"><div className="result-answer"><div className="section-kicker">GROUNDED ANSWER</div><h3>{props.answer.result.answer}</h3><div className="answer-stats"><span>召回 {props.answer.result.search.hits.length} 条</span><span>{Math.round(props.answer.result.search.total_latency_ms)} ms</span><span>{props.answer.result.generation.model || props.answer.result.generation.generator}</span></div></div><div className="binding-proof"><div className="section-kicker">RESOLVED BINDINGS</div>{props.answer.bindings.map((binding) => <div className="binding-proof-row" key={binding.dataset_id}><strong>{binding.dataset_name || binding.dataset_id}</strong><span>{binding.hits} hits · top_k {binding.policy.top_k} · candidate {binding.policy.candidate_k}</span></div>)}<code>{props.answer.result.search.filter}</code></div></div>}</> : <div className="empty-evidence app-empty"><div>◇</div><strong>还没有可用的 Agent 应用</strong><p>先通过控制面创建 Application 并绑定一个或多个知识库，门户会在这里展示可体验的 Gateway。</p></div>}</div>;
+  return <div className="content-page application-page"><div className="page-intro"><div><span className="section-kicker">APPLICATION KNOWLEDGE GATEWAY</span><h2>Agent 应用知识入口</h2><p>上层 Agent 只选择应用和环境。服务端会解析绑定、租户权限与检索策略，不把 Milvus Filter 暴露给调用方。</p></div><span className="secure-pill">✓ SERVER POLICY</span></div>{props.applications.length ? <><div className="create-panel app-selector"><div className="form-grid"><label>应用<select value={props.selectedApplication} onChange={(event) => props.setSelectedApplication(event.target.value)}>{props.applications.map((application) => <option key={application.app_id} value={application.app_id}>{application.name} · {application.tenant_id}</option>)}</select></label><label>环境<select value={props.selectedEnvironment} onChange={(event) => props.setSelectedEnvironment(event.target.value)}>{props.environments.map((environment) => <option key={environment.environment_id} value={environment.environment_id}>{environment.name} · {environment.config_version}</option>)}</select></label></div><small className="gateway-contract">POST /api/v1/apps/{props.selectedApplication || "{app_id}"}/answer/stream</small></div><div className="create-panel gateway-query"><div className="panel-heading"><div><span className="section-kicker">GATEWAY ANSWER</span><h3>{props.current?.name ?? "选择一个应用"}</h3></div><span className="lock-badge">BINDING ACL</span></div><textarea value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="向当前 Agent 应用提问…" rows={3} /><div className="ingest-actions"><span>应用级多知识库聚合 · Citation Allowlist · Environment 隔离</span><button className="primary-button compact" onClick={props.ask} disabled={props.busy || !props.query.trim() || !props.selectedEnvironment}>{props.busy ? "检索与生成中…" : "调用 Gateway →"}</button></div></div>{props.answer && <div className="gateway-result"><div className="result-answer"><div className="section-kicker">GROUNDED ANSWER</div><h3>{props.answer.result.answer}</h3><div className="answer-stats"><span>召回 {props.answer.result.search.hits.length} 条</span><span>{Math.round(props.answer.result.search.total_latency_ms)} ms</span><span>{props.answer.result.generation.model || props.answer.result.generation.generator}</span></div>{props.answer.trace_id && <small className="gateway-trace">Trace {props.answer.trace_id}</small>}</div><div className="binding-proof"><div className="section-kicker">RESOLVED BINDINGS</div>{props.answer.bindings.map((binding) => <div className="binding-proof-row" key={binding.dataset_id}><strong>{binding.dataset_name || binding.dataset_id}</strong><span>{binding.hits} hits · top_k {binding.policy.top_k} · candidate {binding.policy.candidate_k} · index {binding.index_version || "default"}</span><small>{binding.rewrite?.applied ? `rewrite ${binding.rewrite.rewriter || "on"}` : "rewrite off"} · {binding.rerank?.applied ? `rerank ${binding.rerank.model || "on"}` : "rerank off"}</small></div>)}<code>{props.answer.result.search.filter}</code></div></div>}</> : <div className="empty-evidence app-empty"><div>◇</div><strong>还没有可用的 Agent 应用</strong><p>先通过控制面创建 Application 并绑定一个或多个知识库，门户会在这里展示可体验的 Gateway。</p></div>}</div>;
 }
 
 function AnswerMeta({ response }: { response: AnswerResponse }) {

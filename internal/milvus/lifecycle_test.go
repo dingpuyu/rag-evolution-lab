@@ -253,6 +253,45 @@ func TestLifecycleRejectsEmbeddingVersionMixInSameCollection(t *testing.T) {
 	}
 }
 
+func TestLifecycleValidatesIndexStateBeforeAliasSwitch(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/v2/vectordb/collections/list":
+			writeMockResponse(t, writer, []string{"candidate_v2"})
+		case "/v2/vectordb/collections/describe":
+			writeMockResponse(t, writer, map[string]any{
+				"collectionName": "candidate_v2",
+				"fields": []map[string]any{
+					{"name": "chunk_id"}, {"name": "document_id"}, {"name": "title"}, {"name": "content"},
+					{"name": "tenant_id"}, {"name": "allowed_tenants"}, {"name": "allowed_roles"}, {"name": "product"},
+					{"name": "version"}, {"name": "status"}, {"name": "visibility"},
+					{"name": "embedding", "params": []map[string]string{{"key": "dim", "value": "8"}}},
+				},
+				"indexes": []map[string]any{{"fieldName": "embedding", "indexName": "embedding_hnsw"}},
+			})
+		case "/v2/vectordb/collections/get_stats":
+			writeMockResponse(t, writer, map[string]any{"rowCount": 12})
+		case "/v2/vectordb/indexes/describe":
+			writeMockResponse(t, writer, []map[string]any{{"fieldName": "embedding", "indexName": "embedding_hnsw", "indexState": "Finished"}})
+		case "/v2/vectordb/aliases/alter":
+			writeMockResponse(t, writer, map[string]any{})
+		default:
+			t.Errorf("unexpected readiness-check path %s", request.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	service, err := NewLifecycleService(NewClient(Config{BaseURL: server.URL}), retrieval.HashEmbedder{Dimensions: 8}, LifecycleConfig{
+		Collection: "candidate_v2", Alias: "knowledge_active", EmbeddingVersion: "hash-v2", StatePath: t.TempDir() + "/state.json",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := service.PublishCollection(context.Background(), "candidate_v2"); err != nil {
+		t.Fatalf("ready collection should publish: %v", err)
+	}
+}
+
 func lifecycleRecordMatches(record Record, filter string) bool {
 	if strings.Contains(filter, "source_revision > 0") {
 		return record.SourceRevision > 0

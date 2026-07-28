@@ -59,3 +59,24 @@ func TestKnowledgeGatewayAPIHidesCrossTenantApplication(t *testing.T) {
 		t.Fatalf("cross-tenant gateway status=%d body=%s", response.Code, response.Body.String())
 	}
 }
+
+func TestKnowledgeGatewayAPIAnswerStreamEmitsGatewayCompletion(t *testing.T) {
+	apps := &fakeApplicationStore{bindings: []datasetaccess.KnowledgeBinding{{
+		ApplicationID: "tenant_a-support", EnvironmentID: "tenant_a-support-dev", DatasetID: "public-identity", Status: "active",
+		Policy: datasetaccess.RetrievalPolicy{TopK: 1, CandidateK: 1},
+	}}}
+	gateway, err := knowledgegateway.New(gatewayTestSearcher{}, datasetaccess.Defaults(), apps, generation.ExtractiveGenerator{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	api := &KnowledgeGatewayAPI{service: gateway}
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/apps/tenant_a-support/answer/stream", strings.NewReader(`{"query":"SSO"}`))
+	request.SetPathValue("app_id", "tenant_a-support")
+	request = request.WithContext(context.WithValue(request.Context(), identityContextKey{}, auth.Identity{Subject: "alice", TenantID: "tenant_a", Roles: []string{"viewer"}}))
+	response := httptest.NewRecorder()
+	api.answerStream(response, request)
+	body := response.Body.String()
+	if response.Code != http.StatusOK || !strings.Contains(response.Header().Get("Content-Type"), "text/event-stream") || !strings.Contains(body, "event: gateway_completed") || !strings.Contains(body, "knowledge-gateway") {
+		t.Fatalf("gateway SSE status=%d headers=%v body=%s", response.Code, response.Header(), body)
+	}
+}

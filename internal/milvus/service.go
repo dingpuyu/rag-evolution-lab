@@ -55,6 +55,9 @@ type Query struct {
 	Product string `json:"product"`
 	Status  string `json:"status"`
 	TopK    int    `json:"top_k"`
+	// Collection is assigned by the trusted application index resolver. It is
+	// excluded from JSON so callers cannot choose an arbitrary physical index.
+	Collection string `json:"-"`
 	// AccessScope is assigned by trusted server-side resource authorization.
 	// It is intentionally excluded from JSON so clients cannot weaken filtering.
 	AccessScope string `json:"-"`
@@ -71,6 +74,9 @@ type SearchResult struct {
 	SearchLatencyMS    float64     `json:"search_latency_ms"`
 	TotalLatencyMS     float64     `json:"total_latency_ms"`
 	Hits               []SearchHit `json:"hits"`
+	// RerankApplied is an internal merge hint. It is omitted from the API
+	// response so the public contract remains a normal Milvus SearchResult.
+	RerankApplied bool `json:"-"`
 }
 
 func NewService(client *Client, embedder retrieval.Embedder, collection string) (*Service, error) {

@@ -13,6 +13,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
+	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 )
 
 type identityContextKey struct{}
@@ -25,6 +26,8 @@ type EnterpriseOptions struct {
 	IngestionJobs    *ingestionjob.Service
 	DatasetStore     datasetaccess.Store
 	ApplicationStore datasetaccess.ApplicationStore
+	IndexStore       datasetaccess.IndexStore
+	QueryTraceStore  querytrace.Store
 	Generator        generation.Generator
 }
 

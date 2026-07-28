@@ -3,12 +3,14 @@ package knowledgegateway
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
+	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 )
 
 type fakeApps struct {
@@ -55,6 +57,26 @@ func (store fakeDatasetStore) Status(ctx context.Context, identity auth.Identity
 }
 
 type fakeSearcher struct{ queries []milvus.Query }
+
+type fakeTraceStore struct{ records []querytrace.Record }
+
+func (store *fakeTraceStore) UpsertQueryTrace(_ context.Context, record querytrace.Record) error {
+	for index := range store.records {
+		if store.records[index].TraceID == record.TraceID {
+			store.records[index] = record
+			return nil
+		}
+	}
+	store.records = append(store.records, record)
+	return nil
+}
+
+func (store *fakeTraceStore) GetQueryTrace(context.Context, auth.Identity, string, string) (querytrace.Record, error) {
+	if len(store.records) == 0 {
+		return querytrace.Record{}, querytrace.ErrNotFound
+	}
+	return store.records[len(store.records)-1], nil
+}
 
 func (searcher *fakeSearcher) Search(_ context.Context, query milvus.Query) (milvus.SearchResult, error) {
 	searcher.queries = append(searcher.queries, query)
@@ -123,5 +145,34 @@ func TestAnswerUsesMergedEvidence(t *testing.T) {
 	}
 	if !answer.Result.Answerable || len(answer.Result.Citations) != 1 || answer.Result.Search.Collection != "knowledge-gateway" {
 		t.Fatalf("unexpected gateway answer: %#v", answer)
+	}
+}
+
+func TestGatewayAppliesRewriteRerankAndPersistsTraceLifecycle(t *testing.T) {
+	searcher := &fakeSearcher{}
+	traces := &fakeTraceStore{}
+	service, err := NewWithOptions(searcher, fakeDatasetStore{catalog: datasetaccess.Defaults()}, fakeApps{bindings: []datasetaccess.KnowledgeBinding{
+		{DatasetID: "public-identity", Status: "active", Policy: datasetaccess.RetrievalPolicy{TopK: 1, CandidateK: 2, QueryRewrite: true, Rerank: true}},
+	}}, generation.ExtractiveGenerator{}, Options{TraceStore: traces})
+	if err != nil {
+		t.Fatal(err)
+	}
+	identity := auth.Identity{Subject: "viewer", TenantID: "tenant_a", Roles: []string{"viewer"}}
+	result, err := service.Search(context.Background(), identity, Request{AppID: "tenant_a-support", Query: "单点登录"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(traces.records) != 1 || result.TraceID == "" || !result.Bindings[0].Rewrite.Applied || !result.Bindings[0].Rerank.Applied {
+		t.Fatalf("strategy/trace not applied: result=%#v traces=%#v", result, traces.records)
+	}
+	if len(searcher.queries) != 1 || !strings.Contains(searcher.queries[0].Text, "sso") {
+		t.Fatalf("rewritten query was not sent to retriever: %#v", searcher.queries)
+	}
+	answer, err := service.Answer(context.Background(), identity, Request{AppID: "tenant_a-support", Query: "单点登录"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if answer.TraceID == "" || len(traces.records) != 2 || traces.records[1].Status != "completed" || traces.records[1].Generator == "" {
+		t.Fatalf("answer trace was not completed: answer=%#v traces=%#v", answer, traces.records)
 	}
 }

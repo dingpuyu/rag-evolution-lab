@@ -28,6 +28,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
+	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
@@ -269,6 +270,8 @@ func runLabServer(args []string) {
 	}
 	var datasetStore datasetaccess.Store = datasetaccess.Defaults()
 	var applicationStore datasetaccess.ApplicationStore
+	var indexStore datasetaccess.IndexStore
+	var queryTraceStore querytrace.Store
 	var ingestionRepository ingestionjob.Repository
 	if strings.TrimSpace(*postgresURL) != "" {
 		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
@@ -280,6 +283,8 @@ func runLabServer(args []string) {
 		defer postgresStore.Close()
 		datasetStore = postgresStore
 		applicationStore = postgresStore
+		indexStore = postgresStore
+		queryTraceStore = postgresStore
 		ingestionRepository = postgresStore.IngestionRepository()
 	}
 	ingestionJobs, err := ingestionjob.New(lifecycleService, ingestionjob.Config{
@@ -371,6 +376,7 @@ func runLabServer(args []string) {
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
 		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore, ApplicationStore: applicationStore,
+		IndexStore: indexStore, QueryTraceStore: queryTraceStore,
 		Generator: generationGenerator,
 	}, lifecycleService)
 	if err != nil {

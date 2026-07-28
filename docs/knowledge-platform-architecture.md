@@ -165,20 +165,23 @@ POST /api/v1/apps/{app_id}/answer
 - 现有 Dataset API 保持兼容，新增应用级只读查询入口；
 - 回归：跨租户、跨应用、跨环境不能越权。
 
-### P2：检索网关（进行中）
+### P2：检索网关（已完成首版闭环）
 
 - 已实现应用级 `query/answer` Gateway；
 - 已把应用绑定解析成服务端 Retrieval Policy，并支持多个 Dataset fan-out、结果去重与全局 Top-K；
 - 已在每个绑定进入 Milvus 前重新执行 Dataset ACL，撤权后 fail-closed；
-- 统一 Query Trace、成本、模型和索引版本记录；
+- PostgreSQL 持久化 Query Trace，记录策略、索引、模型、延迟、Token、引用上下文和 Answerable；
+- 应用级 SSE `answer/stream`，事件顺序和最终完整答案均可回归验证；
+- Binding 级 Query Rewrite / Rerank 策略已落地，并支持显式 fallback；
 - Agent SDK 只依赖 Gateway Contract。
 
-### P3：索引发布与多版本
+### P3：索引发布与多版本（已完成首版闭环）
 
-- Index Build、Checkpoint、验证、发布、回滚；
-- 构建 Collection 与线上 Alias 分离；
-- Embedding/Chunker/Parser 版本不一致时禁止发布；
-- 支持灰度发布和按应用切换索引版本。
+- `index_releases` 控制面保存环境级版本、状态和发布人；
+- 发布前执行 Collection 存在、维度、非空、Index Finished 检查；
+- 构建 Collection 与线上 Alias 分离，Gateway 只解析 published 版本；
+- 支持发布新版本、supersede 旧版本和管理员回滚；
+- 下一步将 Index Build/Checkpoint/Manifest 做成异步可审计 Job，并增加灰度发布。
 
 ### P4：企业运行面
 
@@ -189,6 +192,6 @@ POST /api/v1/apps/{app_id}/answer
 
 ## 8. 本项目的真实边界
 
-当前已完成的是 P0/P1 之前的可靠性基础：Tenant/Dataset ACL、Milvus 生命周期、异步导入、PostgreSQL Job 持久化、门户人工运维和评测闭环。
+当前已完成的是 P0/P1 以及 P2/P3 首版可靠性基础：Tenant/Dataset ACL、Milvus 生命周期、异步导入、PostgreSQL Job/Trace 持久化、门户人工运维、应用级 SSE、策略化检索和索引版本回滚。
 
-当前仍不能宣称已经是完整的商业化多应用知识平台：Gateway 已落地核心路由，但 Query Trace、检索重排、索引发布版本、限流与配额仍在后续阶段。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。
+当前仍不能宣称已经是完整的商业化多应用知识平台：异步 Index Build/Manifest、灰度发布、限流与配额、分布式 Outbox/DLQ 和 OpenTelemetry 运营面仍在后续阶段。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。
