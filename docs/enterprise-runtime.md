@@ -15,6 +15,8 @@ Idempotency-Key: <body.idempotency_key>
 
 设置 `RAGLAB_OTEL_ENDPOINT=localhost:4318` 后，服务通过 OTLP/HTTP 导出 W3C trace-context。Gateway span 包含租户、应用、索引版本、改写、重排、候选数和命中数；回答完成时把输入/输出 token 与价格计算写入 `query_traces`，并可用 `RAGLAB_COST_INPUT_USD_PER_1M`、`RAGLAB_COST_OUTPUT_USD_PER_1M` 配置价格。
 
+仓库提供可选的 Collector + Jaeger 本地观测 profile：先启动主栈，再执行 `make observability-up`，把 API 的 `RAGLAB_OTEL_ENDPOINT` 设置为 `http://otel-collector:4318`，即可在 <http://localhost:16686> 查看 trace。Collector 负责批处理和内存保护，Jaeger 只保存本地演示数据；生产环境应替换为团队的 OTLP 后端和保留策略。
+
 ## 应用 Credential / OIDC Scope
 
 管理员可创建一次性展示 secret 的应用凭证：
@@ -28,7 +30,7 @@ POST /api/v1/apps/{app_id}/credentials
 
 ## 限流、配额与灰度发布
 
-Gateway 默认按 `tenant/app/subject` 做单实例滑动窗口限流，返回 `429 + Retry-After`。可通过 `RAGLAB_RATE_LIMIT_RPM`、`RAGLAB_RATE_LIMIT_BURST`、`RAGLAB_TOKEN_QUOTA_PER_MINUTE` 调整。生产多副本时，将 `internal/ratelimit.Limiter` 替换为 Redis 实现即可保留调用边界。
+Gateway 默认按 `tenant/app/subject` 做单实例固定窗口限流，返回 `429 + Retry-After`。可通过 `RAGLAB_RATE_LIMIT_RPM`、`RAGLAB_RATE_LIMIT_BURST`、`RAGLAB_TOKEN_QUOTA_PER_MINUTE` 调整。`RAGLAB_RATE_LIMIT_BACKEND=memory` 使用进程内实现；Compose 默认使用 `redis`，通过原子 Lua 脚本同时更新请求数、Token 配额和并发预留，多个 API 副本共享同一窗口。Redis 不可用时当前策略 fail-open 并把 `Remaining` 标为未知，避免限流依赖故障拖垮回答链路；对强一致准入的生产场景应增加 Redis 健康门禁或网关级保护。连接由 `RAGLAB_REDIS_URL`、`RAGLAB_REDIS_PREFIX` 配置。
 
 索引发布支持 `channel=stable|canary` 与 `rollout_percent=0..100`。稳定版本始终 100%，灰度版本按 `sha256(subject|app|environment) % 100` 做稳定分桶；回滚只影响同一 channel，不会打断另一条发布轨道。
 
@@ -74,4 +76,4 @@ go run ./cmd/raglab serve-lab --rate-limit-burst 1 --rate-limit-rpm 1
 go run ./cmd/raglab enterprise-eval --rate-limit-requests 2
 ```
 
-报告会标记首次收到 `429 + Retry-After` 的请求位置；生产环境仍应把单实例内存 Limiter 换成 Redis/网关级共享实现。
+报告会标记首次收到 `429 + Retry-After` 的请求位置；生产多副本默认使用 Compose 的 Redis 共享实现，单机实验可显式切回 `RAGLAB_RATE_LIMIT_BACKEND=memory`。

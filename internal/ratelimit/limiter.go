@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+// Gate is the runtime boundary used by the Knowledge Gateway. The default
+// Limiter is process-local; RedisLimiter implements the same contract for
+// horizontally scaled API replicas.
+type Gate interface {
+	Allow(key string, tokens int) Decision
+	Release(key string)
+}
+
 type Policy struct {
 	RequestsPerMinute int
 	Burst             int
@@ -31,6 +39,11 @@ type Limiter struct {
 }
 
 func New(policy Policy) *Limiter {
+	policy = normalizePolicy(policy)
+	return &Limiter{policy: policy, buckets: make(map[string]*bucket), now: time.Now}
+}
+
+func normalizePolicy(policy Policy) Policy {
 	if policy.RequestsPerMinute <= 0 {
 		policy.RequestsPerMinute = 60
 	}
@@ -40,7 +53,7 @@ func New(policy Policy) *Limiter {
 	if policy.TokensPerMinute <= 0 {
 		policy.TokensPerMinute = 100_000
 	}
-	return &Limiter{policy: policy, buckets: make(map[string]*bucket), now: time.Now}
+	return policy
 }
 
 func (limiter *Limiter) Allow(key string, tokens int) Decision {
@@ -92,3 +105,5 @@ func maxInt(a, b int) int {
 	}
 	return b
 }
+
+var _ Gate = (*Limiter)(nil)

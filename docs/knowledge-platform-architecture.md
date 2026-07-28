@@ -181,7 +181,7 @@ POST /api/v1/apps/{app_id}/answer
 - 发布前执行 Collection 存在、维度、非空、Index Finished 检查；
 - 构建 Collection 与线上 Alias 分离，Gateway 只解析 published 版本；
 - 支持发布新版本、supersede 旧版本和管理员回滚；
-- 下一步将 Index Build/Checkpoint/Manifest 做成异步可审计 Job，并增加灰度发布。
+- 下一步将 Checkpoint/Manifest 校验接入更完整的异步 Worker、Outbox 与灰度指标闭环。
 
 ### P4：企业运行面
 
@@ -192,6 +192,6 @@ POST /api/v1/apps/{app_id}/answer
 
 ## 8. 本项目的真实边界
 
-当前已完成的是 P0/P1 以及 P2/P3 首版可靠性基础：Tenant/Dataset ACL、Milvus 生命周期、异步导入、PostgreSQL Job/Trace 持久化、门户人工运维、应用级 SSE、策略化检索和索引版本回滚。
+当前已完成的是 P0/P1 以及 P2/P3 首版可靠性基础：Tenant/Dataset ACL、Milvus 生命周期、异步导入、PostgreSQL Job/Trace 持久化、门户人工运维、应用级 SSE、策略化检索、索引版本回滚、OTLP Trace profile 和 Redis 共享限流。
 
-当前仍不能宣称已经是完整的商业化多应用知识平台：异步 Index Build/Manifest、灰度发布、限流与配额、分布式 Outbox/DLQ 和 OpenTelemetry 运营面仍在后续阶段。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。
+当前仍不能宣称已经是完整的商业化多应用知识平台：多格式生产级解析、Connector、分布式 Outbox/DLQ、指标/日志/告警统一运营面、备份恢复和 1M 持续增量写入仍在后续阶段。后续所有代码和演示都应以本文模型为约束，避免继续把某个客服业务的字段当作平台核心。

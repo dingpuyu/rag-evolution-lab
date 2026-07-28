@@ -18,6 +18,22 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${RAGLAB_REDIS_PORT:-6379}:6379"
+    volumes:
+      - raglab_stack_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
+
   etcd:
     image: quay.io/coreos/etcd:v3.5.25
     restart: unless-stopped
@@ -103,6 +119,9 @@ services:
       RAGLAB_RATE_LIMIT_RPM: ${RAGLAB_RATE_LIMIT_RPM:-120}
       RAGLAB_RATE_LIMIT_BURST: ${RAGLAB_RATE_LIMIT_BURST:-30}
       RAGLAB_TOKEN_QUOTA_PER_MINUTE: ${RAGLAB_TOKEN_QUOTA_PER_MINUTE:-100000}
+      RAGLAB_RATE_LIMIT_BACKEND: ${RAGLAB_RATE_LIMIT_BACKEND:-redis}
+      RAGLAB_REDIS_URL: ${RAGLAB_REDIS_URL:-redis://redis:6379/0}
+      RAGLAB_REDIS_PREFIX: ${RAGLAB_REDIS_PREFIX:-raglab:ratelimit}
       RAGLAB_COST_INPUT_USD_PER_1M: ${RAGLAB_COST_INPUT_USD_PER_1M:-0}
       RAGLAB_COST_OUTPUT_USD_PER_1M: ${RAGLAB_COST_OUTPUT_USD_PER_1M:-0}
       RAGLAB_MILVUS_URL: http://milvus:19530
@@ -127,6 +146,8 @@ services:
       retries: 20
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
       milvus:
         condition: service_healthy
@@ -156,6 +177,7 @@ networks:
 
 volumes:
   raglab_stack_postgres_data:
+  raglab_stack_redis_data:
   raglab_stack_etcd_data:
   raglab_stack_minio_data:
   raglab_stack_milvus_data:

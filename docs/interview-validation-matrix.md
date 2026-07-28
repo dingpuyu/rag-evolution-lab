@@ -8,7 +8,7 @@
 
 | 编号 | 核心问题 | 状态 | 当前项目证据 | 下一步验收 |
 |---|---|---|---|---|
-| R1 | 生产 RAG 完整链路 | 已验证首版 | `docs/architecture.md`；真实 DeepSeek Generator、Milvus 检索、Context Packing、Citation Gate、SSE 和 Answer Harness 已串通 | OpenTelemetry、限流、超时、降级和多 Worker |
+| R1 | 生产 RAG 完整链路 | 已验证首版 | `docs/architecture.md`；真实 DeepSeek Generator、Milvus 检索、Context Packing、Citation Gate、SSE、Answer Harness、OTLP Collector profile 和 Redis 共享限流已串通 | 故障注入、指标、超时降级和多 Worker |
 | R2 | RAG、长上下文、Prompt、微调如何选 | 部分验证 | `docs/roadmap.md` 与 ADR 体现按问题演进；当前使用 RAG 解决动态私有知识 | 增加同一任务的长上下文成本/质量对照实验 |
 | R3 | 文档解析、清洗与分块 | 部分验证 | `internal/ingest/chunker.go` 及单测；Header-aware Markdown Chunk | 增加表格、代码块、Parent/Child 和 Chunk 参数消融实验 |
 | R4 | Embedding 选型与评估 | 已验证 | Hash Embedder 保证 CI；Ollama + Qwen3-Embedding-4B 真实评测；内容哈希缓存 | 扩展中英文、长文本和不同维度/量化版本的对照集 |
@@ -19,7 +19,7 @@
 | R9 | 可复现 RAG 评估 | 已验证首版 | Golden Dataset + 8 条 Blind Answer Query；Answerability、Required/Forbidden Facts、Citation/ACL、P50/P95、SSE TTFT/Token Rate | 扩展到 60/80 Query、置信区间和线上反馈集 |
 | R10 | 幻觉、无答案和错误引用 | 已验证首版 | DeepSeek 真实生成；Citation Allowlist、Required/Forbidden Facts、Prompt Injection、空拒答安全兜底；原始集/Blind 集均无违规 | Faithfulness 对照、模型超时降级和自动红队生成 |
 | R11 | 文档增删改和索引一致性 | 已验证首版 | Event ID幂等、Revision乱序门禁、稳定Chunk ID Upsert、陈旧Chunk Delete、删除后Strong Query、Embedding版本门禁、Active Alias网页实验 | 补齐全量回填、发布门禁、Alias原子晋升与回滚演练 |
-| R12 | 扩展性、可观测性与成本 | 部分验证 | Query Trace、Embedding Cache、Answer Token/TTFT/Token Rate、P50/P95、可配置成本估算 | OpenTelemetry、压测、超时降级、缓存命中率、实际账单和资源水位 |
+| R12 | 扩展性、可观测性与成本 | 已验证首版 | Query Trace、Embedding Cache、Answer Token/TTFT/Token Rate、P50/P95、可配置成本估算、OTLP Collector + Jaeger profile、Redis 共享限流 | Prometheus 指标、Redis/Collector 故障注入、缓存命中率、实际账单和资源水位 |
 
 ## 本轮新增的可验证知识点
 

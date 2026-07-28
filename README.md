@@ -27,7 +27,7 @@ make stack-up
 应用身份、环境、知识库绑定、检索策略和索引发布将成为独立的控制面资源，详细目标见
 [Agent 知识基础设施架构](docs/knowledge-platform-architecture.md)。
 
-当前生产运行面已包含异步 Index Build/Manifest、OTLP Trace 与 token 成本链路、应用 Credential/OIDC Scope、租户/应用限流配额，以及 stable/canary 灰度索引发布；设计与 API 说明见 [企业级运行面](docs/enterprise-runtime.md)。
+当前生产运行面已包含异步 Index Build/Manifest、OTLP Trace 与 token 成本链路、应用 Credential/OIDC Scope、租户/应用限流配额，以及 stable/canary 灰度索引发布；Compose 默认启用 Redis 共享限流，并提供 Collector + Jaeger 本地观测 profile。设计与 API 说明见 [企业级运行面](docs/enterprise-runtime.md)。
 
 ## 演进路线
 

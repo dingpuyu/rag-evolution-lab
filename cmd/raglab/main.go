@@ -37,6 +37,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
 	"github.com/dingpuyu/rag-evolution-lab/internal/telemetry"
+	"github.com/redis/go-redis/v9"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -258,6 +259,9 @@ func runLabServer(args []string) {
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
 	otelEndpoint := flags.String("otel-endpoint", os.Getenv("RAGLAB_OTEL_ENDPOINT"), "OTLP HTTP endpoint, e.g. localhost:4318")
 	otelServiceName := flags.String("otel-service-name", environmentOr("RAGLAB_OTEL_SERVICE_NAME", "rag-evolution-lab"), "OpenTelemetry service name")
+	rateBackend := flags.String("rate-limit-backend", environmentOr("RAGLAB_RATE_LIMIT_BACKEND", "memory"), "rate limiter backend: memory or redis")
+	redisURL := flags.String("redis-url", environmentOr("RAGLAB_REDIS_URL", "redis://127.0.0.1:6379/0"), "Redis URL used by the shared rate limiter")
+	redisPrefix := flags.String("redis-prefix", environmentOr("RAGLAB_REDIS_PREFIX", "raglab:ratelimit"), "Redis key prefix for rate limiter buckets")
 	rateRPM := flags.Int("rate-limit-rpm", environmentInt("RAGLAB_RATE_LIMIT_RPM", 120), "per-tenant/application requests per minute")
 	rateBurst := flags.Int("rate-limit-burst", environmentInt("RAGLAB_RATE_LIMIT_BURST", 30), "per-tenant/application burst capacity")
 	tokenQuota := flags.Int("token-quota-per-minute", environmentInt("RAGLAB_TOKEN_QUOTA_PER_MINUTE", 100000), "per-tenant/application token quota per minute")
@@ -271,7 +275,39 @@ func runLabServer(args []string) {
 	defer telemetryProvider.Shutdown(context.Background())
 	var gatewayTracer trace.Tracer = telemetry.Tracer("raglab.knowledge-gateway")
 	gatewayCost := &cost.Calculator{InputPerMillion: *costInput, OutputPerMillion: *costOutput}
-	gatewayLimiter := ratelimit.New(ratelimit.Policy{RequestsPerMinute: *rateRPM, Burst: *rateBurst, TokensPerMinute: *tokenQuota})
+	ratePolicy := ratelimit.Policy{RequestsPerMinute: *rateRPM, Burst: *rateBurst, TokensPerMinute: *tokenQuota}
+	var gatewayLimiter ratelimit.Gate
+	rateBackendName := strings.ToLower(strings.TrimSpace(*rateBackend))
+	switch rateBackendName {
+	case "memory", "local", "":
+		gatewayLimiter = ratelimit.New(ratePolicy)
+	case "redis":
+		options, redisErr := redis.ParseURL(*redisURL)
+		if redisErr != nil {
+			fatal(fmt.Errorf("parse redis URL: %w", redisErr))
+		}
+		if options.DialTimeout == 0 {
+			options.DialTimeout = 2 * time.Second
+		}
+		if options.ReadTimeout == 0 {
+			options.ReadTimeout = 2 * time.Second
+		}
+		if options.WriteTimeout == 0 {
+			options.WriteTimeout = 2 * time.Second
+		}
+		redisClient := redis.NewClient(options)
+		pingContext, cancelPing := context.WithTimeout(context.Background(), 5*time.Second)
+		redisErr = redisClient.Ping(pingContext).Err()
+		cancelPing()
+		if redisErr != nil {
+			_ = redisClient.Close()
+			fatal(fmt.Errorf("connect rate limiter Redis: %w", redisErr))
+		}
+		gatewayLimiter = ratelimit.NewRedis(redisClient, ratePolicy, *redisPrefix)
+		defer redisClient.Close()
+	default:
+		fatal(fmt.Errorf("unknown rate limiter backend %q", *rateBackend))
+	}
 
 	embedder, err := newLabEmbedder(*embeddingBackend, *ollamaURL, *model, *queryInstruction, *hashDimensions)
 	if err != nil {

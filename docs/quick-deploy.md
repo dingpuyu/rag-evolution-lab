@@ -23,6 +23,17 @@ make stack-smoke
 - API 健康检查：<http://localhost:8080/healthz>
 - Milvus 健康检查：<http://localhost:9091/healthz>
 
+Compose 默认同时启动 Redis，作为多副本可替换的共享限流后端。需要查看 Trace 时，在主栈启动后执行：
+
+```bash
+make observability-up
+# 将 .env 中的 RAGLAB_OTEL_ENDPOINT 改为：
+# RAGLAB_OTEL_ENDPOINT=http://otel-collector:4318
+make stack-up
+```
+
+Jaeger UI：<http://localhost:16686>。关闭观测 profile 使用 `make observability-down`，不会删除主栈数据卷。
+
 首次启动 Milvus 可能需要 1–3 分钟。可以用 `docker-compose -f deploy/stack/docker-compose.yml logs -f milvus api` 查看启动过程。
 
 `make stack-smoke` 会等待 API 和门户健康检查，然后使用默认管理员验证登录、数据集目录和 Agent Application 控制面。它不写入业务资料，适合部署后快速验收；需要验证索引构建、Credential Scope 和回滚链路时，再执行 `make enterprise-eval` 或 `make enterprise-eval-build`。
@@ -82,6 +93,7 @@ RAGLAB_WEB_PORT=13000 \
 RAGLAB_MILVUS_PORT=29530 \
 RAGLAB_MILVUS_HEALTH_PORT=29091 \
 RAGLAB_POSTGRES_PORT=15433 \
+RAGLAB_REDIS_PORT=16379 \
 NEXT_PUBLIC_API_BASE=http://localhost:18080 \
 make stack-up
 ```

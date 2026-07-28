@@ -41,7 +41,7 @@ type EnterpriseOptions struct {
 	Generator          generation.Generator
 	Tracer             trace.Tracer
 	Cost               *cost.Calculator
-	Limiter            *ratelimit.Limiter
+	Limiter            ratelimit.Gate
 }
 
 type authAPI struct {

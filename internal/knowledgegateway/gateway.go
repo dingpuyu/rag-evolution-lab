@@ -85,7 +85,7 @@ type Service struct {
 	reranker   HitReranker
 	tracer     trace.Tracer
 	cost       *cost.Calculator
-	limiter    *ratelimit.Limiter
+	limiter    ratelimit.Gate
 }
 
 type Options struct {
@@ -95,7 +95,7 @@ type Options struct {
 	Reranker   HitReranker
 	Tracer     trace.Tracer
 	Cost       *cost.Calculator
-	Limiter    *ratelimit.Limiter
+	Limiter    ratelimit.Gate
 }
 
 func New(searcher Searcher, datasets datasetaccess.Store, apps datasetaccess.ApplicationStore, generator generation.Generator) (*Service, error) {

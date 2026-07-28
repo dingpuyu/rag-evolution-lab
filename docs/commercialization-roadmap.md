@@ -56,7 +56,7 @@
 - 数据源 Connector、定时同步、Webhook 和增量游标尚未形成统一协议；
 - 多租户控制面已有首版，但成员邀请、Group映射、API Key、租户配额和用量计量尚未闭环；
 - 缓存、限流、熔断、超时、Fallback 和背压缺少故障注入证明；
-- OpenTelemetry、指标、日志、Trace 和告警尚未接入统一观测面；
+- 已有 OTLP Trace、Collector + Jaeger profile，但指标、日志、Trace 和告警尚未接入统一观测面；
 - 备份恢复、索引重建、灾难恢复和升级回滚尚未演练；
 - 100K 已验证，但 1M 数据与持续增量写入尚未完成；
 - 缺少真实业务 Blind Set、人工反馈和线上 A/B/Canary 机制。
