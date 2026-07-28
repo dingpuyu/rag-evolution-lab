@@ -1,6 +1,6 @@
 # PostgreSQL 多租户控制面
 
-这一阶段把数据集授权从进程内静态 Catalog 迁移到 PostgreSQL。Milvus 继续承担向量数据面，PostgreSQL 成为 Tenant、User、Membership、Dataset 和管理审计的控制面事实源。
+这一阶段把数据集授权从进程内静态 Catalog 迁移到 PostgreSQL。Milvus 继续承担向量数据面，PostgreSQL 成为 Tenant、User、Membership、Dataset、Application、Knowledge Binding 和管理审计的控制面事实源。
 
 ## 架构边界
 
@@ -48,6 +48,14 @@ OIDC / Local JWT
 - Tenant Admin 创建的数据集由服务端强制写入当前 Tenant；
 - Product 是数据集到 Milvus Metadata 的映射，不要求全局唯一；
 - Dataset Role 单独存入`dataset_roles`，便于后续扩展 Group 和自定义角色。
+
+### Application / Environment / Knowledge Binding
+
+- `applications` 表示一个独立发布的 Agent 产品，不等同于 Dataset；
+- `app_environments` 隔离 dev、staging、prod 的配置和索引发布；
+- `knowledge_bindings` 表示应用在某个环境中可使用哪些 Dataset，并保存应用专属 Retrieval Policy；
+- Tenant Admin 只能管理本租户 Application，Platform Admin 可以跨租户运维；
+- Binding 创建时服务端再次检查 Dataset 授权，客户端不能通过 `tenant_id` 绕过边界。
 
 ### Control Plane Audit
 
@@ -135,6 +143,33 @@ roles   = [admin]
 status  = active
 ```
 
+### 创建 Agent Application 与知识绑定
+
+```http
+POST /api/v1/apps
+Authorization: Bearer <tenant-admin-token>
+Content-Type: application/json
+
+{"name":"客服 Agent","slug":"support-agent","description":"面向客服的知识问答应用"}
+```
+
+服务端会自动创建 `dev` Environment。随后绑定知识库：
+
+```http
+POST /api/v1/apps/tenant_a-support-agent/bindings
+Authorization: Bearer <tenant-admin-token>
+Content-Type: application/json
+
+{
+  "environment_id":"tenant_a-support-agent-dev",
+  "dataset_id":"tenant-a-operations",
+  "purpose":"customer support",
+  "policy":{"top_k":6,"candidate_k":24,"rerank":true,"token_budget":4000}
+}
+```
+
+同一 Dataset 可以被多个 Application 绑定；绑定策略存储在控制面，不会修改其他应用的策略。
+
 ## 已验证问题
 
 ### Product 不能错误地全局唯一
@@ -165,6 +200,7 @@ RAGLAB_TEST_POSTGRES_URL='postgres://raglab:raglab-local@127.0.0.1:5433/raglab?s
 - Membership 设为`revoked`后立即失去访问；
 - 后续请求不会自动恢复被撤销的 Membership；
 - Dataset Create 产生一条控制面审计。
+- Application、Environment、Binding 的租户隔离和默认策略落库。
 
 ## 下一步
 

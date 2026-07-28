@@ -392,6 +392,44 @@ CREATE TABLE IF NOT EXISTS control_plane_audit (
 CREATE INDEX IF NOT EXISTS memberships_subject_idx ON memberships(subject, status);
 CREATE INDEX IF NOT EXISTS datasets_tenant_status_idx ON datasets(tenant_id, status);
 ALTER TABLE datasets DROP CONSTRAINT IF EXISTS datasets_product_key;
+CREATE TABLE IF NOT EXISTS applications (
+	app_id text PRIMARY KEY,
+	tenant_id text NOT NULL REFERENCES tenants(id),
+	name text NOT NULL,
+	slug text NOT NULL,
+	description text NOT NULL DEFAULT '',
+	status text NOT NULL CHECK (status IN ('active','archived')),
+	created_by text NOT NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	UNIQUE (tenant_id, slug)
+);
+CREATE INDEX IF NOT EXISTS applications_tenant_status_idx ON applications(tenant_id, status);
+CREATE TABLE IF NOT EXISTS app_environments (
+	environment_id text PRIMARY KEY,
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	name text NOT NULL,
+	config_version text NOT NULL DEFAULT 'v1',
+	status text NOT NULL CHECK (status IN ('active','archived')),
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	UNIQUE (app_id, name)
+);
+CREATE INDEX IF NOT EXISTS app_environments_app_status_idx ON app_environments(app_id, status);
+CREATE TABLE IF NOT EXISTS knowledge_bindings (
+	app_id text NOT NULL REFERENCES applications(app_id) ON DELETE CASCADE,
+	environment_id text NOT NULL REFERENCES app_environments(environment_id) ON DELETE CASCADE,
+	dataset_id text NOT NULL REFERENCES datasets(id),
+	purpose text NOT NULL DEFAULT '',
+	priority integer NOT NULL DEFAULT 0,
+	status text NOT NULL CHECK (status IN ('active','disabled')),
+	policy jsonb NOT NULL DEFAULT '{}'::jsonb,
+	created_by text NOT NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (app_id, environment_id, dataset_id)
+);
+CREATE INDEX IF NOT EXISTS knowledge_bindings_dataset_idx ON knowledge_bindings(dataset_id, status);
 CREATE TABLE IF NOT EXISTS ingestion_jobs (
 	job_id text PRIMARY KEY,
 	idempotency_key text NOT NULL UNIQUE,

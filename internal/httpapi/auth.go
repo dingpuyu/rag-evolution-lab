@@ -18,13 +18,14 @@ import (
 type identityContextKey struct{}
 
 type EnterpriseOptions struct {
-	Verifier      auth.Verifier
-	DevIssuer     *auth.Manager
-	LocalAccounts *auth.AccountStore
-	Audit         *auth.AuditLog
-	IngestionJobs *ingestionjob.Service
-	DatasetStore  datasetaccess.Store
-	Generator     generation.Generator
+	Verifier         auth.Verifier
+	DevIssuer        *auth.Manager
+	LocalAccounts    *auth.AccountStore
+	Audit            *auth.AuditLog
+	IngestionJobs    *ingestionjob.Service
+	DatasetStore     datasetaccess.Store
+	ApplicationStore datasetaccess.ApplicationStore
+	Generator        generation.Generator
 }
 
 type authAPI struct {

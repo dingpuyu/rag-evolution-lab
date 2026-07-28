@@ -268,6 +268,7 @@ func runLabServer(args []string) {
 		fatal(err)
 	}
 	var datasetStore datasetaccess.Store = datasetaccess.Defaults()
+	var applicationStore datasetaccess.ApplicationStore
 	var ingestionRepository ingestionjob.Repository
 	if strings.TrimSpace(*postgresURL) != "" {
 		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
@@ -278,6 +279,7 @@ func runLabServer(args []string) {
 		}
 		defer postgresStore.Close()
 		datasetStore = postgresStore
+		applicationStore = postgresStore
 		ingestionRepository = postgresStore.IngestionRepository()
 	}
 	ingestionJobs, err := ingestionjob.New(lifecycleService, ingestionjob.Config{
@@ -368,7 +370,7 @@ func runLabServer(args []string) {
 	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
 		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
-		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore,
+		Audit: auth.NewAuditLog(200), IngestionJobs: ingestionJobs, DatasetStore: datasetStore, ApplicationStore: applicationStore,
 		Generator: generationGenerator,
 	}, lifecycleService)
 	if err != nil {

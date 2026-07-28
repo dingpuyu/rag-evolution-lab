@@ -122,6 +122,20 @@ Authenticate → Authorize Binding → Build Server Filter
 
 未来可以为 LangChain、Spring AI、Go Agent、MCP Server 提供薄适配器，但适配器不复制权限和检索逻辑。
 
+当前已落地的 P1 控制面接口为：
+
+```http
+GET  /api/v1/apps
+POST /api/v1/apps
+GET  /api/v1/apps/{app_id}/environments
+POST /api/v1/apps/{app_id}/environments
+GET  /api/v1/apps/{app_id}/bindings
+POST /api/v1/apps/{app_id}/bindings
+```
+
+这些接口已经写入 PostgreSQL 的 `applications`、`app_environments` 和 `knowledge_bindings`，并复用现有 Tenant/Dataset 授权。
+它们暂时是管理面，尚未替代 `/api/v1/datasets/{dataset_id}/search`；下一步会把查询逻辑下沉到统一 Knowledge Gateway。
+
 ## 6. 存储职责
 
 | 组件 | 负责内容 |

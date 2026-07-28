@@ -118,6 +118,15 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer/stream", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answerStream)))
 		mux.Handle("GET /api/v1/control-plane/status", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.status)))
 		mux.Handle("GET /api/v1/memberships", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.members)))
+		if enterprise.ApplicationStore != nil {
+			applicationAPI := &ApplicationAPI{store: enterprise.ApplicationStore, datasetStore: datasetStore}
+			mux.Handle("GET /api/v1/apps", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.list)))
+			mux.Handle("POST /api/v1/apps", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.create)))
+			mux.Handle("GET /api/v1/apps/{app_id}/environments", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.environments)))
+			mux.Handle("POST /api/v1/apps/{app_id}/environments", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createEnvironment)))
+			mux.Handle("GET /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.bindings)))
+			mux.Handle("POST /api/v1/apps/{app_id}/bindings", authenticator.requireIdentity(http.HandlerFunc(applicationAPI.createBinding)))
+		}
 	}
 	if enterprise.IngestionJobs != nil {
 		if authenticator == nil {

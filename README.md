@@ -174,6 +174,13 @@ PostgreSQL 多租户控制面首版已完成：
 - `Environment`、`Index Build`、`Published Index` 支持开发/生产隔离和可回滚发布；
 - 后续以统一 Knowledge Gateway 承接 Go Agent、Spring AI、LangChain 和 MCP 适配器。
 
+P1 控制面已开始落地：
+
+- `/api/v1/apps` 管理独立 Agent Application；
+- 应用自动拥有 `dev` Environment，也可新增 staging/prod 环境；
+- `/api/v1/apps/{app_id}/bindings` 将应用绑定到可复用知识库，并保存独立 Retrieval Policy；
+- 应用资源沿用 Tenant 隔离，跨租户访问统一返回 404。
+
 异步资料导入与人工运维闭环已完成首版：
 
 - 导入请求进入带幂等键的 Job，按 validating、chunking、embedding、indexing、verifying 阶段执行
