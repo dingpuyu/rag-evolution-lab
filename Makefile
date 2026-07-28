@@ -1,4 +1,4 @@
-.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-down stack-status
+.PHONY: fmt test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-down stack-status
 
 DOCKER_COMPOSE ?= docker-compose
 STACK_COMPOSE = $(DOCKER_COMPOSE) -f deploy/stack/docker-compose.yml
@@ -60,6 +60,12 @@ answer-eval-blind-stream:
 
 answer-eval-blind-isolated:
 	RAGLAB_API_URL=$${RAGLAB_EVAL_API_URL:-http://127.0.0.1:8081} go run ./cmd/raglab answer-eval --suite datasets/answer-harness/grounded-answer-blind-v1.json --json-report eval/reports/grounded-answer-blind-isolated-latest.json --markdown-report eval/reports/grounded-answer-blind-isolated-latest.md
+
+enterprise-eval:
+	go run ./cmd/raglab enterprise-eval
+
+enterprise-eval-build:
+	go run ./cmd/raglab enterprise-eval --build --publish
 
 serve-embedding:
 	go run ./cmd/raglab serve-embedding --backend auto

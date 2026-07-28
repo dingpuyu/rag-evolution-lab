@@ -29,6 +29,13 @@ func (api *IndexBuildAPI) submit(writer http.ResponseWriter, request *http.Reque
 		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
 		return
 	}
+	if headerKey := strings.TrimSpace(request.Header.Get("Idempotency-Key")); headerKey != "" {
+		if input.IdempotencyKey != "" && input.IdempotencyKey != headerKey {
+			writeError(writer, http.StatusBadRequest, "idempotency_key_mismatch", "body and Idempotency-Key header must match")
+			return
+		}
+		input.IdempotencyKey = headerKey
+	}
 	input.ApplicationID = request.PathValue("app_id")
 	input.EnvironmentID = request.PathValue("environment_id")
 	build, existing, err := api.service.Submit(request.Context(), identity, input)

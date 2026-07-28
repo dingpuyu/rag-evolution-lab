@@ -1,0 +1,76 @@
+{
+  "suite": "enterprise-runtime-v1",
+  "started_at": "2026-07-28T18:00:36.173431Z",
+  "completed_at": "2026-07-28T18:00:36.707108Z",
+  "passed": true,
+  "cases": 8,
+  "passed_cases": 8,
+  "failed_cases": 0,
+  "application": {
+    "app_id": "tenant_a-support-agent",
+    "environment_id": "tenant_a-support-agent-dev",
+    "collection": "raglab_lifecycle_v1",
+    "trace_id": "gw_trace_1785261636473236000"
+  },
+  "results": [
+    {
+      "id": "gateway_query_and_trace_id",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 259.917
+    },
+    {
+      "id": "query_trace_persisted",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 4.5
+    },
+    {
+      "id": "application_credential_created",
+      "passed": true,
+      "expected_status": 201,
+      "actual_status": 201,
+      "latency_ms": 6.871
+    },
+    {
+      "id": "credential_query_allowed",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 210.01
+    },
+    {
+      "id": "credential_answer_scope_denied",
+      "passed": true,
+      "expected_status": 422,
+      "actual_status": 422,
+      "latency_ms": 1.899,
+      "details": "knowledge_gateway_failed"
+    },
+    {
+      "id": "credential_cross_app_denied",
+      "passed": true,
+      "expected_status": 403,
+      "actual_status": 403,
+      "latency_ms": 1.874,
+      "details": "credential_scope_violation"
+    },
+    {
+      "id": "application_credential_revoked",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 5.313
+    },
+    {
+      "id": "revoked_credential_denied",
+      "passed": true,
+      "expected_status": 401,
+      "actual_status": 401,
+      "latency_ms": 0.755,
+      "details": "authentication_required"
+    }
+  ]
+}

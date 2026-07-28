@@ -303,7 +303,10 @@ make answer-eval
 make answer-eval-blind
 make answer-eval-stream
 make answer-eval-blind-stream
+make enterprise-eval
 ```
+
+运行面回归会通过公开 API 验证应用级 Query Trace、Credential Scope、跨应用隔离和撤销；要把异步 Index Build/Manifest 及 stable rollback 也纳入验收，使用 `make enterprise-eval-build`（详见[企业级运行面](docs/enterprise-runtime.md)）。
 
 回答评测默认只统计 Token；不要把供应商价格写死在代码中。需要成本估算时，在运行命令前显式配置当前账单费率：
 

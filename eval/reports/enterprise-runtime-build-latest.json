@@ -1,0 +1,137 @@
+{
+  "suite": "enterprise-runtime-v1",
+  "started_at": "2026-07-28T18:00:36.852367Z",
+  "completed_at": "2026-07-28T18:00:38.354505Z",
+  "passed": true,
+  "cases": 12,
+  "passed_cases": 12,
+  "failed_cases": 0,
+  "application": {
+    "app_id": "tenant_a-support-agent",
+    "environment_id": "tenant_a-support-agent-dev",
+    "collection": "raglab_lifecycle_v1",
+    "trace_id": "gw_trace_1785261638125997000"
+  },
+  "build": {
+    "build_id": "ib_dae30497c5db367c45a4509a",
+    "idempotency_key": "runtime-harness-harness-20260728-180036",
+    "app_id": "tenant_a-support-agent",
+    "environment_id": "tenant_a-support-agent-dev",
+    "version": "harness-20260728-180036",
+    "collection": "raglab_lifecycle_v1",
+    "status": "completed",
+    "stage": "completed",
+    "attempts": 1,
+    "manifest": {
+      "build_id": "ib_dae30497c5db367c45a4509a",
+      "version": "harness-20260728-180036",
+      "collection": "raglab_lifecycle_v1",
+      "embedding_model": "ollama/qwen3-embedding:4b-local",
+      "embedding_version": "qwen3-embedding-4b-q4km-v1",
+      "row_count": 12,
+      "dimensions": 2560,
+      "schema_hash": "6830fe0ce968e19bd9e11667d464f5d0afec7aabed173985739efff6c88a463b",
+      "manifest_hash": "707645c1a312444eb1f5552c6f39200bb0416cde28f3480d7ee8cefa28b0d726",
+      "validated_at": "2026-07-28T18:00:37.11284Z"
+    }
+  },
+  "release": {
+    "release_id": "tenant_a-support-agent-dev-harness-20260728-180036",
+    "version": "harness-20260728-180036",
+    "collection": "raglab_lifecycle_v1",
+    "state": "published",
+    "channel": "stable",
+    "rollout_percent": 100
+  },
+  "results": [
+    {
+      "id": "index_build_completed",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 8.623,
+      "details": "status=completed stage=completed attempts=1 rows=12 dimensions=2560 manifest=707645c1a312444eb1f5552c6f39200bb0416cde28f3480d7ee8cefa28b0d726"
+    },
+    {
+      "id": "stable_release_published",
+      "passed": true,
+      "expected_status": 201,
+      "actual_status": 201,
+      "latency_ms": 178.48,
+      "details": "release=tenant_a-support-agent-dev-harness-20260728-180036 state=published channel=stable rollout=100%"
+    },
+    {
+      "id": "stable_release_superseded",
+      "passed": true,
+      "expected_status": 201,
+      "actual_status": 201,
+      "latency_ms": 0
+    },
+    {
+      "id": "stable_release_rollback",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 159.039
+    },
+    {
+      "id": "gateway_query_and_trace_id",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 227.225
+    },
+    {
+      "id": "query_trace_persisted",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 6.059
+    },
+    {
+      "id": "application_credential_created",
+      "passed": true,
+      "expected_status": 201,
+      "actual_status": 201,
+      "latency_ms": 6.091
+    },
+    {
+      "id": "credential_query_allowed",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 202.781
+    },
+    {
+      "id": "credential_answer_scope_denied",
+      "passed": true,
+      "expected_status": 422,
+      "actual_status": 422,
+      "latency_ms": 2.279,
+      "details": "knowledge_gateway_failed"
+    },
+    {
+      "id": "credential_cross_app_denied",
+      "passed": true,
+      "expected_status": 403,
+      "actual_status": 403,
+      "latency_ms": 1.939,
+      "details": "credential_scope_violation"
+    },
+    {
+      "id": "application_credential_revoked",
+      "passed": true,
+      "expected_status": 200,
+      "actual_status": 200,
+      "latency_ms": 5.209
+    },
+    {
+      "id": "revoked_credential_denied",
+      "passed": true,
+      "expected_status": 401,
+      "actual_status": 401,
+      "latency_ms": 1.127,
+      "details": "authentication_required"
+    }
+  ]
+}

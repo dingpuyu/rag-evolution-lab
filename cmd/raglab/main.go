@@ -33,6 +33,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
+	"github.com/dingpuyu/rag-evolution-lab/internal/runtimeharness"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
 	"github.com/dingpuyu/rag-evolution-lab/internal/telemetry"
@@ -66,6 +67,10 @@ func main() {
 	}
 	if os.Args[1] == "answer-eval" {
 		runAnswerEval(root, os.Args[2:])
+		return
+	}
+	if os.Args[1] == "enterprise-eval" {
+		runEnterpriseEval(root, os.Args[2:])
 		return
 	}
 	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
@@ -785,6 +790,63 @@ func runAnswerEval(root string, args []string) {
 	}
 }
 
+func runEnterpriseEval(root string, args []string) {
+	flags := flag.NewFlagSet("enterprise-eval", flag.ExitOnError)
+	baseURL := flags.String("api", environmentOr("RAGLAB_API_URL", "http://127.0.0.1:8080"), "enterprise lab API base URL")
+	email := flags.String("email", environmentOr("RAGLAB_ENTERPRISE_EVAL_EMAIL", "alice@tenant-a.local"), "administrator email used by the harness")
+	password := flags.String("password", environmentOr("RAGLAB_ENTERPRISE_EVAL_PASSWORD", "RagLab-Alice-2026!"), "administrator password used by the harness")
+	applicationID := flags.String("app-id", environmentOr("RAGLAB_ENTERPRISE_EVAL_APP_ID", "tenant_a-support-agent"), "application boundary")
+	environmentID := flags.String("environment-id", "", "application environment; defaults to <app-id>-dev")
+	collection := flags.String("collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "ready Milvus collection used for optional index build")
+	crossAppID := flags.String("cross-app-id", environmentOr("RAGLAB_ENTERPRISE_EVAL_CROSS_APP_ID", "tenant_b-support-agent"), "different application used for credential isolation")
+	embeddingModel := flags.String("embedding-model", "", "optional embedding model assertion for the manifest")
+	embeddingVersion := flags.String("embedding-version", "", "optional embedding version assertion for the manifest")
+	chunkerVersion := flags.String("chunker-version", "", "optional chunker version recorded in the manifest")
+	sourceRevision := flags.Int64("source-revision", 0, "optional source revision recorded in the manifest")
+	build := flags.Bool("build", false, "submit and poll an asynchronous index build (mutates control-plane state)")
+	publish := flags.Bool("publish", false, "publish, supersede and rollback the built index (implies -build)")
+	rateLimitRequests := flags.Int("rate-limit-requests", 0, "optional number of credential queries used to observe a 429; configure a low server burst first")
+	timeout := flags.Duration("timeout", 5*time.Minute, "whole-suite timeout")
+	jsonReport := flags.String("json-report", filepath.Join(root, "eval", "reports", "enterprise-runtime-latest.json"), "JSON report path")
+	markdownReport := flags.String("markdown-report", filepath.Join(root, "eval", "reports", "enterprise-runtime-latest.md"), "Markdown report path")
+	_ = flags.Parse(args)
+	if *publish {
+		*build = true
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+	report, err := runtimeharness.Run(ctx, runtimeharness.Config{
+		BaseURL: *baseURL, Email: *email, Password: *password, ApplicationID: *applicationID,
+		EnvironmentID: *environmentID, Collection: *collection, CrossAppID: *crossAppID,
+		EmbeddingModel: *embeddingModel, EmbeddingVer: *embeddingVersion, ChunkerVersion: *chunkerVersion,
+		SourceRevision: *sourceRevision, Build: *build, Publish: *publish, RateLimitRequests: *rateLimitRequests, Timeout: *timeout,
+	})
+	if report.Cases > 0 {
+		jsonData, marshalErr := runtimeharness.MarshalReport(report)
+		if marshalErr != nil {
+			fatal(marshalErr)
+		}
+		for path, data := range map[string][]byte{
+			*jsonReport: append(jsonData, '\n'), *markdownReport: []byte(runtimeharness.Markdown(report)),
+		} {
+			if mkdirErr := os.MkdirAll(filepath.Dir(path), 0o755); mkdirErr != nil {
+				fatal(mkdirErr)
+			}
+			if writeErr := os.WriteFile(path, data, 0o644); writeErr != nil {
+				fatal(writeErr)
+			}
+		}
+		fmt.Printf("enterprise_runtime_suite=%s passed=%t cases=%d failed=%d app=%s environment=%s\n", report.Suite, report.Passed, report.Cases, report.FailedCases, report.Application.ID, report.Application.Environment)
+		fmt.Printf("json_report=%s\nmarkdown_report=%s\n", *jsonReport, *markdownReport)
+	}
+	if err != nil {
+		fatal(err)
+	}
+	if !report.Passed {
+		os.Exit(1)
+	}
+}
+
 func evaluate(root string, runtime *app.Runtime, pipelineName, split string) evaluation.Report {
 	target, err := runtime.Pipeline(pipelineName)
 	if err != nil {
@@ -860,5 +922,5 @@ func fatal(err error) {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|dataset-eval|answer-eval|serve-embedding|milvus-seed|serve-lab> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: raglab <validate|ingest|query|eval|compare|dataset-eval|answer-eval|enterprise-eval|serve-embedding|milvus-seed|serve-lab> [flags]")
 }

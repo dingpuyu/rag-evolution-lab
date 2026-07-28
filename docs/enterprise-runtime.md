@@ -43,3 +43,35 @@ curl -X POST http://127.0.0.1:8080/api/v1/apps/<app>/environments/<env>/index-bu
 ```
 
 建议先用物理 collection 的真实 Embedding 维度跑构建验证，再调用 indexes publish；不要把客户端传入的 collection 直接用于查询。
+
+## 一键回归 Harness
+
+`enterprise-eval` 只通过公开 HTTP API 验证运行面，因此可以对本地进程、Docker Compose 或预发布环境执行。默认是只读数据面回归，同时会创建并撤销一个临时的 `rag:query` Credential，验证应用边界和 Scope 门禁：
+
+```bash
+make enterprise-eval
+# 或显式指定部署地址和管理员
+go run ./cmd/raglab enterprise-eval \
+  --api http://127.0.0.1:8080 \
+  --email alice@tenant-a.local \
+  --password 'RagLab-Alice-2026!'
+```
+
+报告会写入 `eval/reports/enterprise-runtime-latest.{json,md}`，包含 Gateway `trace_id`、持久化 Trace、Credential 查询允许、`rag:answer` 缺失拒绝、跨应用拒绝和撤销后拒绝。需要验证异步 Index Build/Manifest 以及发布 supersede/rollback 时，显式执行：
+
+```bash
+make enterprise-eval-build
+# 等价于：go run ./cmd/raglab enterprise-eval --build --publish \
+#   --collection raglab_lifecycle_v1
+```
+
+`--build` 和 `--publish` 会写入控制面，默认关闭，避免共享环境的回归任务不断制造版本。构建用幂等 key `runtime-harness-<version>`，等待状态到 `completed`，并要求 `row_count`、`dimensions`、`schema_hash`、`manifest_hash` 均存在；发布模式会先发布 stable、再发布下一 stable 使旧版本进入 superseded，最后回滚旧版本。这样可以把索引生命周期作为可重复的验收证据，而不是只检查 HTTP 200。
+
+限流是可选的主动探针，避免普通回归为了撞出 `429` 耗尽共享环境配额。启动一个低 burst 的隔离进程后执行：
+
+```bash
+go run ./cmd/raglab serve-lab --rate-limit-burst 1 --rate-limit-rpm 1
+go run ./cmd/raglab enterprise-eval --rate-limit-requests 2
+```
+
+报告会标记首次收到 `429 + Retry-After` 的请求位置；生产环境仍应把单实例内存 Limiter 换成 Redis/网关级共享实现。
