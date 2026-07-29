@@ -79,3 +79,10 @@ test("removes starter preview assets and includes social preview", async () => {
   await access(new URL("../public/og.png", import.meta.url));
   await assert.rejects(access(new URL("app/_sites-preview", projectRoot)));
 });
+
+test("keeps the core RAG portal path discoverable", async () => {
+  const portal = await readFile(new URL("../app/portal/page.tsx", import.meta.url), "utf8");
+  assert.match(portal, /导入 Markdown \/ 文本文件/);
+  assert.match(portal, /setSearchHits\(progress\.response\.search\.hits/);
+  assert.match(portal, /VALIDATE → EMBED → INDEX → VERIFY/);
+});
