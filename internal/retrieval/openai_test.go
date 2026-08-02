@@ -76,6 +76,41 @@ func TestOpenAICompatibleEmbedderAppliesInstructionOnlyToQuery(t *testing.T) {
 	}
 }
 
+func TestOpenAICompatibleEmbedderSplitsConfiguredBatches(t *testing.T) {
+	requests := 0
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		requests++
+		var payload struct {
+			Input []string `json:"input"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if len(payload.Input) > 2 {
+			t.Fatalf("batch exceeded configured size: %d", len(payload.Input))
+		}
+		data := make([]map[string]any, len(payload.Input))
+		for index := range payload.Input {
+			data[index] = map[string]any{"index": index, "embedding": []float64{float64(requests), float64(index)}}
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(writer).Encode(map[string]any{"data": data})
+	}))
+	defer server.Close()
+
+	embedder := OpenAICompatibleEmbedder{BaseURL: server.URL, APIKey: "key", Model: "qwen", BatchSize: 2, Client: server.Client()}
+	vectors, err := embedder.EmbedDocuments(context.Background(), []string{"a", "b", "c", "d", "e"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if requests != 3 || len(vectors) != 5 {
+		t.Fatalf("expected three requests and five vectors, got requests=%d vectors=%d", requests, len(vectors))
+	}
+	if vectors[2][0] != 2 || vectors[4][1] != 0 {
+		t.Fatalf("unexpected batch ordering: %#v", vectors)
+	}
+}
+
 func TestOpenAICompatibleEmbedderValidatesDimensions(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")

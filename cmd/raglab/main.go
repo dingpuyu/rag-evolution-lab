@@ -129,6 +129,7 @@ func runEmbeddingServer(args []string) {
 	openAIKey := flags.String("embedding-api-key", firstNonEmptyEnv("RAGLAB_EMBEDDING_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY", "TOKENHUB_API_KEY"), "OpenAI-compatible embedding API key")
 	openAIModel := flags.String("embedding-model", os.Getenv("RAGLAB_EMBEDDING_MODEL"), "OpenAI-compatible embedding model")
 	openAIDimensions := flags.Int("embedding-dimensions", environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"), "optional expected embedding dimensions")
+	embeddingBatchSize := flags.Int("embedding-batch-size", environmentIntOrZero("RAGLAB_EMBEDDING_BATCH_SIZE"), "maximum texts per OpenAI-compatible embedding request")
 	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "instruction used only in query_document mode")
 	_ = flags.Parse(args)
 
@@ -136,7 +137,7 @@ func runEmbeddingServer(args []string) {
 		Backend: *backend, OllamaURL: *ollamaURL, OllamaModel: *model, QueryInstruction: *queryInstruction,
 		OllamaDimensions: *openAIDimensions,
 		HashDimensions:   *dimensions, OpenAIBaseURL: *openAIBaseURL, OpenAIAPIKey: *openAIKey,
-		OpenAIModel: *openAIModel, OpenAIDimensions: *openAIDimensions,
+		OpenAIModel: *openAIModel, OpenAIDimensions: *openAIDimensions, OpenAIBatchSize: *embeddingBatchSize,
 	})
 	if err != nil {
 		fatal(err)
@@ -188,6 +189,7 @@ func runMilvusSeed(args []string) {
 	apiKey := flags.String("embedding-api-key", firstNonEmptyEnv("RAGLAB_EMBEDDING_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY", "TOKENHUB_API_KEY"), "OpenAI-compatible embedding API key")
 	embeddingModel := flags.String("embedding-model", os.Getenv("RAGLAB_EMBEDDING_MODEL"), "OpenAI-compatible embedding model")
 	embeddingDimensions := flags.Int("embedding-dimensions", environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"), "optional expected embedding dimensions")
+	embeddingBatchSize := flags.Int("embedding-batch-size", environmentIntOrZero("RAGLAB_EMBEDDING_BATCH_SIZE"), "maximum texts per OpenAI-compatible embedding request")
 	hashDimensions := flags.Int("hash-dimensions", environmentInt("RAGLAB_HASH_EMBEDDING_DIMENSIONS", 512), "hash embedding dimensions")
 	queryInstruction := flags.String("query-instruction", os.Getenv("RAGLAB_QUERY_INSTRUCTION"), "instruction used only for query embeddings")
 	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
@@ -211,7 +213,7 @@ func runMilvusSeed(args []string) {
 		Backend: *backend, OllamaURL: *ollamaURL, OllamaModel: *model, QueryInstruction: *queryInstruction,
 		OllamaDimensions: *embeddingDimensions,
 		HashDimensions:   *hashDimensions, OpenAIBaseURL: *baseURL, OpenAIAPIKey: *apiKey,
-		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions,
+		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions, OpenAIBatchSize: *embeddingBatchSize,
 	})
 	if err != nil {
 		fatal(err)
@@ -289,6 +291,7 @@ func runLabServer(args []string) {
 	embeddingAPIKey := flags.String("embedding-api-key", firstNonEmptyEnv("RAGLAB_EMBEDDING_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY", "TOKENHUB_API_KEY"), "OpenAI-compatible embedding API key")
 	embeddingModel := flags.String("embedding-model", os.Getenv("RAGLAB_EMBEDDING_MODEL"), "OpenAI-compatible embedding model")
 	embeddingDimensions := flags.Int("embedding-dimensions", environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"), "optional expected embedding dimensions")
+	embeddingBatchSize := flags.Int("embedding-batch-size", environmentIntOrZero("RAGLAB_EMBEDDING_BATCH_SIZE"), "maximum texts per OpenAI-compatible embedding request")
 	milvusURL := flags.String("milvus-url", environmentOr("RAGLAB_MILVUS_URL", milvus.DefaultURL), "Milvus REST URL")
 	collection := flags.String("collection", environmentOr("RAGLAB_MILVUS_COLLECTION", milvus.DefaultCollection), "Milvus collection")
 	scalePrefix := flags.String("scale-prefix", "raglab_bench_100k", "100K scale collection prefix")
@@ -377,7 +380,7 @@ func runLabServer(args []string) {
 		OllamaDimensions: *embeddingDimensions,
 		HashDimensions:   *hashDimensions,
 		OpenAIBaseURL:    *embeddingBaseURL, OpenAIAPIKey: *embeddingAPIKey,
-		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions,
+		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions, OpenAIBatchSize: *embeddingBatchSize,
 	})
 	if err != nil {
 		fatal(err)
@@ -643,6 +646,7 @@ type labEmbedderConfig struct {
 	OpenAIAPIKey     string
 	OpenAIModel      string
 	OpenAIDimensions int
+	OpenAIBatchSize  int
 }
 
 func newLabEmbedder(config labEmbedderConfig) (retrieval.Embedder, error) {
@@ -678,7 +682,7 @@ func newLabEmbedder(config labEmbedderConfig) (retrieval.Embedder, error) {
 		}
 		return retrieval.OpenAICompatibleEmbedder{
 			BaseURL: config.OpenAIBaseURL, APIKey: config.OpenAIAPIKey, Model: config.OpenAIModel,
-			Dimensions: config.OpenAIDimensions, QueryInstruction: config.QueryInstruction,
+			Dimensions: config.OpenAIDimensions, BatchSize: config.OpenAIBatchSize, QueryInstruction: config.QueryInstruction,
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported embedding backend %q; use ollama, hash, or openai-compatible", config.Backend)

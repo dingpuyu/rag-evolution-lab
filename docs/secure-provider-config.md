@@ -42,6 +42,8 @@ DeepSeek 和 Embedding 使用不同的 Key，按服务和环境分别创建、�
 
 远程 Embedding 模型或维度变化时，必须更新 `RAGLAB_EMBEDDING_VERSION`，新建 Milvus Collection 并重新导入，验证通过后再切换 Alias。不能把远程 1024 维向量和当前本地 Qwen3-Embedding-4B 的 2560 维向量写入同一个 Collection。
 
+阿里云 `text-embedding-v4` 的批量请求配置为 `RAGLAB_EMBEDDING_BATCH_SIZE=10`，避免一次提交过多文本导致同步接口拒绝。该值通过 Embedding 适配器切分，不影响上层 RAG 流程。
+
 本地 Ollama 的 Qwen3-Embedding-4B 默认返回 2560 维；项目支持通过
 `RAGLAB_EMBEDDING_DIMENSIONS=1024` 请求 1024 维。这个设置只解决向量长度和存储规格
 的一致性，不会让本地 Qwen3-Embedding-4B 与远程 `text-embedding-v4` 变成同一个模型。

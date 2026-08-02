@@ -26,6 +26,7 @@ type OpenAICompatibleEmbedder struct {
 	APIKey           string
 	Model            string
 	Dimensions       int
+	BatchSize        int
 	QueryInstruction string
 	Client           *http.Client
 }
@@ -66,6 +67,26 @@ func (e OpenAICompatibleEmbedder) embed(ctx context.Context, texts []string) ([]
 	if len(texts) == 0 {
 		return [][]float64{}, nil
 	}
+	batchSize := e.BatchSize
+	if batchSize <= 0 || batchSize > len(texts) {
+		batchSize = len(texts)
+	}
+	vectors := make([][]float64, 0, len(texts))
+	for start := 0; start < len(texts); start += batchSize {
+		end := start + batchSize
+		if end > len(texts) {
+			end = len(texts)
+		}
+		batch, err := e.embedBatch(ctx, texts[start:end])
+		if err != nil {
+			return nil, fmt.Errorf("embed batch %d-%d with %s: %w", start, end, e.Name(), err)
+		}
+		vectors = append(vectors, batch...)
+	}
+	return vectors, nil
+}
+
+func (e OpenAICompatibleEmbedder) embedBatch(ctx context.Context, texts []string) ([][]float64, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(e.BaseURL), "/")
 	if baseURL == "" {
 		return nil, fmt.Errorf("%s base URL must not be empty", e.Name())
