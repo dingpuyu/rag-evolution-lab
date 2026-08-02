@@ -259,6 +259,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
 - [企业 IT 服务台 Agent 方案](docs/agent-business-architecture.md)
+- [Python + LangGraph Agent Service](services/agent-orchestrator/README.md)
 - [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 - [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)

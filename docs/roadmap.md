@@ -199,11 +199,11 @@
 
 - [x] DeepSeek 结构化 Planner（当前 Go 基线）
 - [x] Go Agent Loop、最大步数和循环保护（兼容/降级运行时）
-- [ ] Knowledge Gateway RAG Tool
-- [ ] Service Status / Account Access 只读工具
-- [ ] Ticket Draft 待确认工具
+- [x] Knowledge Gateway RAG Tool
+- [x] Service Status / Account Access 只读工具
+- [x] Ticket Draft 待确认工具
 - [ ] Agent Trace 与工具审计
-- [ ] Python + LangGraph 主 Agent 服务
+- [x] Python + LangGraph 主 Agent 服务（首个 IT 服务台垂直切片）
 - [ ] LangChain / Spring AI / MCP 上层调用示例
 
 完成标准：同一个用户问题能够展示“意图 → 工具 → 观察 → 最终回答”的完整链路；专有知识回答带服务端引用；跨租户和未确认写操作均被拒绝；DeepSeek 不可用时不会静默执行危险工具。

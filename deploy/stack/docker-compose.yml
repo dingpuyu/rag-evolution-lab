@@ -153,12 +153,37 @@ services:
       milvus:
         condition: service_healthy
 
+  agent:
+    build:
+      context: ../..
+      dockerfile: services/agent-orchestrator/Dockerfile
+    restart: unless-stopped
+    environment:
+      RAGLAB_API_URL: http://api:8080
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      RAGLAB_GENERATION_API_KEY: ${RAGLAB_GENERATION_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${RAGLAB_GENERATION_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${RAGLAB_GENERATION_MODEL:-deepseek-chat}
+      AGENT_CORS_ORIGINS: ${AGENT_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:13000,http://127.0.0.1:13000}
+    ports:
+      - "${RAGLAB_AGENT_PORT:-8090}:8090"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/healthz')"]
+      interval: 10s
+      start_period: 30s
+      timeout: 5s
+      retries: 20
+
   web:
     build:
       context: ../../web
       dockerfile: Dockerfile
       args:
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8080}
+        NEXT_PUBLIC_AGENT_API_BASE: ${NEXT_PUBLIC_AGENT_API_BASE:-http://localhost:8090}
     restart: unless-stopped
     ports:
       - "${RAGLAB_WEB_PORT:-3000}:3000"

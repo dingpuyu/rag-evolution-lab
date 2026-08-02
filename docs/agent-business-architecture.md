@@ -79,7 +79,7 @@ TOKEN=$(curl -sS -H 'Content-Type: application/json' \
 curl -sS -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' \
   -d '{"environment_id":"tenant_a-support-agent-dev","query":"如何申请企业单点登录？"}' \
-  http://127.0.0.1:18080/api/v1/apps/tenant_a-support-agent/agent/answer
+  http://127.0.0.1:8090/api/v1/apps/tenant_a-support-agent/agent/answer
 ```
 
 建议依次体验：
