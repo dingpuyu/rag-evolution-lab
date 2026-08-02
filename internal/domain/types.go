@@ -26,6 +26,10 @@ type Chunk struct {
 	DocumentID     string
 	DocumentTitle  string
 	Content        string
+	ParentID       string
+	ParentContent  string
+	ParentSequence int
+	SourcePage     int
 	Sequence       int
 	HeadingPath    []string
 	Product        string

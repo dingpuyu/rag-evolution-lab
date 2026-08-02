@@ -227,6 +227,33 @@ func TestDatasetAnswerStreamPreservesResourceNonEnumeration(t *testing.T) {
 	}
 }
 
+func TestDatasetDocumentPreviewReturnsPageAndParentProvenance(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	token := issueTestPersona(t, handler, "tenant_a_admin")
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/datasets/tenant-a-operations/documents/preview", strings.NewReader(`{
+		"title":"客服手册",
+		"content":"# 登录\n\n第一页说明。\f<!-- page: 4 -->\n## 配置\n\n第二页说明。",
+		"max_runes":100,
+		"overlap_runes":10
+	}`))
+	request.Header.Set("Authorization", "Bearer "+token)
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("preview status=%d body=%s", response.Code, response.Body.String())
+	}
+	body := response.Body.String()
+	for _, fragment := range []string{`"chunker_version":"header-page-parent-v1"`, `"parent_count":2`, `"child_count":2`, `"source_page":4`, `"parent_id":"preview#p002"`} {
+		if !strings.Contains(body, fragment) {
+			t.Fatalf("preview missing %s: %s", fragment, body)
+		}
+	}
+	if filter != "" {
+		t.Fatalf("preview must not call Milvus: filter=%q", filter)
+	}
+}
+
 func TestLifecycleAdministrationRequiresPlatformRole(t *testing.T) {
 	var filter string
 	handler := newEnterpriseTestHandler(t, &filter)

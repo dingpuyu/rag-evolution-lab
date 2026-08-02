@@ -4,9 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
@@ -18,6 +21,24 @@ type datasetDocumentInput struct {
 	SourceRevision int64  `json:"source_revision"`
 	EventID        string `json:"event_id"`
 	Operation      string `json:"operation"`
+}
+
+type documentPreviewInput struct {
+	Title        string `json:"title"`
+	Content      string `json:"content"`
+	MaxRunes     int    `json:"max_runes"`
+	OverlapRunes int    `json:"overlap_runes"`
+}
+
+type documentPreviewChunk struct {
+	ID             string   `json:"id"`
+	ParentID       string   `json:"parent_id"`
+	ParentSequence int      `json:"parent_sequence"`
+	SourcePage     int      `json:"source_page"`
+	Sequence       int      `json:"sequence"`
+	HeadingPath    []string `json:"heading_path,omitempty"`
+	Content        string   `json:"content"`
+	ParentContent  string   `json:"parent_content"`
 }
 
 func (api *DatasetAPI) document(writer http.ResponseWriter, request *http.Request) {
@@ -95,4 +116,79 @@ func (api *DatasetAPI) document(writer http.ResponseWriter, request *http.Reques
 		return
 	}
 	writeJSON(writer, http.StatusOK, map[string]any{"dataset": dataset, "identity": identity, "result": result})
+}
+
+// previewDocument validates the structure-aware ingestion result without
+// writing to Milvus. It lets an operator inspect page provenance, parent-child
+// grouping and overlap before spending embedding/indexing cost.
+func (api *DatasetAPI) previewDocument(writer http.ResponseWriter, request *http.Request) {
+	if _, _, ok := api.authorizeDataset(writer, request); !ok {
+		return
+	}
+	request.Body = http.MaxBytesReader(writer, request.Body, maxLifecycleRequestBytes)
+	decoder := json.NewDecoder(request.Body)
+	decoder.DisallowUnknownFields()
+	var input documentPreviewInput
+	if err := decoder.Decode(&input); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+	if err := ensureEOF(decoder); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_json", err.Error())
+		return
+	}
+	input.Title = strings.TrimSpace(input.Title)
+	input.Content = strings.TrimSpace(input.Content)
+	if input.Title == "" || input.Content == "" {
+		writeError(writer, http.StatusBadRequest, "invalid_preview", "title and content are required")
+		return
+	}
+	if len([]rune(input.Title)) > 200 || len([]rune(input.Content)) > 1_000_000 {
+		writeError(writer, http.StatusBadRequest, "invalid_preview", "title must be <= 200 runes and content must be <= 1,000,000 runes")
+		return
+	}
+	if input.MaxRunes <= 0 {
+		input.MaxRunes = 500
+	}
+	if input.MaxRunes < 100 || input.MaxRunes > 2000 {
+		writeError(writer, http.StatusBadRequest, "invalid_preview", "max_runes must be between 100 and 2000")
+		return
+	}
+	if input.OverlapRunes < 0 || input.OverlapRunes >= input.MaxRunes/2 {
+		writeError(writer, http.StatusBadRequest, "invalid_preview", "overlap_runes must be non-negative and less than half of max_runes")
+		return
+	}
+
+	chunks := (ingest.Chunker{MaxRunes: input.MaxRunes, OverlapRunes: input.OverlapRunes, PageAware: true}).Chunk(domain.Document{
+		ID: "preview", Title: input.Title, Content: input.Content,
+	})
+	parents := make(map[string]struct{}, len(chunks))
+	pages := make(map[int]struct{}, len(chunks))
+	previewChunks := make([]documentPreviewChunk, 0, len(chunks))
+	for _, chunk := range chunks {
+		parents[chunk.ParentID] = struct{}{}
+		if chunk.SourcePage > 0 {
+			pages[chunk.SourcePage] = struct{}{}
+		}
+		previewChunks = append(previewChunks, documentPreviewChunk{
+			ID: chunk.ID, ParentID: chunk.ParentID, ParentSequence: chunk.ParentSequence,
+			SourcePage: chunk.SourcePage, Sequence: chunk.Sequence,
+			HeadingPath: append([]string(nil), chunk.HeadingPath...), Content: chunk.Content,
+			ParentContent: chunk.ParentContent,
+		})
+	}
+	pageList := make([]int, 0, len(pages))
+	for page := range pages {
+		pageList = append(pageList, page)
+	}
+	sort.Ints(pageList)
+	writeJSON(writer, http.StatusOK, map[string]any{
+		"chunker_version": "header-page-parent-v1",
+		"max_runes":       input.MaxRunes,
+		"overlap_runes":   input.OverlapRunes,
+		"parent_count":    len(parents),
+		"child_count":     len(previewChunks),
+		"pages":           pageList,
+		"chunks":          previewChunks,
+	})
 }
