@@ -50,6 +50,12 @@ type LifecycleService struct {
 	state lifecycleState
 }
 
+// Catalog exposes the lifecycle collection through the same metadata-only
+// inventory used by the operator UI.
+func (service *LifecycleService) Catalog(ctx context.Context) (Catalog, error) {
+	return (&Service{client: service.client, embedder: service.embedder, collection: service.config.Collection}).Catalog(ctx)
+}
+
 type LifecycleDocument struct {
 	ID             string   `json:"document_id"`
 	Title          string   `json:"title"`

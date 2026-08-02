@@ -30,6 +30,14 @@ npm run dev
 
 当前演示语料包含 23 篇 AcmeCloud 文档、78 个 Chunk，覆盖身份、报表、API、存储、计费、运维、安全和集成八个公开知识域；Tenant A/B 仍各自保留独立的运维知识库绑定。
 
+平台管理员登录后进入“知识库”页，可以在“向量库入库目录”看到当前生命周期 Collection 的实际库存：文档标题、文档 ID、产品/版本、可见性、每篇文档的 Chunk 数，以及 Collection、Embedding 模型、向量维度和总行数。目录接口只返回元数据，不返回正文，并且服务端只允许 `platform_admin` 访问：
+
+```text
+GET /api/v1/milvus/catalog
+```
+
+当前生产配置使用 DashScope OpenAI-compatible `text-embedding-v4`、1024 维向量，生命周期 Collection 为 `raglab_lifecycle_qwen_v4_1024`，别名为 `raglab_knowledge_qwen_v4_1024`。旧的 2560 维 Collection 保留用于回滚/对比，不会混入当前目录。
+
 ## 演示账号
 
 | 身份 | 邮箱 | 密码 |

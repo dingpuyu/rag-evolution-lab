@@ -48,6 +48,32 @@ type SeedResult struct {
 	Metric     string `json:"metric"`
 }
 
+// StoredDocument is the operator-facing projection of rows currently stored
+// in a vector collection. It intentionally contains metadata only; document
+// content remains available through authorized search/citation paths.
+type StoredDocument struct {
+	DocumentID       string `json:"document_id"`
+	Title            string `json:"title"`
+	TenantID         string `json:"tenant_id,omitempty"`
+	Product          string `json:"product,omitempty"`
+	Version          string `json:"version,omitempty"`
+	Status           string `json:"status,omitempty"`
+	Visibility       string `json:"visibility,omitempty"`
+	Chunks           int    `json:"chunks"`
+	IndexedAt        int64  `json:"indexed_at,omitempty"`
+	EmbeddingModel   string `json:"embedding_model,omitempty"`
+	EmbeddingVersion string `json:"embedding_version,omitempty"`
+}
+
+type Catalog struct {
+	Collection    string           `json:"collection"`
+	Embedder      string           `json:"embedder"`
+	Dimensions    int              `json:"dimensions"`
+	Rows          int64            `json:"rows"`
+	DocumentCount int              `json:"document_count"`
+	Documents     []StoredDocument `json:"documents"`
+}
+
 type Query struct {
 	Text    string `json:"query"`
 	Tenant  string `json:"tenant_id"`
@@ -140,6 +166,55 @@ func (s *Service) Status(ctx context.Context) (Status, error) {
 		status.IndexType = "HNSW"
 	}
 	return status, nil
+}
+
+// Catalog returns a metadata-only inventory of the active collection. It is
+// used by the operator UI to prove which documents have actually reached
+// Milvus without exposing full document content in a management response.
+func (s *Service) Catalog(ctx context.Context) (Catalog, error) {
+	status, err := s.Status(ctx)
+	if err != nil {
+		return Catalog{}, err
+	}
+	entities, err := s.client.QueryEntities(ctx, s.collection, "source_revision > 0", 16_384)
+	if err != nil {
+		return Catalog{}, fmt.Errorf("list stored documents: %w", err)
+	}
+	byDocument := make(map[string]*StoredDocument, len(entities))
+	for _, entity := range entities {
+		documentID := strings.TrimSpace(entity.DocumentID)
+		if documentID == "" {
+			continue
+		}
+		document := byDocument[documentID]
+		if document == nil {
+			document = &StoredDocument{
+				DocumentID: documentID, Title: entity.Title, TenantID: entity.TenantID,
+				Product: entity.Product, Version: entity.Version, Status: entity.Status,
+				Visibility: entity.Visibility, IndexedAt: entity.IndexedAt,
+				EmbeddingModel: entity.EmbeddingModel, EmbeddingVersion: entity.EmbeddingVer,
+			}
+			byDocument[documentID] = document
+		}
+		document.Chunks++
+		if entity.IndexedAt > document.IndexedAt {
+			document.IndexedAt = entity.IndexedAt
+		}
+	}
+	documents := make([]StoredDocument, 0, len(byDocument))
+	for _, document := range byDocument {
+		documents = append(documents, *document)
+	}
+	sort.SliceStable(documents, func(i, j int) bool {
+		if documents[i].Title == documents[j].Title {
+			return documents[i].DocumentID < documents[j].DocumentID
+		}
+		return documents[i].Title < documents[j].Title
+	})
+	return Catalog{
+		Collection: status.Collection, Embedder: status.Embedder, Dimensions: status.Dimensions,
+		Rows: status.RowCount, DocumentCount: len(documents), Documents: documents,
+	}, nil
 }
 
 func (s *Service) Seed(ctx context.Context, chunks []domain.Chunk) (SeedResult, error) {

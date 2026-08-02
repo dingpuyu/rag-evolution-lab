@@ -65,8 +65,9 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		datasetStore = datasetaccess.Defaults()
 	}
 	registerEmbeddingRoutes(mux, &EmbeddingAPI{service: embeddingService})
-	vectorAPI := &MilvusAPI{service: milvusService}
+	vectorAPI := &MilvusAPI{service: milvusService, lifecycle: lifecycleService}
 	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
+	catalog := http.Handler(http.HandlerFunc(vectorAPI.catalog))
 	vectorSearch := http.Handler(http.HandlerFunc(vectorAPI.search))
 	var authenticator *authAPI
 	if enterprise.Verifier != nil {
@@ -83,8 +84,10 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		}
 		mux.Handle("GET /api/v1/auth/me", authenticator.requireIdentity(http.HandlerFunc(authenticator.me)))
 		mux.Handle("GET /api/v1/audit/recent", authenticator.requireIdentity(http.HandlerFunc(authenticator.recentAudit)))
+		catalog = authenticator.requireIdentity(catalog)
 		vectorSearch = authenticator.requireIdentity(vectorSearch)
 	}
+	mux.Handle("GET /api/v1/milvus/catalog", catalog)
 	mux.Handle("POST /api/v1/milvus/search", vectorSearch)
 	if scaleService != nil {
 		scaleAPI := &ScaleAPI{service: scaleService}
@@ -209,7 +212,8 @@ func registerEmbeddingRoutes(mux *http.ServeMux, api *EmbeddingAPI) {
 }
 
 type MilvusAPI struct {
-	service *milvus.Service
+	service   *milvus.Service
+	lifecycle *milvus.LifecycleService
 }
 
 type ScaleAPI struct {
@@ -223,6 +227,28 @@ func (a *MilvusAPI) status(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	writeJSON(writer, http.StatusOK, status)
+}
+
+func (a *MilvusAPI) catalog(writer http.ResponseWriter, request *http.Request) {
+	identity := identityFromContext(request.Context())
+	if identity.Subject != "" && !identity.HasRole("platform_admin") {
+		writeError(writer, http.StatusForbidden, "catalog_forbidden", "stored document catalog requires platform_admin")
+		return
+	}
+	var (
+		catalog milvus.Catalog
+		err     error
+	)
+	if a.lifecycle != nil {
+		catalog, err = a.lifecycle.Catalog(request.Context())
+	} else {
+		catalog, err = a.service.Catalog(request.Context())
+	}
+	if err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "milvus_catalog_unavailable", err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, catalog)
 }
 
 func (a *MilvusAPI) search(writer http.ResponseWriter, request *http.Request) {

@@ -121,6 +121,12 @@ type Record struct {
 type Entity struct {
 	ChunkID        string `json:"chunk_id"`
 	DocumentID     string `json:"document_id"`
+	Title          string `json:"title"`
+	TenantID       string `json:"tenant_id"`
+	Product        string `json:"product"`
+	Version        string `json:"version"`
+	Status         string `json:"status"`
+	Visibility     string `json:"visibility"`
 	ContentHash    string `json:"content_hash"`
 	EmbeddingModel string `json:"embedding_model"`
 	EmbeddingVer   string `json:"embedding_version"`
@@ -360,8 +366,8 @@ func (c *Client) QueryEntities(ctx context.Context, collection, filter string, l
 		"collectionName": collection,
 		"filter":         filter,
 		"outputFields": []string{
-			"chunk_id", "document_id", "content_hash", "embedding_model", "embedding_version",
-			"document_version", "source_revision", "indexed_at",
+			"chunk_id", "document_id", "title", "tenant_id", "product", "version", "status", "visibility",
+			"content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at",
 		},
 		"limit":            limit,
 		"consistencyLevel": "Strong",
