@@ -1,0 +1,35 @@
+.agent-chat-layout .workspace-strip{align-items:flex-end}
+.agent-scope-selectors{display:flex;gap:8px;align-items:flex-end;flex:none}
+.agent-scope-selectors label{display:grid;gap:5px;color:#8090a6;font-size:9px;letter-spacing:.04em}
+.agent-scope-selectors select{min-width:150px}
+.agent-chat-layout .message-body,.agent-answer-meta{max-width:760px}
+.agent-confirm-row{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:10px 11px;border:1px solid #f0dfbf;background:#fffaf0;border-radius:8px;color:#a77a3f;font-size:10px}
+.agent-confirm-row .primary-button{white-space:nowrap}
+.agent-trace-summary{display:flex;align-items:center;gap:8px;margin:17px 0 12px}
+.agent-trace-summary small{color:#8e9caf;font-size:9px}
+.agent-trace-list{padding:13px 14px}
+.agent-trace-list .binding-proof-row{display:block;padding:11px 0}
+.agent-trace-list .binding-proof-row strong,.agent-trace-list .binding-proof-row span,.agent-trace-list .binding-proof-row small{display:block}
+.agent-trace-list .binding-proof-row span{margin-top:5px;line-height:1.5}
+.agent-trace-list .binding-proof-row small{margin-top:5px;color:#58a783}
+.agent-tool-strip{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:14px}
+.agent-tool-strip span{font-size:9px;color:#98a5b5;margin-right:3px}
+.agent-tool-strip code{padding:4px 6px;border-radius:4px;background:#eef4ff;color:#6080bb;font:9px var(--font-geist-mono)}
+.agent-trace-confirm{width:100%;margin-top:14px}
+.agent-trace-citations{display:block;margin-top:15px}
+.agent-trace-citations>span{display:block;margin-bottom:7px}
+.agent-trace-citations button{display:block;width:100%;text-align:left;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.agent-chat-layout .composer-bottom>span{max-width:62%;line-height:1.5}
+@media (max-width: 900px){
+  .agent-scope-selectors select{min-width:115px}
+  .agent-chat-layout .workspace-strip{align-items:flex-start}
+  .agent-scope-selectors{flex-wrap:wrap;justify-content:flex-end}
+}
+@media (max-width: 700px){
+  .agent-chat-layout .workspace-strip{display:block}
+  .agent-scope-selectors{display:grid;grid-template-columns:1fr 1fr;margin-top:15px;justify-content:stretch}
+  .agent-scope-selectors label,.agent-scope-selectors select{width:100%}
+  .agent-chat-layout .composer-bottom>span{max-width:50%}
+  .agent-confirm-row{display:block}
+  .agent-confirm-row .primary-button{margin-top:9px;width:100%}
+}

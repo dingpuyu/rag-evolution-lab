@@ -13,7 +13,7 @@ cp .env.example .env
 make stack-up
 ```
 
-然后打开 <http://localhost:3000/portal>。默认档位使用确定性 Hash Embedding 和抽取式回答，不依赖外部模型；接入本地 Ollama 与 DeepSeek 的配置、端口冲突处理、数据卷和清理方式见 [一键部署指南](docs/quick-deploy.md)。主流程体验步骤见 [RAG 主流程体验指南](docs/rag-core-demo.md)。
+然后打开 <http://localhost:3000/portal>（如果你在 `.env` 中使用了 `RAGLAB_WEB_PORT=13000`，则打开 `http://localhost:13000/portal`）。默认档位使用确定性 Hash Embedding 和抽取式回答，不依赖外部模型；接入本地 Ollama 与 DeepSeek 的配置、端口冲突处理、数据卷和清理方式见 [一键部署指南](docs/quick-deploy.md)。主流程体验步骤见 [RAG 主流程体验指南](docs/rag-core-demo.md)，完整 Agent 对话体验见 [Agent 对话工作台](docs/agent-chat-demo.md)。
 
 ## 项目目标
 
