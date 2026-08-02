@@ -179,7 +179,8 @@
 - [ ] 同一知识库被多个 Agent 复用时的策略隔离
 - [ ] Index Build / Published Index / Rollback 发布模型
 - [ ] 应用级配额、限流、成本和质量 SLO
-- [ ] Go、Spring AI、LangChain、MCP 的薄适配器示例
+- [ ] Python + LangGraph 主 Agent 适配器（LangChain 负责模型/工具）
+- [ ] Go 兼容运行时、Spring AI 和 MCP 薄适配器示例
 
 ### 完成条件
 
@@ -196,12 +197,13 @@
 
 当前 Agent 不做泛化聊天 Demo，而是围绕真实客服/运维流程构建一条受控闭环：
 
-- [ ] DeepSeek 结构化 Planner
-- [ ] Go Agent Loop、最大步数和循环保护
+- [x] DeepSeek 结构化 Planner（当前 Go 基线）
+- [x] Go Agent Loop、最大步数和循环保护（兼容/降级运行时）
 - [ ] Knowledge Gateway RAG Tool
 - [ ] Service Status / Account Access 只读工具
 - [ ] Ticket Draft 待确认工具
 - [ ] Agent Trace 与工具审计
+- [ ] Python + LangGraph 主 Agent 服务
 - [ ] LangChain / Spring AI / MCP 上层调用示例
 
 完成标准：同一个用户问题能够展示“意图 → 工具 → 观察 → 最终回答”的完整链路；专有知识回答带服务端引用；跨租户和未确认写操作均被拒绝；DeepSeek 不可用时不会静默执行危险工具。

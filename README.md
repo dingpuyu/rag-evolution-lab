@@ -174,9 +174,9 @@ PostgreSQL 多租户控制面首版已完成：
 - `Application` 表示一个可独立发布的 Agent 产品，和知识库解耦；
 - `Knowledge Binding` 表示应用对知识库的授权、范围和检索策略；
 - `Environment`、`Index Build`、`Published Index` 支持开发/生产隔离和可回滚发布；
-- 后续以统一 Knowledge Gateway 承接 Go Agent、Spring AI、LangChain 和 MCP 适配器。
+- 后续以统一 Knowledge Gateway 承接 Python + LangGraph 主 Agent、Go 兼容运行时，以及可选的 Spring AI/MCP 适配器。
 
-Agent 业务垂直切片的目标已经确定为企业 IT 服务台：DeepSeek 负责结构化决策，Go Agent Loop 负责有限步执行，Knowledge Gateway 负责授权 RAG，工具调用默认只读或生成待确认工单草稿。LangChain、Spring AI 和 MCP 属于上层适配器，不作为底层 RAG 的强耦合依赖，具体边界见 [企业 IT 服务台 Agent 方案](docs/agent-business-architecture.md)。
+Agent 业务垂直切片的目标已经确定为企业 IT 服务台：Python + LangGraph 负责主编排，LangChain 负责模型/工具适配，DeepSeek 负责结构化决策与生成，Go Knowledge Gateway 负责授权 RAG，工具调用默认只读或生成待确认工单草稿。Go Agent Loop 作为兼容/降级运行时保留；Spring AI 和 MCP 作为后续接入方式，不作为底层 RAG 的强耦合依赖，具体边界见 [企业 IT 服务台 Agent 方案](docs/agent-business-architecture.md)。
 
 P1 应用控制面已完成：
 

@@ -5,22 +5,22 @@
 ## 技术定位
 
 ```text
-LangChain / Spring AI / Go Agent / MCP（上层适配器）
+Python Agent Service（LangGraph + LangChain，主编排层）
                              │ REST / SSE / App Credential
                              ▼
-                    Knowledge Gateway
+                    Knowledge Gateway（Go）
                              │
               ┌──────────────┴──────────────┐
               │                             │
-        Go Agent Loop                  Enterprise RAG
-   Planner → Tool → Observation   Milvus + BM25 + RRF + Rerank
+       Go Agent Loop（兼容/降级）       Enterprise RAG
+                                  Milvus + BM25 + RRF + Rerank
               │                             │
               └──────────────┬──────────────┘
                              ▼
                     DeepSeek API（规划/生成）
 ```
 
-核心检索和权限链路继续由 Go 自研，不引入 LangChain 作为底层依赖。LangChain 作为后续上层 Agent 适配器：它可以调用本项目的 Gateway，而不直接拼接 Milvus Filter 或绕过租户权限。这样既能验证 LangChain/LangGraph 的使用能力，也保留生产 RAG 的可控性和可解释性。
+核心检索和权限链路继续由 Go 实现，但正式 Agent 编排以 Python + LangGraph 为主：LangChain 负责模型、工具和结构化输出适配，LangGraph 负责状态、分支、循环、人工确认和恢复执行。Go Agent Loop 保留为兼容/降级运行时和回归基线。未来如需 Java 接入，使用 Spring AI 调用同一 Gateway，不复制 RAG 逻辑。
 
 ## 第一条业务闭环：IT 服务台
 
