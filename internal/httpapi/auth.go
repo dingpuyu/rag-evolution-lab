@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/agent"
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
@@ -39,6 +40,7 @@ type EnterpriseOptions struct {
 	QueryTraceStore    querytrace.Store
 	IndexBuilds        *indexbuild.Service
 	Generator          generation.Generator
+	AgentPlanner       agent.Planner
 	Tracer             trace.Tracer
 	Cost               *cost.Calculator
 	Limiter            ratelimit.Gate

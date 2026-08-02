@@ -26,6 +26,22 @@ type OpenAICompatibleGenerator struct {
 	NumPredict int
 }
 
+// StructuredGeneration is the provider-neutral response used by the Agent
+// planner. It intentionally exposes only JSON text and accounting metadata;
+// the Agent package owns the action schema and validation.
+type StructuredGeneration struct {
+	Content   string
+	Model     string
+	Usage     Usage
+	LatencyMS float64
+}
+
+// StructuredGenerator is the small optional capability needed by an Agent
+// planner. Grounded answer generation remains available through Generator.
+type StructuredGenerator interface {
+	GenerateStructured(context.Context, string, string) (StructuredGeneration, error)
+}
+
 func (generator OpenAICompatibleGenerator) Name() string {
 	provider := strings.TrimSpace(generator.Provider)
 	if provider == "" {
@@ -40,6 +56,87 @@ func (generator OpenAICompatibleGenerator) Generate(ctx context.Context, request
 
 func (generator OpenAICompatibleGenerator) GenerateStream(ctx context.Context, request Request, sink func(GenerationStreamEvent) error) (Generation, error) {
 	return generator.generate(ctx, request, true, sink)
+}
+
+// GenerateStructured asks an OpenAI-compatible endpoint for a JSON object
+// without coupling the endpoint to the grounded-answer schema. This is used
+// for bounded Agent planning, where the server validates the action before any
+// tool can execute.
+func (generator OpenAICompatibleGenerator) GenerateStructured(ctx context.Context, systemPrompt, userMessage string) (StructuredGeneration, error) {
+	if strings.TrimSpace(generator.APIKey) == "" {
+		return StructuredGeneration{}, fmt.Errorf("%s API key is not configured", generator.Name())
+	}
+	if strings.TrimSpace(generator.Model) == "" {
+		return StructuredGeneration{}, fmt.Errorf("%s model must not be empty", generator.Name())
+	}
+	if strings.TrimSpace(systemPrompt) == "" || strings.TrimSpace(userMessage) == "" {
+		return StructuredGeneration{}, fmt.Errorf("structured generation prompts must not be empty")
+	}
+	maxTokens := generator.NumPredict
+	if maxTokens <= 0 {
+		maxTokens = 512
+	}
+	payload, err := json.Marshal(map[string]any{
+		"model": generator.Model,
+		"messages": []map[string]string{
+			{"role": "system", "content": systemPrompt},
+			{"role": "user", "content": userMessage},
+		},
+		"response_format": map[string]string{"type": "json_object"},
+		"stream":          false,
+		"temperature":     0,
+		"max_tokens":      maxTokens,
+	})
+	if err != nil {
+		return StructuredGeneration{}, fmt.Errorf("encode %s structured request: %w", generator.Name(), err)
+	}
+	baseURL := strings.TrimRight(strings.TrimSpace(generator.BaseURL), "/")
+	if baseURL == "" {
+		baseURL = "https://api.deepseek.com"
+	}
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/chat/completions", bytes.NewReader(payload))
+	if err != nil {
+		return StructuredGeneration{}, fmt.Errorf("create %s structured request: %w", generator.Name(), err)
+	}
+	httpRequest.Header.Set("Content-Type", "application/json")
+	httpRequest.Header.Set("Authorization", "Bearer "+strings.TrimSpace(generator.APIKey))
+	client := generator.Client
+	if client == nil {
+		timeout := generator.Timeout
+		if timeout <= 0 {
+			timeout = 2 * time.Minute
+		}
+		client = &http.Client{Timeout: timeout}
+	}
+	started := time.Now()
+	response, err := client.Do(httpRequest)
+	if err != nil {
+		return StructuredGeneration{}, fmt.Errorf("call %s structured chat: %w", generator.Name(), err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(response.Body, 16<<10))
+		return StructuredGeneration{}, fmt.Errorf("%s structured chat returned %s: %s", generator.Name(), response.Status, strings.TrimSpace(string(body)))
+	}
+	var decoded openAIChatResponse
+	if err := json.NewDecoder(response.Body).Decode(&decoded); err != nil {
+		return StructuredGeneration{}, fmt.Errorf("decode %s structured response: %w", generator.Name(), err)
+	}
+	if len(decoded.Choices) == 0 {
+		return StructuredGeneration{}, fmt.Errorf("%s structured response contains no choices", generator.Name())
+	}
+	model := decoded.Model
+	if model == "" {
+		model = generator.Model
+	}
+	var usage Usage
+	if decoded.Usage != nil {
+		usage = Usage{PromptTokens: decoded.Usage.PromptTokens, CompletionTokens: decoded.Usage.CompletionTokens}
+	}
+	return StructuredGeneration{
+		Content: decoded.Choices[0].Message.Content,
+		Model:   model, Usage: usage, LatencyMS: milliseconds(time.Since(started)),
+	}, nil
 }
 
 type openAIChatResponse struct {

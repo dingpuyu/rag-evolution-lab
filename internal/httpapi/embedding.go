@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/agent"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
@@ -145,6 +146,25 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			mux.Handle("POST /api/v1/apps/{app_id}/query", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.query)))
 			mux.Handle("POST /api/v1/apps/{app_id}/answer", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.answer)))
 			mux.Handle("POST /api/v1/apps/{app_id}/answer/stream", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.answerStream)))
+			planner := enterprise.AgentPlanner
+			if planner == nil {
+				planner = agent.NewPlanner(generator)
+			}
+			agentService, agentErr := agent.NewService(agent.Config{
+				Planner: planner,
+				Tools: []agent.Tool{
+					agent.KnowledgeAnswerTool{Service: gateway},
+					agent.ServiceStatusTool{Reader: agent.StaticServiceStatus{
+						"acmecloud": {Service: "acmecloud", Status: "operational", Message: "核心服务当前运行正常"},
+					}},
+					agent.AccountAccessTool{}, agent.TicketDraftTool{},
+				},
+			})
+			if agentErr != nil {
+				return nil, agentErr
+			}
+			agentAPI := &AgentAPI{service: agentService}
+			mux.Handle("POST /api/v1/apps/{app_id}/agent/answer", authenticator.requireIdentity(http.HandlerFunc(agentAPI.answer)))
 			if enterprise.QueryTraceStore != nil {
 				gatewayAPI.traces = enterprise.QueryTraceStore
 				mux.Handle("GET /api/v1/apps/{app_id}/traces/{trace_id}", authenticator.requireIdentity(http.HandlerFunc(gatewayAPI.trace)))

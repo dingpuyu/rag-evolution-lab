@@ -192,6 +192,22 @@
 
 平台化资源的正式边界见 [Agent 知识基础设施架构](knowledge-platform-architecture.md)。
 
+## Phase 6：企业 IT 服务台 Agent
+
+当前 Agent 不做泛化聊天 Demo，而是围绕真实客服/运维流程构建一条受控闭环：
+
+- [ ] DeepSeek 结构化 Planner
+- [ ] Go Agent Loop、最大步数和循环保护
+- [ ] Knowledge Gateway RAG Tool
+- [ ] Service Status / Account Access 只读工具
+- [ ] Ticket Draft 待确认工具
+- [ ] Agent Trace 与工具审计
+- [ ] LangChain / Spring AI / MCP 上层调用示例
+
+完成标准：同一个用户问题能够展示“意图 → 工具 → 观察 → 最终回答”的完整链路；专有知识回答带服务端引用；跨租户和未确认写操作均被拒绝；DeepSeek 不可用时不会静默执行危险工具。
+
+详细设计见 [企业 IT 服务台 Agent 方案](agent-business-architecture.md)。
+
 ## 每阶段 Git 约定
 
 推荐使用小提交：

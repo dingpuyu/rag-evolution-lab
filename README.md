@@ -176,6 +176,8 @@ PostgreSQL 多租户控制面首版已完成：
 - `Environment`、`Index Build`、`Published Index` 支持开发/生产隔离和可回滚发布；
 - 后续以统一 Knowledge Gateway 承接 Go Agent、Spring AI、LangChain 和 MCP 适配器。
 
+Agent 业务垂直切片的目标已经确定为企业 IT 服务台：DeepSeek 负责结构化决策，Go Agent Loop 负责有限步执行，Knowledge Gateway 负责授权 RAG，工具调用默认只读或生成待确认工单草稿。LangChain、Spring AI 和 MCP 属于上层适配器，不作为底层 RAG 的强耦合依赖，具体边界见 [企业 IT 服务台 Agent 方案](docs/agent-business-architecture.md)。
+
 P1 应用控制面已完成：
 
 - `/api/v1/apps` 管理独立 Agent Application；
@@ -256,6 +258,7 @@ Rerank、Context 与引用门禁的首轮失败实验见 [Phase 5 Report](eval/r
 - [100K Milvus 规模验证与自我改进](docs/scale-benchmark-100k.md)
 - [Milvus 100K 网页交互实验室](docs/milvus-100k-web-lab.md)
 - [企业RAG身份、权限与审计闭环](docs/enterprise-rag-security.md)
+- [企业 IT 服务台 Agent 方案](docs/agent-business-architecture.md)
 - [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 - [PostgreSQL多租户控制面](docs/postgres-control-plane.md)
 - [企业RAG增量索引与删除一致性](docs/incremental-index-lifecycle.md)
