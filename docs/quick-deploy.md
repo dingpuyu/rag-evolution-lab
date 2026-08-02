@@ -84,7 +84,46 @@ Compose 已为 API 容器配置 `host.docker.internal`；Linux Docker 环境也�
 make stack-up
 ```
 
-## 4. 与已有本地服务并存
+## 4. 接入 DeepSeek 生成 + Qwen Embedding
+
+生成和向量化是两条独立的 Provider 链路。上层 Agent、RAG Gateway 和门户只依赖统一的生成/Embedding 接口，不需要感知模型厂商；因此可以用 DeepSeek 负责回答，用 TokenHub 或企业内部 OpenAI-compatible 网关提供 Qwen Embedding。
+
+以 TokenHub 的 Qwen3 Embedding 4B 为例，在 `.env` 中配置：
+
+```dotenv
+RAGLAB_EMBEDDING_BACKEND=openai-compatible
+RAGLAB_EMBEDDING_BASE_URL=https://tokenhub.tencentmaas.com/v1
+RAGLAB_EMBEDDING_API_KEY=替换为你的Embedding服务token
+RAGLAB_EMBEDDING_MODEL=kinfra-text-embedding-4b
+RAGLAB_EMBEDDING_DIMENSIONS=2560
+RAGLAB_QUERY_INSTRUCTION=Given a user query, retrieve passages that directly answer it
+
+RAGLAB_GENERATION_PROVIDER=deepseek
+RAGLAB_GENERATION_BASE_URL=https://api.deepseek.com
+RAGLAB_GENERATION_API_KEY=替换为你的DeepSeek token
+RAGLAB_GENERATION_MODEL=deepseek-chat
+```
+
+切换 Embedding 模型、维度或版本后，必须使用新的 Milvus Collection/索引版本完成回填，再通过 Alias 发布；不能把旧向量和新向量混写。建议同时设置：
+
+```dotenv
+RAGLAB_EMBEDDING_VERSION=qwen3-embedding-4b-tokenhub-v1
+```
+
+验证 Embedding 适配器而不启动完整门户：
+
+```bash
+RAGLAB_EMBEDDING_BACKEND=openai-compatible \
+RAGLAB_EMBEDDING_BASE_URL=https://tokenhub.tencentmaas.com/v1 \
+RAGLAB_EMBEDDING_API_KEY="$TOKENHUB_API_KEY" \
+RAGLAB_EMBEDDING_MODEL=kinfra-text-embedding-4b \
+RAGLAB_EMBEDDING_DIMENSIONS=2560 \
+go run ./cmd/raglab serve-embedding --backend openai-compatible --addr 127.0.0.1:18081
+```
+
+这样做的关键点是：LLM 的失败重试、回答提示词和 Agent 编排不与 Embedding 供应商耦合；Embedding 维度、模型版本和 Milvus Collection 则由索引生命周期门禁统一管理。
+
+## 5. 与已有本地服务并存
 
 如果本机已有 8080、3000、19530、9091 或 5433 被占用，可以使用另一组端口。网页在构建时需要知道 API 的宿主机地址：
 
