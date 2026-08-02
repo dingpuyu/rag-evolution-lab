@@ -23,6 +23,7 @@ type Runtime struct {
 
 type Options struct {
 	OllamaModel       string
+	OllamaDimensions  int
 	OllamaURL         string
 	QueryInstruction  string
 	EmbeddingCacheDir string
@@ -88,6 +89,7 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
 			BaseURL:          options.OllamaURL,
 			Model:            options.OllamaModel,
+			Dimensions:       options.OllamaDimensions,
 			QueryInstruction: options.QueryInstruction,
 		}
 		if options.EmbeddingCacheDir != "" {

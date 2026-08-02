@@ -87,6 +87,7 @@ func main() {
 	}
 	runtime, err := app.BuildWithOptions(context.Background(), filepath.Join(root, "datasets", "corpus", "acmecloud"), app.Options{
 		OllamaModel:       ollamaModel,
+		OllamaDimensions:  environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"),
 		OllamaURL:         os.Getenv("RAGLAB_OLLAMA_URL"),
 		QueryInstruction:  os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
 		EmbeddingCacheDir: filepath.Join(root, "data", "cache", "embeddings"),
@@ -133,7 +134,8 @@ func runEmbeddingServer(args []string) {
 
 	embedder, err := newLabEmbedder(labEmbedderConfig{
 		Backend: *backend, OllamaURL: *ollamaURL, OllamaModel: *model, QueryInstruction: *queryInstruction,
-		HashDimensions: *dimensions, OpenAIBaseURL: *openAIBaseURL, OpenAIAPIKey: *openAIKey,
+		OllamaDimensions: *openAIDimensions,
+		HashDimensions:   *dimensions, OpenAIBaseURL: *openAIBaseURL, OpenAIAPIKey: *openAIKey,
 		OpenAIModel: *openAIModel, OpenAIDimensions: *openAIDimensions,
 	})
 	if err != nil {
@@ -207,7 +209,8 @@ func runMilvusSeed(args []string) {
 	}
 	embedder, err := newLabEmbedder(labEmbedderConfig{
 		Backend: *backend, OllamaURL: *ollamaURL, OllamaModel: *model, QueryInstruction: *queryInstruction,
-		HashDimensions: *hashDimensions, OpenAIBaseURL: *baseURL, OpenAIAPIKey: *apiKey,
+		OllamaDimensions: *embeddingDimensions,
+		HashDimensions:   *hashDimensions, OpenAIBaseURL: *baseURL, OpenAIAPIKey: *apiKey,
 		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions,
 	})
 	if err != nil {
@@ -371,8 +374,9 @@ func runLabServer(args []string) {
 
 	embedder, err := newLabEmbedder(labEmbedderConfig{
 		Backend: *embeddingBackend, OllamaURL: *ollamaURL, OllamaModel: *model, QueryInstruction: *queryInstruction,
-		HashDimensions: *hashDimensions,
-		OpenAIBaseURL:  *embeddingBaseURL, OpenAIAPIKey: *embeddingAPIKey,
+		OllamaDimensions: *embeddingDimensions,
+		HashDimensions:   *hashDimensions,
+		OpenAIBaseURL:    *embeddingBaseURL, OpenAIAPIKey: *embeddingAPIKey,
 		OpenAIModel: *embeddingModel, OpenAIDimensions: *embeddingDimensions,
 	})
 	if err != nil {
@@ -632,6 +636,7 @@ type labEmbedderConfig struct {
 	Backend          string
 	OllamaURL        string
 	OllamaModel      string
+	OllamaDimensions int
 	QueryInstruction string
 	HashDimensions   int
 	OpenAIBaseURL    string
@@ -655,7 +660,7 @@ func newLabEmbedder(config labEmbedderConfig) (retrieval.Embedder, error) {
 		if strings.TrimSpace(config.OllamaModel) == "" {
 			return nil, fmt.Errorf("RAGLAB_OLLAMA_MODEL is required for the ollama embedding backend")
 		}
-		return retrieval.OllamaEmbedder{BaseURL: config.OllamaURL, Model: config.OllamaModel, QueryInstruction: config.QueryInstruction}, nil
+		return retrieval.OllamaEmbedder{BaseURL: config.OllamaURL, Model: config.OllamaModel, Dimensions: config.OllamaDimensions, QueryInstruction: config.QueryInstruction}, nil
 	case "hash", "deterministic":
 		if config.HashDimensions <= 0 {
 			return nil, fmt.Errorf("hash embedding dimensions must be positive")

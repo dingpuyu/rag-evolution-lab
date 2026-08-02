@@ -41,6 +41,7 @@ func (h HashEmbedder) EmbedQuery(_ context.Context, text string) ([]float64, err
 type OllamaEmbedder struct {
 	BaseURL          string
 	Model            string
+	Dimensions       int
 	QueryInstruction string
 	Client           *http.Client
 }
@@ -74,9 +75,10 @@ func (o OllamaEmbedder) embed(ctx context.Context, texts []string) ([][]float64,
 		baseURL = "http://127.0.0.1:11434"
 	}
 	payload, err := json.Marshal(struct {
-		Model string   `json:"model"`
-		Input []string `json:"input"`
-	}{Model: o.Model, Input: texts})
+		Model      string   `json:"model"`
+		Input      []string `json:"input"`
+		Dimensions int      `json:"dimensions,omitempty"`
+	}{Model: o.Model, Input: texts, Dimensions: o.Dimensions})
 	if err != nil {
 		return nil, fmt.Errorf("encode ollama request: %w", err)
 	}
@@ -115,6 +117,9 @@ func (o OllamaEmbedder) embed(ctx context.Context, texts []string) ([][]float64,
 		if len(vector) != dimensions {
 			return nil, fmt.Errorf("ollama embedding %d has %d dimensions, expected %d", index, len(vector), dimensions)
 		}
+	}
+	if o.Dimensions > 0 && dimensions != o.Dimensions {
+		return nil, fmt.Errorf("ollama returned %d dimensions, expected configured %d", dimensions, o.Dimensions)
 	}
 	return decoded.Embeddings, nil
 }

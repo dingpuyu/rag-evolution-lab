@@ -38,6 +38,28 @@ func TestOllamaEmbedderBatchesInputs(t *testing.T) {
 	}
 }
 
+func TestOllamaEmbedderRequestsConfiguredDimensions(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var payload struct {
+			Dimensions int `json:"dimensions"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Dimensions != 1024 {
+			t.Fatalf("expected dimensions=1024, got %d", payload.Dimensions)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"embeddings":[[1,0,0]]}`))
+	}))
+	defer server.Close()
+
+	embedder := OllamaEmbedder{BaseURL: server.URL, Model: "test-embedding", Dimensions: 1024, Client: server.Client()}
+	if _, err := embedder.EmbedQuery(context.Background(), "query"); err == nil {
+		t.Fatal("expected configured dimension validation error")
+	}
+}
+
 func TestOllamaEmbedderRejectsInvalidVectorCount(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
 		writer.Header().Set("Content-Type", "application/json")
