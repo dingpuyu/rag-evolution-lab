@@ -320,6 +320,7 @@ func runLabServer(args []string) {
 	authAudience := flags.String("auth-audience", environmentOr("RAGLAB_AUTH_AUDIENCE", "raglab-api"), "JWT audience")
 	authOIDCIssuer := flags.String("auth-oidc-issuer", os.Getenv("RAGLAB_AUTH_OIDC_ISSUER"), "enterprise OIDC issuer; enables RS256/JWKS mode")
 	authJWKSURL := flags.String("auth-jwks-url", os.Getenv("RAGLAB_AUTH_JWKS_URL"), "optional direct JWKS URL; otherwise OIDC discovery is used")
+	requireOIDC := flags.Bool("require-oidc", environmentBool("RAGLAB_REQUIRE_OIDC", false), "fail startup unless enterprise OIDC/RS256 mode is configured")
 	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
 	platformAdminPassword := flags.String("platform-admin-password", environmentOr("RAGLAB_PLATFORM_ADMIN_PASSWORD", "RagLab-Platform-2026!"), "local-lab platform administrator password")
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
@@ -407,9 +408,11 @@ func runLabServer(args []string) {
 	var queryTraceStore querytrace.Store
 	var indexBuildStore indexbuild.Store
 	var ingestionRepository ingestionjob.Repository
+	var postgresStore *datasetaccess.PostgresStore
 	if strings.TrimSpace(*postgresURL) != "" {
 		controlPlaneContext, cancelControlPlane := context.WithTimeout(context.Background(), 10*time.Second)
-		postgresStore, postgresErr := datasetaccess.OpenPostgres(controlPlaneContext, *postgresURL)
+		var postgresErr error
+		postgresStore, postgresErr = datasetaccess.OpenPostgres(controlPlaneContext, *postgresURL)
 		cancelControlPlane()
 		if postgresErr != nil {
 			fatal(postgresErr)
@@ -517,10 +520,28 @@ func runLabServer(args []string) {
 			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, demo.roles); managerErr != nil {
 				fatal(managerErr)
 			}
+			if postgresStore != nil {
+				identity, authenticateErr := localAccounts.Authenticate(demo.email, demo.password)
+				if authenticateErr != nil {
+					fatal(authenticateErr)
+				}
+				if managerErr = postgresStore.ProvisionIdentity(context.Background(), identity); managerErr != nil {
+					fatal(managerErr)
+				}
+			}
 		}
 	}
+	if *requireOIDC && authMode != "oidc_rs256" {
+		fatal(fmt.Errorf("RAGLAB_REQUIRE_OIDC is enabled but enterprise OIDC/RS256 is not configured"))
+	}
+	var identityProvisioner auth.IdentityProvisioner
+	if devIssuer != nil && postgresStore != nil {
+		// Local accounts are an explicitly local-only bootstrap path. OIDC mode
+		// leaves provisioning to an invitation/admin workflow instead.
+		identityProvisioner = postgresStore
+	}
 	handler, err := httpapi.NewEnterpriseLabHandler(embeddingService, milvusService, scaleService, httpapi.EnterpriseOptions{
-		Verifier: verifier, DevIssuer: devIssuer, LocalAccounts: localAccounts,
+		Verifier: verifier, IdentityProvisioner: identityProvisioner, DevIssuer: devIssuer, LocalAccounts: localAccounts,
 		CredentialVerifier: func() auth.CredentialVerifier {
 			if postgresStore, ok := datasetStore.(*datasetaccess.PostgresStore); ok {
 				return postgresStore

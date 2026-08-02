@@ -38,8 +38,9 @@ OIDC / Local JWT
 - 复合主键：`tenant_id + subject`；
 - Role：`viewer`、`admin`、`platform_admin`；
 - Status：`active`、`revoked`；
-- 首次出现的可信 Claims 可以建立初始 Membership；
-- 已存在的 Membership 不会被后续请求自动覆盖或重新激活，因此数据库撤权可以生效。
+- Token Claims 只证明身份，不自动建立 Membership；邀请、管理员或本地 Demo Bootstrap 必须显式调用 ProvisionIdentity；
+- 普通请求只读校验 Tenant、User、Membership 的 active 状态，并要求数据库 Role 出现在当前 Token roles 中；
+- 已撤销或已降级的 Membership 不会被后续请求自动恢复，避免权限降级后复用旧 admin。
 
 ### Dataset
 
@@ -95,6 +96,8 @@ postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable
 4. 初始化 Platform、Tenant A、Tenant B；
 5. 初始化两个 Public Dataset 和两个 Tenant Dataset；
 6. 连接失败则拒绝启动，不静默退化为内存授权。
+
+本地 HS256 Demo 的三个账号由启动流程显式 Provision 到控制面；这只是本地引导。OIDC 生产模式不会因为请求第一次到达就自动写入用户或 Membership，必须通过邀请/管理员流程完成绑定。
 
 明确传入空`--postgres-url`时才使用只读内存 Catalog，适合单元测试和最小演示。
 

@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/base64"
@@ -25,6 +26,13 @@ type Identity struct {
 // provider. Both the local HMAC lab and enterprise OIDC implementations satisfy it.
 type Verifier interface {
 	VerifyAuthorization(value string) (Identity, error)
+}
+
+// IdentityProvisioner is intentionally separate from Verifier. A verified
+// OIDC token proves who a subject is; a control-plane provisioner decides
+// whether that subject is invited to a tenant and with which role.
+type IdentityProvisioner interface {
+	ProvisionIdentity(context.Context, Identity) error
 }
 
 func (identity Identity) HasRole(role string) bool {

@@ -24,6 +24,10 @@ func (api *DatasetAPI) list(writer http.ResponseWriter, request *http.Request) {
 	identity := identityFromContext(request.Context())
 	datasets, err := api.store.Visible(request.Context(), identity)
 	if err != nil {
+		if errors.Is(err, datasetaccess.ErrDatasetDenied) {
+			writeError(writer, http.StatusForbidden, "dataset_forbidden", "active tenant membership is required")
+			return
+		}
 		writeError(writer, http.StatusServiceUnavailable, "control_plane_unavailable", err.Error())
 		return
 	}
@@ -245,6 +249,10 @@ func (api *DatasetAPI) members(writer http.ResponseWriter, request *http.Request
 func (api *DatasetAPI) status(writer http.ResponseWriter, request *http.Request) {
 	status, err := api.store.Status(request.Context(), identityFromContext(request.Context()))
 	if err != nil {
+		if errors.Is(err, datasetaccess.ErrDatasetDenied) {
+			writeError(writer, http.StatusForbidden, "control_plane_forbidden", "active tenant membership is required")
+			return
+		}
 		writeError(writer, http.StatusServiceUnavailable, "control_plane_unavailable", err.Error())
 		return
 	}

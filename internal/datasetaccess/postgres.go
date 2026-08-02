@@ -136,6 +136,35 @@ func (store *PostgresStore) EnsureIdentity(ctx context.Context, identity auth.Id
 	if strings.TrimSpace(identity.Subject) == "" || strings.TrimSpace(identity.TenantID) == "" || identity.PrimaryRole() == "" {
 		return fmt.Errorf("verified subject, tenant and role are required")
 	}
+	var tenantStatus, userStatus, membershipRole, membershipStatus string
+	err := store.db.QueryRowContext(ctx, `
+		SELECT t.status, u.status, m.role, m.status
+		FROM tenants t
+		JOIN memberships m ON m.tenant_id=t.id AND m.subject=$2
+		JOIN users u ON u.subject=m.subject
+		WHERE t.id=$1`, identity.TenantID, identity.Subject).Scan(
+		&tenantStatus, &userStatus, &membershipRole, &membershipStatus)
+	if err == sql.ErrNoRows {
+		return ErrDatasetDenied
+	}
+	if err != nil {
+		return fmt.Errorf("check identity membership: %w", err)
+	}
+	if tenantStatus != "active" || userStatus != "active" || membershipStatus != "active" || !roleIncluded(identity.Roles, membershipRole) {
+		return ErrDatasetDenied
+	}
+	return nil
+}
+
+// ProvisionIdentity is an explicit control-plane mutation used by an invite
+// flow or a local-only demo bootstrap. It is never called implicitly during a
+// normal authenticated request. The update is deliberate: revoking or
+// changing a membership must replace the previous role rather than leave a
+// stale admin binding behind.
+func (store *PostgresStore) ProvisionIdentity(ctx context.Context, identity auth.Identity) error {
+	if strings.TrimSpace(identity.Subject) == "" || strings.TrimSpace(identity.TenantID) == "" || identity.PrimaryRole() == "" {
+		return fmt.Errorf("subject, tenant and role are required for provisioning")
+	}
 	tx, err := store.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -144,21 +173,31 @@ func (store *PostgresStore) EnsureIdentity(ctx context.Context, identity auth.Id
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO tenants (id, name, status) VALUES ($1, $2, 'active')
 		ON CONFLICT (id) DO NOTHING`, identity.TenantID, identity.TenantID); err != nil {
-		return fmt.Errorf("ensure tenant: %w", err)
+		return fmt.Errorf("provision tenant: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO users (subject, display_name, status) VALUES ($1, $2, 'active')
-		ON CONFLICT (subject) DO NOTHING`, identity.Subject, identity.Subject); err != nil {
-		return fmt.Errorf("ensure user: %w", err)
+		ON CONFLICT (subject) DO UPDATE SET status='active', display_name=EXCLUDED.display_name`, identity.Subject, identity.Subject); err != nil {
+		return fmt.Errorf("provision user: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		INSERT INTO memberships (tenant_id, subject, role, status)
 		VALUES ($1, $2, $3, 'active')
-		ON CONFLICT (tenant_id, subject) DO NOTHING`,
+		ON CONFLICT (tenant_id, subject) DO UPDATE SET
+			role=EXCLUDED.role, status='active', updated_at=now()`,
 		identity.TenantID, identity.Subject, identity.PrimaryRole()); err != nil {
-		return fmt.Errorf("ensure membership: %w", err)
+		return fmt.Errorf("provision membership: %w", err)
 	}
 	return tx.Commit()
+}
+
+func roleIncluded(roles []string, wanted string) bool {
+	for _, role := range roles {
+		if strings.EqualFold(strings.TrimSpace(role), strings.TrimSpace(wanted)) {
+			return true
+		}
+	}
+	return false
 }
 
 func (store *PostgresStore) Visible(ctx context.Context, identity auth.Identity) ([]Dataset, error) {

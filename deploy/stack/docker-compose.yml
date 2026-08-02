@@ -5,7 +5,7 @@ services:
     environment:
       POSTGRES_DB: raglab
       POSTGRES_USER: raglab
-      POSTGRES_PASSWORD: raglab-local
+      POSTGRES_PASSWORD: ${RAGLAB_POSTGRES_PASSWORD:-raglab-local}
     ports:
       - "127.0.0.1:${RAGLAB_POSTGRES_PORT:-5433}:5432"
     volumes:
@@ -55,8 +55,8 @@ services:
     image: minio/minio:RELEASE.2024-12-18T13-15-44Z
     restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
+      MINIO_ROOT_USER: ${RAGLAB_MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${RAGLAB_MINIO_ROOT_PASSWORD:-minioadmin}
     volumes:
       - raglab_stack_minio_data:/minio_data
     command: minio server /minio_data --console-address ":9001"
@@ -75,12 +75,16 @@ services:
     environment:
       ETCD_ENDPOINTS: etcd:2379
       MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: ${RAGLAB_MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_ACCESS_KEY: ${RAGLAB_MINIO_ROOT_PASSWORD:-minioadmin}
       MQ_TYPE: woodpecker
     volumes:
       - raglab_stack_milvus_data:/var/lib/milvus
     ports:
-      - "${RAGLAB_MILVUS_PORT:-19530}:19530"
-      - "${RAGLAB_MILVUS_HEALTH_PORT:-9091}:9091"
+      # Milvus is an internal data plane. The API container reaches it over
+      # the Compose network; host exposure is loopback-only for local labs.
+      - "127.0.0.1:${RAGLAB_MILVUS_PORT:-19530}:19530"
+      - "127.0.0.1:${RAGLAB_MILVUS_HEALTH_PORT:-9091}:9091"
     healthcheck:
       test: ["CMD", "curl", "--fail", "--silent", "http://localhost:9091/healthz"]
       interval: 15s
@@ -115,12 +119,13 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-${RAGLAB_GENERATION_API_KEY:-}}
       RAGLAB_GENERATION_BASE_URL: ${RAGLAB_GENERATION_BASE_URL:-https://api.deepseek.com}
       RAGLAB_GENERATION_MODEL: ${RAGLAB_GENERATION_MODEL:-deepseek-v4-pro}
-      RAGLAB_AUTH_SECRET: ${RAGLAB_AUTH_SECRET:-change-this-local-secret}
+      RAGLAB_AUTH_SECRET: ${RAGLAB_AUTH_SECRET:-raglab-local-development-secret-change-me}
       RAGLAB_PLATFORM_ADMIN_PASSWORD: ${RAGLAB_PLATFORM_ADMIN_PASSWORD:-change-this-admin-password}
       RAGLAB_AUTH_ISSUER: ${RAGLAB_AUTH_ISSUER:-raglab-local}
       RAGLAB_AUTH_AUDIENCE: ${RAGLAB_AUTH_AUDIENCE:-raglab-api}
       RAGLAB_AUTH_OIDC_ISSUER: ${RAGLAB_AUTH_OIDC_ISSUER:-}
       RAGLAB_AUTH_JWKS_URL: ${RAGLAB_AUTH_JWKS_URL:-}
+      RAGLAB_REQUIRE_OIDC: ${RAGLAB_REQUIRE_OIDC:-false}
       RAGLAB_OTEL_ENDPOINT: ${RAGLAB_OTEL_ENDPOINT:-}
       RAGLAB_OTEL_SERVICE_NAME: ${RAGLAB_OTEL_SERVICE_NAME:-rag-evolution-lab}
       RAGLAB_RATE_LIMIT_RPM: ${RAGLAB_RATE_LIMIT_RPM:-120}
@@ -131,8 +136,8 @@ services:
       RAGLAB_REDIS_PREFIX: ${RAGLAB_REDIS_PREFIX:-raglab:ratelimit}
       RAGLAB_COST_INPUT_USD_PER_1M: ${RAGLAB_COST_INPUT_USD_PER_1M:-0}
       RAGLAB_COST_OUTPUT_USD_PER_1M: ${RAGLAB_COST_OUTPUT_USD_PER_1M:-0}
-      RAGLAB_MILVUS_URL: http://milvus:19530
-      RAGLAB_POSTGRES_URL: postgres://raglab:raglab-local@postgres:5432/raglab?sslmode=disable
+      RAGLAB_MILVUS_URL: ${RAGLAB_MILVUS_URL:-http://milvus:19530}
+      RAGLAB_POSTGRES_URL: ${RAGLAB_POSTGRES_URL:-postgres://raglab:${RAGLAB_POSTGRES_PASSWORD:-raglab-local}@postgres:5432/raglab?sslmode=disable}
       RAGLAB_MILVUS_COLLECTION: ${RAGLAB_MILVUS_COLLECTION:-raglab_chunks_qwen3}
       RAGLAB_LIFECYCLE_COLLECTION: ${RAGLAB_LIFECYCLE_COLLECTION:-raglab_lifecycle_v1}
       RAGLAB_LIFECYCLE_ALIAS: ${RAGLAB_LIFECYCLE_ALIAS:-raglab_knowledge_active}

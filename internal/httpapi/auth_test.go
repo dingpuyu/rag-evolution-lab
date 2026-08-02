@@ -288,6 +288,48 @@ func TestEnterpriseProductionModeDoesNotExposeDevIssuer(t *testing.T) {
 	}
 }
 
+func TestEnterpriseOperationalAndEmbeddingRoutesRequireIdentity(t *testing.T) {
+	var filter string
+	handler := newEnterpriseTestHandler(t, &filter)
+	for _, test := range []struct {
+		method string
+		path   string
+		body   string
+	}{
+		{http.MethodGet, "/api/v1/milvus/status", ""},
+		{http.MethodGet, "/api/v1/milvus/scale/status", ""},
+		{http.MethodGet, "/api/v1/embeddings/info", ""},
+		{http.MethodPost, "/api/v1/embeddings/similarity", `{"text_a":"a","text_b":"b"}`},
+	} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(test.method, test.path, strings.NewReader(test.body)))
+		if response.Code != http.StatusUnauthorized {
+			t.Fatalf("unauthenticated internal route %s %s returned %d: %s", test.method, test.path, response.Code, response.Body.String())
+		}
+	}
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("healthz should remain public: %d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestApplicationCredentialPathScopeUsesExactRoutePrefix(t *testing.T) {
+	if !applicationCredentialPathAllowed("/api/v1/apps/support/query", "support") {
+		t.Fatal("expected exact application route prefix to be allowed")
+	}
+	for _, path := range []string{
+		"/api/v1/apps/supporting/query",
+		"/api/v1/other/apps/support/query",
+		"/api/v1/apps/support",
+	} {
+		if applicationCredentialPathAllowed(path, "support") {
+			t.Fatalf("path %q bypassed application credential prefix", path)
+		}
+	}
+}
+
 func issueTestPersona(t *testing.T, handler http.Handler, persona string) string {
 	t.Helper()
 	response := httptest.NewRecorder()

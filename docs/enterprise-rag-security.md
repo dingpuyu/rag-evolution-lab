@@ -198,3 +198,14 @@ Tenant和Role缺失时不会回退为更宽权限。Viewer调用Admin场景返�
 - Canary索引与自动回滚门禁。
 
 当前版本已经具备“企业IdP签发Token → OIDC/JWKS验签 → 可信Claims → 接口授权 → Milvus Pre-ANN ACL → Request ID审计”的纵向证据链，但不把Resource Server验签、内存审计或本地Persona夸大为完整企业IAM。
+
+## 9. 身份绑定的生产门禁
+
+身份 Token 只证明 Subject、Tenant 和声明的角色来自可信签发方，不自动授予数据库权限。PostgreSQL `EnsureIdentity` 现在是只读校验：租户、用户、Membership 必须都处于 active，且数据库角色必须出现在当前 Token 的角色集合中。新用户或角色变更必须通过显式 `ProvisionIdentity`/邀请流程完成；普通检索请求不会写入 Membership。
+
+这条规则专门防止两类高风险问题：
+
+1. 未邀请用户在 Token 中自带一个租户 Claim 后自助获得 tenant access；
+2. admin 被 IdP 降级为 viewer 后，继续复用数据库中旧的 admin Membership。
+
+本地 Demo 的账号预置仍然存在，但它在启动时显式 Provision；OIDC 模式不注册本地账号、登录和 Dev Token。生产启动建议设置 `RAGLAB_REQUIRE_OIDC=true`，由 [production_preflight.sh](../scripts/production_preflight.sh) 检查 OIDC、TLS 数据库连接、非默认凭据、Redis 共享限流和 Milvus 主机暴露面。

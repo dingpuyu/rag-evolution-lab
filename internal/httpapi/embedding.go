@@ -64,15 +64,14 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	if datasetStore == nil {
 		datasetStore = datasetaccess.Defaults()
 	}
-	registerEmbeddingRoutes(mux, &EmbeddingAPI{service: embeddingService})
+	embeddingAPI := &EmbeddingAPI{service: embeddingService}
 	vectorAPI := &MilvusAPI{service: milvusService, lifecycle: lifecycleService}
-	mux.HandleFunc("GET /api/v1/milvus/status", vectorAPI.status)
 	catalog := http.Handler(http.HandlerFunc(vectorAPI.catalog))
 	vectorSearch := http.Handler(http.HandlerFunc(vectorAPI.search))
 	var authenticator *authAPI
 	if enterprise.Verifier != nil {
 		authenticator = &authAPI{
-			verifier: enterprise.Verifier, credentials: enterprise.CredentialVerifier, devIssuer: enterprise.DevIssuer,
+			verifier: enterprise.Verifier, provisioner: enterprise.IdentityProvisioner, credentials: enterprise.CredentialVerifier, devIssuer: enterprise.DevIssuer,
 			accounts: enterprise.LocalAccounts, audit: enterprise.Audit,
 		}
 		if enterprise.DevIssuer != nil {
@@ -87,11 +86,28 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		catalog = authenticator.requireIdentity(catalog)
 		vectorSearch = authenticator.requireIdentity(vectorSearch)
 	}
+	var protectInternal func(http.Handler) http.Handler
+	if authenticator != nil {
+		protectInternal = authenticator.requireIdentity
+	}
+	// Keep only /healthz public in the enterprise handler. Provider metadata,
+	// embedding execution and Milvus diagnostics can disclose deployment
+	// details or incur remote-model cost, so they require a trusted identity.
+	registerEmbeddingRoutesWithProtection(mux, embeddingAPI, protectInternal)
+	milvusStatus := http.Handler(http.HandlerFunc(vectorAPI.status))
+	if authenticator != nil {
+		milvusStatus = authenticator.requireIdentity(milvusStatus)
+	}
+	mux.Handle("GET /api/v1/milvus/status", milvusStatus)
 	mux.Handle("GET /api/v1/milvus/catalog", catalog)
 	mux.Handle("POST /api/v1/milvus/search", vectorSearch)
 	if scaleService != nil {
 		scaleAPI := &ScaleAPI{service: scaleService}
-		mux.HandleFunc("GET /api/v1/milvus/scale/status", scaleAPI.status)
+		scaleStatus := http.Handler(http.HandlerFunc(scaleAPI.status))
+		if authenticator != nil {
+			scaleStatus = authenticator.requireIdentity(scaleStatus)
+		}
+		mux.Handle("GET /api/v1/milvus/scale/status", scaleStatus)
 		scaleSearch := http.Handler(http.HandlerFunc(scaleAPI.search))
 		if authenticator != nil {
 			scaleSearch = authenticator.requireIdentity(scaleSearch)
@@ -207,9 +223,19 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 }
 
 func registerEmbeddingRoutes(mux *http.ServeMux, api *EmbeddingAPI) {
+	registerEmbeddingRoutesWithProtection(mux, api, nil)
+}
+
+func registerEmbeddingRoutesWithProtection(mux *http.ServeMux, api *EmbeddingAPI, protect func(http.Handler) http.Handler) {
 	mux.HandleFunc("GET /healthz", api.health)
-	mux.HandleFunc("GET /api/v1/embeddings/info", api.info)
-	mux.HandleFunc("POST /api/v1/embeddings/similarity", api.similarity)
+	info := http.Handler(http.HandlerFunc(api.info))
+	similarity := http.Handler(http.HandlerFunc(api.similarity))
+	if protect != nil {
+		info = protect(info)
+		similarity = protect(similarity)
+	}
+	mux.Handle("GET /api/v1/embeddings/info", info)
+	mux.Handle("POST /api/v1/embeddings/similarity", similarity)
 }
 
 type MilvusAPI struct {

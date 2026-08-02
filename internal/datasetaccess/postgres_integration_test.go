@@ -36,10 +36,10 @@ func TestPostgresTenantDatasetLifecycleAndRevocation(t *testing.T) {
 		_, _ = store.db.ExecContext(context.Background(), `DELETE FROM tenants WHERE id IN ($1,$2)`, tenantA, tenantB)
 	}()
 
-	if err := store.EnsureIdentity(ctx, alice); err != nil {
+	if err := store.ProvisionIdentity(ctx, alice); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.EnsureIdentity(ctx, bob); err != nil {
+	if err := store.ProvisionIdentity(ctx, bob); err != nil {
 		t.Fatal(err)
 	}
 	created, err := store.Create(ctx, alice, CreateDataset{
@@ -79,5 +79,64 @@ func TestPostgresTenantDatasetLifecycleAndRevocation(t *testing.T) {
 	}
 	if auditCount != 1 {
 		t.Fatalf("dataset mutation audit count=%d", auditCount)
+	}
+}
+
+// Security regression: a signed identity is not, by itself, a membership
+// grant. Before the control-plane hardening, EnsureIdentity inserted a new
+// admin membership on every request, so a never-invited subject could claim a
+// tenant in its token and immediately see that tenant's datasets.
+func TestPostgresUnprovisionedIdentityCannotSelfAssignTenantAccess(t *testing.T) {
+	databaseURL := os.Getenv("RAGLAB_TEST_POSTGRES_URL")
+	if databaseURL == "" {
+		t.Skip("RAGLAB_TEST_POSTGRES_URL is not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	store, err := OpenPostgres(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	identity := auth.Identity{Subject: "uninvited_" + fmt.Sprint(time.Now().UnixNano()), TenantID: "tenant_a", Roles: []string{"admin"}}
+	if _, err := store.Visible(ctx, identity); !errors.Is(err, ErrDatasetDenied) {
+		t.Fatalf("unprovisioned identity access error=%v, want ErrDatasetDenied", err)
+	}
+}
+
+// Security regression: removing admin from the current token must not leave
+// an old database role usable. The control plane must require the DB binding
+// and the current signed role to agree.
+func TestPostgresRoleDowngradeCannotReuseStaleAdminMembership(t *testing.T) {
+	databaseURL := os.Getenv("RAGLAB_TEST_POSTGRES_URL")
+	if databaseURL == "" {
+		t.Skip("RAGLAB_TEST_POSTGRES_URL is not configured")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	store, err := OpenPostgres(ctx, databaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	suffix := fmt.Sprint(time.Now().UnixNano())
+	identity := auth.Identity{Subject: "downgrade_" + suffix, TenantID: "tenant_a", Roles: []string{"admin"}}
+	if err := store.ProvisionIdentity(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_, _ = store.db.ExecContext(context.Background(), `DELETE FROM memberships WHERE tenant_id=$1 AND subject=$2`, identity.TenantID, identity.Subject)
+		_, _ = store.db.ExecContext(context.Background(), `DELETE FROM users WHERE subject=$1`, identity.Subject)
+	}()
+
+	if _, err := store.Visible(ctx, identity); err != nil {
+		t.Fatalf("provisioned admin should be visible: %v", err)
+	}
+	downgraded := identity
+	downgraded.Roles = []string{"viewer"}
+	if _, err := store.Visible(ctx, downgraded); !errors.Is(err, ErrDatasetDenied) {
+		t.Fatalf("downgraded identity access error=%v, want ErrDatasetDenied", err)
 	}
 }

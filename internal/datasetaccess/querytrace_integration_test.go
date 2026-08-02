@@ -24,6 +24,9 @@ func TestPostgresQueryTraceRoundTripIsTenantScoped(t *testing.T) {
 	}
 	defer store.Close()
 	identity := auth.Identity{Subject: "trace-test-a", TenantID: "tenant_a", Roles: []string{"admin"}}
+	if err := store.ProvisionIdentity(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
 	record := querytrace.Record{
 		TraceID: "gw_trace_integration_" + time.Now().UTC().Format("20060102150405.000000000"), AppID: "tenant_a-support-agent",
 		EnvironmentID: "tenant_a-support-agent-dev", TenantID: identity.TenantID, Subject: identity.Subject,

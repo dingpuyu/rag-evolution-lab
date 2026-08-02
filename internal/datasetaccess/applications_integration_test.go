@@ -24,6 +24,9 @@ func TestPostgresApplicationBindingsAreTenantScoped(t *testing.T) {
 	defer store.Close()
 
 	identity := auth.Identity{Subject: "application-test-a", TenantID: "tenant_a", Roles: []string{"admin"}}
+	if err := store.ProvisionIdentity(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
 	slug := "platform-test-" + time.Now().UTC().Format("20060102150405")
 	application, err := store.CreateApplication(ctx, identity, CreateApplication{Name: "Platform Test App", Slug: slug})
 	if err != nil {
@@ -69,6 +72,9 @@ func TestPostgresIndexReleasePublishAndRollback(t *testing.T) {
 	}
 	defer store.Close()
 	identity := auth.Identity{Subject: "index-test-a", TenantID: "tenant_a", Roles: []string{"admin"}}
+	if err := store.ProvisionIdentity(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
 	slug := "index-release-" + time.Now().UTC().Format("20060102150405")
 	application, err := store.CreateApplication(ctx, identity, CreateApplication{Name: "Index Release Test", Slug: slug})
 	if err != nil {

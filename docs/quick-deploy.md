@@ -158,3 +158,18 @@ docker-compose -f deploy/stack/docker-compose.yml down -v
 ## 6. 生产化边界
 
 这份 Compose 是“单机可复现部署”和面试演示基线，不等同于高可用生产编排。真实生产环境还需要外置 PostgreSQL/Milvus、密钥管理、TLS、OIDC、备份恢复、镜像签名、资源限制、监控告警和 Kubernetes/云托管策略。项目中的安全、评测和增量索引文档分别记录了这些演进边界。
+
+正式上线前建议先执行安全门禁：
+
+```bash
+RAGLAB_REQUIRE_OIDC=true \
+RAGLAB_AUTH_OIDC_ISSUER=https://id.example.com/realms/acme \
+RAGLAB_AUTH_JWKS_URL=https://id.example.com/realms/acme/protocol/openid-connect/certs \
+RAGLAB_POSTGRES_PASSWORD='<secret>' \
+RAGLAB_MINIO_ROOT_USER='<user>' \
+RAGLAB_MINIO_ROOT_PASSWORD='<secret>' \
+RAGLAB_POSTGRES_URL='postgres://...?...&sslmode=verify-full' \
+make production-preflight
+```
+
+预检失败时不要通过修改脚本绕过。生产 OIDC Token 只负责证明身份，租户 Membership 必须由邀请/管理员流程显式 Provision；服务不会因为第一次请求就自动创建权限。Milvus 的宿主机端口在 Compose 中默认只绑定 loopback，云上仍需通过安全组和私有子网再次限制。

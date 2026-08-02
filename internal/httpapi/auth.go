@@ -27,27 +27,29 @@ import (
 type identityContextKey struct{}
 
 type EnterpriseOptions struct {
-	Verifier           auth.Verifier
-	CredentialVerifier auth.CredentialVerifier
-	CredentialStore    datasetaccess.CredentialStore
-	DevIssuer          *auth.Manager
-	LocalAccounts      *auth.AccountStore
-	Audit              *auth.AuditLog
-	IngestionJobs      *ingestionjob.Service
-	DatasetStore       datasetaccess.Store
-	ApplicationStore   datasetaccess.ApplicationStore
-	IndexStore         datasetaccess.IndexStore
-	QueryTraceStore    querytrace.Store
-	IndexBuilds        *indexbuild.Service
-	Generator          generation.Generator
-	AgentPlanner       agent.Planner
-	Tracer             trace.Tracer
-	Cost               *cost.Calculator
-	Limiter            ratelimit.Gate
+	Verifier            auth.Verifier
+	IdentityProvisioner auth.IdentityProvisioner
+	CredentialVerifier  auth.CredentialVerifier
+	CredentialStore     datasetaccess.CredentialStore
+	DevIssuer           *auth.Manager
+	LocalAccounts       *auth.AccountStore
+	Audit               *auth.AuditLog
+	IngestionJobs       *ingestionjob.Service
+	DatasetStore        datasetaccess.Store
+	ApplicationStore    datasetaccess.ApplicationStore
+	IndexStore          datasetaccess.IndexStore
+	QueryTraceStore     querytrace.Store
+	IndexBuilds         *indexbuild.Service
+	Generator           generation.Generator
+	AgentPlanner        agent.Planner
+	Tracer              trace.Tracer
+	Cost                *cost.Calculator
+	Limiter             ratelimit.Gate
 }
 
 type authAPI struct {
 	verifier    auth.Verifier
+	provisioner auth.IdentityProvisioner
 	credentials auth.CredentialVerifier
 	devIssuer   *auth.Manager
 	accounts    *auth.AccountStore
@@ -104,8 +106,15 @@ func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 			})
 			return
 		}
-		if identity.ApplicationID != "" && !strings.Contains(request.URL.Path, "/apps/"+identity.ApplicationID+"/") {
+		if identity.ApplicationID != "" && !applicationCredentialPathAllowed(request.URL.Path, identity.ApplicationID) {
 			writeError(writer, http.StatusForbidden, "credential_scope_violation", "application credential cannot access this resource")
+			api.audit.Append(auth.AuditEvent{
+				RequestID: requestID, Timestamp: time.Now().UTC(), Subject: identity.Subject,
+				TenantID: identity.TenantID, Roles: append([]string(nil), identity.Roles...),
+				Method: request.Method, Path: request.URL.Path, Decision: "denied",
+				Reason: "application credential path scope violation", Status: http.StatusForbidden,
+				DurationMS: elapsedMS(started),
+			})
 			return
 		}
 		recorder := &statusRecorder{ResponseWriter: writer}
@@ -124,6 +133,11 @@ func (api *authAPI) requireIdentity(next http.Handler) http.Handler {
 			Method: request.Method, Path: request.URL.Path, Decision: decision, Status: status, DurationMS: elapsedMS(started),
 		})
 	})
+}
+
+func applicationCredentialPathAllowed(path, applicationID string) bool {
+	prefix := "/api/v1/apps/" + strings.TrimSpace(applicationID) + "/"
+	return strings.HasPrefix(path, prefix)
 }
 
 func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) {
@@ -158,6 +172,10 @@ func (api *authAPI) devToken(writer http.ResponseWriter, request *http.Request) 
 	identity, ok := personas[input.Persona]
 	if !ok {
 		writeError(writer, http.StatusBadRequest, "unknown_persona", "persona must be one of the server-defined demo identities")
+		return
+	}
+	if err := api.provisionIdentity(request.Context(), identity); err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "identity_provisioning_failed", err.Error())
 		return
 	}
 	token, err := api.devIssuer.Issue(identity)
@@ -199,6 +217,10 @@ func (api *authAPI) register(writer http.ResponseWriter, request *http.Request) 
 		writeError(writer, status, code, err.Error())
 		return
 	}
+	if err := api.provisionIdentity(request.Context(), identity); err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "identity_provisioning_failed", err.Error())
+		return
+	}
 	api.issueIdentity(writer, identity, http.StatusCreated)
 }
 
@@ -219,7 +241,18 @@ func (api *authAPI) login(writer http.ResponseWriter, request *http.Request) {
 		writeError(writer, http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
 		return
 	}
+	if err := api.provisionIdentity(request.Context(), identity); err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "identity_provisioning_failed", err.Error())
+		return
+	}
 	api.issueIdentity(writer, identity, http.StatusOK)
+}
+
+func (api *authAPI) provisionIdentity(ctx context.Context, identity auth.Identity) error {
+	if api.provisioner == nil {
+		return nil
+	}
+	return api.provisioner.ProvisionIdentity(ctx, identity)
 }
 
 func (api *authAPI) issueIdentity(writer http.ResponseWriter, identity auth.Identity, status int) {

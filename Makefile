@@ -1,4 +1,4 @@
-.PHONY: fmt test agent-test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status
+.PHONY: fmt test agent-test validate validate-v4 ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
 DOCKER_COMPOSE ?= docker-compose
 STACK_ENV_FILE = $(if $(wildcard .env),--env-file .env,)
@@ -144,6 +144,9 @@ stack-down:
 
 stack-status:
 	$(STACK_COMPOSE) ps
+
+production-preflight:
+	bash scripts/production_preflight.sh
 
 observability-up:
 	$(OBSERVABILITY_COMPOSE) up -d

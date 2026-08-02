@@ -135,6 +135,7 @@ Phase 5 已完成首轮工程基线实验：
 - 本地网页可切换预定义Persona；OIDC模式不注册本地Token签发接口
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
+- 受控漏洞演练、修复前后证据和生产预检见 [身份隔离安全演练](docs/security-lab.md)
 
 面向业务体验的企业 Agent 工作台已完成：
 
