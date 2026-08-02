@@ -195,7 +195,8 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 				continue
 			}
 			if pageAware {
-				block, markerPage := stripPageMarker(block)
+				var markerPage int
+				block, markerPage = stripPageMarker(block)
 				if markerPage > 0 {
 					currentPage = markerPage
 				}

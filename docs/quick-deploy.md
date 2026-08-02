@@ -12,9 +12,10 @@
 
 ```bash
 cp .env.example .env
-make stack-up
-make stack-status
-make stack-smoke
+# Makefile automatically loads .env when it exists.
+RAGLAB_GENERATION_API_KEY="$DEEPSEEK_API_KEY" make stack-up
+RAGLAB_API_PORT=18080 RAGLAB_WEB_PORT=13000 make stack-status
+RAGLAB_API_PORT=18080 RAGLAB_WEB_PORT=13000 make stack-smoke
 ```
 
 启动完成后访问：

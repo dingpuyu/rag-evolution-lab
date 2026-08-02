@@ -48,9 +48,17 @@ func TestChunkerSplitsLongBlockWithoutDroppingRunes(t *testing.T) {
 }
 
 func TestChunkerPageAwareParentChildProvenance(t *testing.T) {
+	cleaned, page := stripPageMarker("<!-- page: 7 -->\n## 配置")
+	if page != 7 || cleaned != "## 配置" {
+		t.Fatalf("stripPageMarker got page=%d content=%q", page, cleaned)
+	}
 	document := domain.Document{
 		ID:      "manual-v1",
 		Content: "# 登录\n\n第一页说明。\f<!-- page: 7 -->\n## 配置\n\n第二页说明。",
+	}
+	parents := parseMarkdownParents(document.Content, true)
+	if len(parents) != 2 || strings.Contains(parents[1].content, "<!-- page:") {
+		t.Fatalf("parsed parents=%#v", parents)
 	}
 	chunks := (Chunker{MaxRunes: 100, PageAware: true}).Chunk(document)
 	if len(chunks) != 2 {
@@ -64,6 +72,12 @@ func TestChunkerPageAwareParentChildProvenance(t *testing.T) {
 	}
 	if chunks[1].Content == "" || chunks[1].ParentContent == "" {
 		t.Fatal("child and parent content must be retained for citation preview")
+	}
+	if strings.Contains(chunks[1].Content, "<!-- page:") || !strings.Contains(chunks[1].Content, "第二页说明") {
+		t.Fatalf("page marker must be removed from child content: %q", chunks[1].Content)
+	}
+	if !reflect.DeepEqual(chunks[1].HeadingPath, []string{"登录", "配置"}) {
+		t.Fatalf("unexpected page heading path: %#v", chunks[1].HeadingPath)
 	}
 	if !strings.Contains(chunks[1].ParentContent, "第二页说明") {
 		t.Fatalf("parent content lost source text: %q", chunks[1].ParentContent)
