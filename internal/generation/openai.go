@@ -66,14 +66,13 @@ func (generator OpenAICompatibleGenerator) generate(ctx context.Context, request
 	if strings.TrimSpace(generator.Model) == "" {
 		return Generation{}, fmt.Errorf("%s model must not be empty", generator.Name())
 	}
-	if strings.TrimSpace(request.Query) == "" || len(request.Evidence) == 0 {
-		return Generation{}, fmt.Errorf("generation query and evidence are required")
+	if strings.TrimSpace(request.Query) == "" {
+		return Generation{}, fmt.Errorf("generation query must not be empty")
 	}
-	evidenceJSON, err := json.Marshal(request.Evidence)
+	systemPrompt, userMessage, err := requestPrompt(Request{Query: strings.TrimSpace(request.Query), Evidence: request.Evidence, Mode: request.Mode})
 	if err != nil {
-		return Generation{}, fmt.Errorf("encode generation evidence: %w", err)
+		return Generation{}, err
 	}
-	userMessage := "QUESTION:\n" + strings.TrimSpace(request.Query) + "\n\nEVIDENCE_JSON:\n" + string(evidenceJSON)
 	maxTokens := generator.NumPredict
 	if maxTokens <= 0 {
 		maxTokens = 512
@@ -81,7 +80,7 @@ func (generator OpenAICompatibleGenerator) generate(ctx context.Context, request
 	payloadBody := map[string]any{
 		"model": generator.Model,
 		"messages": []map[string]string{
-			{"role": "system", "content": groundedSystemPrompt},
+			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": userMessage},
 		},
 		"response_format": map[string]string{"type": "json_object"},
@@ -153,7 +152,7 @@ func (generator OpenAICompatibleGenerator) generate(ctx context.Context, request
 		return Generation{}, fmt.Errorf("decode %s grounded JSON output: %w", generator.Name(), err)
 	}
 	return Generation{
-		Output: output, Model: model, PromptVersion: PromptVersion, FinishReason: finishReason,
+		Output: output, Model: model, PromptVersion: promptVersion(request.Mode), FinishReason: finishReason,
 		LatencyMS: milliseconds(time.Since(started)), Usage: usage,
 	}, nil
 }

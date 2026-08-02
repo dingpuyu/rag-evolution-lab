@@ -58,14 +58,13 @@ func (generator OllamaGenerator) generate(ctx context.Context, request Request, 
 	if strings.TrimSpace(generator.Model) == "" {
 		return Generation{}, fmt.Errorf("ollama generation model must not be empty")
 	}
-	if strings.TrimSpace(request.Query) == "" || len(request.Evidence) == 0 {
-		return Generation{}, fmt.Errorf("generation query and evidence are required")
+	if strings.TrimSpace(request.Query) == "" {
+		return Generation{}, fmt.Errorf("generation query must not be empty")
 	}
-	evidenceJSON, err := json.Marshal(request.Evidence)
+	systemPrompt, userMessage, err := requestPrompt(Request{Query: strings.TrimSpace(request.Query), Evidence: request.Evidence, Mode: request.Mode})
 	if err != nil {
-		return Generation{}, fmt.Errorf("encode generation evidence: %w", err)
+		return Generation{}, err
 	}
-	userMessage := "QUESTION:\n" + strings.TrimSpace(request.Query) + "\n\nEVIDENCE_JSON:\n" + string(evidenceJSON)
 	numPredict := generator.NumPredict
 	if numPredict <= 0 {
 		numPredict = 512
@@ -75,7 +74,7 @@ func (generator OllamaGenerator) generate(ctx context.Context, request Request, 
 		"stream": stream,
 		"format": groundedAnswerSchema(),
 		"messages": []map[string]string{
-			{"role": "system", "content": groundedSystemPrompt},
+			{"role": "system", "content": systemPrompt},
 			{"role": "user", "content": userMessage},
 		},
 		"options": map[string]any{"temperature": 0, "num_predict": numPredict},
@@ -153,7 +152,7 @@ func (generator OllamaGenerator) generate(ctx context.Context, request Request, 
 		model = generator.Model
 	}
 	return Generation{
-		Output: output, Model: model, PromptVersion: PromptVersion, FinishReason: decoded.Reason,
+		Output: output, Model: model, PromptVersion: promptVersion(request.Mode), FinishReason: decoded.Reason,
 		LatencyMS: milliseconds(time.Since(started)),
 		Usage:     Usage{PromptTokens: decoded.PromptTokens, CompletionTokens: decoded.OutputTokens},
 	}, nil

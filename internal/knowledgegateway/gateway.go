@@ -309,7 +309,7 @@ func (service *Service) Answer(ctx context.Context, identity auth.Identity, requ
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	answerService, err := generation.NewService(staticSearcher{result: search.Result}, service.generator)
+	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generation.Options{GeneralGenerator: service.generator})
 	if err != nil {
 		return AnswerResponse{}, err
 	}
@@ -337,7 +337,7 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	answerService, err := generation.NewService(staticSearcher{result: search.Result}, service.generator)
+	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generation.Options{GeneralGenerator: service.generator})
 	if err != nil {
 		return AnswerResponse{}, err
 	}

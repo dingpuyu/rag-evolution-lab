@@ -106,7 +106,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		if generator == nil {
 			generator = generation.ExtractiveGenerator{}
 		}
-		answerService, answerErr := generation.NewService(lifecycleService, generator)
+		answerService, answerErr := generation.NewServiceWithOptions(lifecycleService, generator, generation.Options{GeneralGenerator: generator})
 		if answerErr != nil {
 			return nil, answerErr
 		}

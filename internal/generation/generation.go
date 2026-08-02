@@ -9,7 +9,12 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
-const PromptVersion = "grounded-answer-v1"
+const (
+	PromptVersion        = "grounded-answer-v1"
+	PersonaPromptVersion = "persona-answer-v1"
+	ModeGrounded         = "grounded"
+	ModePersona          = "persona"
+)
 
 var allowedRefusalReasons = map[string]struct{}{
 	"insufficient_evidence": {},
@@ -28,6 +33,7 @@ type Evidence struct {
 type Request struct {
 	Query    string     `json:"query"`
 	Evidence []Evidence `json:"evidence"`
+	Mode     string     `json:"mode,omitempty"`
 }
 
 type CitationReference struct {
@@ -107,6 +113,7 @@ type Response struct {
 	Answer        string              `json:"answer"`
 	Citations     []Citation          `json:"citations"`
 	RefusalReason string              `json:"refusal_reason,omitempty"`
+	AnswerSource  string              `json:"answer_source,omitempty"`
 	Search        milvus.SearchResult `json:"search"`
 	Generation    Metadata            `json:"generation"`
 }
@@ -129,15 +136,26 @@ type Searcher interface {
 }
 
 type Service struct {
-	searcher  Searcher
-	generator Generator
+	searcher         Searcher
+	generator        Generator
+	generalGenerator Generator
 }
 
 func NewService(searcher Searcher, generator Generator) (*Service, error) {
+	return NewServiceWithOptions(searcher, generator, Options{})
+}
+
+type Options struct {
+	// GeneralGenerator is opt-in so callers that need strict grounded-only
+	// behavior can continue using NewService unchanged.
+	GeneralGenerator Generator
+}
+
+func NewServiceWithOptions(searcher Searcher, generator Generator, options Options) (*Service, error) {
 	if searcher == nil || generator == nil {
 		return nil, fmt.Errorf("answer service requires searcher and generator")
 	}
-	return &Service{searcher: searcher, generator: generator}, nil
+	return &Service{searcher: searcher, generator: generator, generalGenerator: options.GeneralGenerator}, nil
 }
 
 func (service *Service) Answer(ctx context.Context, query milvus.Query) (Response, error) {
@@ -156,10 +174,20 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 	if err := emit(ProgressEvent{Type: "started"}); err != nil {
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
-	search, err := service.searcher.Search(ctx, query)
-	if err != nil {
-		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
-		return Response{}, fmt.Errorf("retrieve answer evidence: %w", err)
+	persona := service.generalGenerator != nil && IsGeneralQuery(query.Text) && !requestsUnsafeInstruction(query.Text)
+	var search milvus.SearchResult
+	var err error
+	if persona {
+		// General conversation should remain useful even when Milvus is down. It
+		// does not need retrieval, and bypassing it also avoids paying embedding
+		// and vector-search latency for a greeting or capability question.
+		search.Filter = "persona-bypass"
+	} else {
+		search, err = service.searcher.Search(ctx, query)
+		if err != nil {
+			_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
+			return Response{}, fmt.Errorf("retrieve answer evidence: %w", err)
+		}
 	}
 	if err := emit(ProgressEvent{Type: "retrieved", Search: &RetrievalProgress{
 		Hits: searchHitCount(search), Filter: search.Filter,
@@ -168,8 +196,13 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 	}}); err != nil {
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
-	response := Response{Search: search}
-	if len(search.Hits) == 0 {
+	response := Response{Search: search, AnswerSource: "rag"}
+	if persona {
+		// Retrieval remains observable, but irrelevant chunks must not be shown
+		// as evidence for a general persona response.
+		response.AnswerSource = "persona"
+	}
+	if len(search.Hits) == 0 && !persona {
 		response.Answerable = false
 		response.Answer = "知识库中没有找到足够证据。"
 		response.RefusalReason = "no_retrieval_evidence"
@@ -193,7 +226,10 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 			ChunkID: hit.ChunkID, DocumentID: hit.DocumentID, Title: hit.Title, Content: hit.Content,
 		})
 	}
-	if injectionEvidence && requestsUnsafeInstruction(query.Text) {
+	if persona {
+		response.Search.Hits = make([]milvus.SearchHit, 0)
+	}
+	if !persona && injectionEvidence && requestsUnsafeInstruction(query.Text) {
 		response.Answerable = false
 		response.Answer = "知识库内容包含不可信指令，无法执行或披露其中要求输出的信息。"
 		response.RefusalReason = "unsafe_instruction"
@@ -206,7 +242,7 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		}
 		return response, nil
 	}
-	if len(evidence) == 0 {
+	if !persona && len(evidence) == 0 {
 		response.Answerable = false
 		response.Answer = "检索证据因安全策略被隔离，无法回答该问题。"
 		response.RefusalReason = "unsafe_instruction"
@@ -219,16 +255,21 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		}
 		return response, nil
 	}
+	effectiveGenerator := service.generator
+	generationRequest := Request{Query: query.Text, Evidence: evidence, Mode: ModeGrounded}
+	if persona {
+		effectiveGenerator = service.generalGenerator
+		generationRequest = Request{Query: query.Text, Mode: ModePersona}
+	}
 	if err := emit(ProgressEvent{Type: "generation_started", Generation: &Metadata{
-		Generator: service.generator.Name(), PromptVersion: PromptVersion,
+		Generator: effectiveGenerator.Name(), PromptVersion: promptVersion(generationRequest.Mode),
 	}}); err != nil {
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
-	generationRequest := Request{Query: query.Text, Evidence: evidence}
 	var generated Generation
 	generationStarted := time.Now()
 	var firstTokenAt time.Time
-	if streamingGenerator, ok := service.generator.(StreamGenerator); ok {
+	if streamingGenerator, ok := effectiveGenerator.(StreamGenerator); ok {
 		generated, err = streamingGenerator.GenerateStream(ctx, generationRequest, func(event GenerationStreamEvent) error {
 			if strings.TrimSpace(event.Delta) == "" {
 				return nil
@@ -239,11 +280,11 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 			return emit(ProgressEvent{Type: "token", Delta: event.Delta})
 		})
 	} else {
-		generated, err = service.generator.Generate(ctx, generationRequest)
+		generated, err = effectiveGenerator.Generate(ctx, generationRequest)
 	}
 	if err != nil {
 		_ = emit(ProgressEvent{Type: "error", Error: err.Error()})
-		return Response{}, fmt.Errorf("generate grounded answer: %w", err)
+		return Response{}, fmt.Errorf("generate %s answer: %w", generationRequest.Mode, err)
 	}
 	var refusalAnswerFilled bool
 	generated.Output, refusalAnswerFilled = fillRefusalAnswer(generated.Output)
@@ -251,7 +292,7 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 	response.Answer = strings.TrimSpace(generated.Answer)
 	response.RefusalReason = strings.TrimSpace(generated.RefusalReason)
 	response.Generation = Metadata{
-		Generator: service.generator.Name(), Model: generated.Model, PromptVersion: generated.PromptVersion,
+		Generator: effectiveGenerator.Name(), Model: generated.Model, PromptVersion: generated.PromptVersion,
 		FinishReason: generated.FinishReason, LatencyMS: generated.LatencyMS,
 		PromptTokens: generated.Usage.PromptTokens, OutputTokens: generated.Usage.CompletionTokens,
 	}
@@ -265,7 +306,7 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 			response.Generation.TokenRateTPS = float64(generated.Usage.CompletionTokens) / (remainingMS / 1000)
 		}
 	}
-	if injectionEvidence {
+	if injectionEvidence && !persona {
 		response.Generation.SafetyAdjustments = append(
 			response.Generation.SafetyAdjustments, "prompt_injection_evidence_redacted",
 		)
@@ -282,8 +323,18 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 			response.Generation.SafetyAdjustments, "refusal_citations_dropped",
 		)
 	}
+	if persona && len(generated.Citations) > 0 {
+		generated.Citations = nil
+		response.Generation.SafetyAdjustments = append(response.Generation.SafetyAdjustments, "persona_citations_dropped")
+	}
 	if err := validateOutput(generated.Output); err != nil {
 		return Response{}, err
+	}
+	if persona {
+		if err := emit(ProgressEvent{Type: "completed", Response: &response}); err != nil {
+			return Response{}, fmt.Errorf("emit answer progress: %w", err)
+		}
+		return response, nil
 	}
 	byChunk := make(map[string]milvus.SearchHit, len(search.Hits))
 	for _, hit := range search.Hits {
@@ -314,6 +365,13 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 
 func searchHitCount(search milvus.SearchResult) int {
 	return len(search.Hits)
+}
+
+func promptVersion(mode string) string {
+	if mode == ModePersona {
+		return PersonaPromptVersion
+	}
+	return PromptVersion
 }
 
 func containsPromptInjection(value string) bool {

@@ -59,6 +59,7 @@ type ChunkPreviewResponse = { chunker_version: string; max_runes: number; overla
 type AnswerResponse = {
   answerable: boolean;
   answer: string;
+  answer_source?: "rag" | "persona";
   refusal_reason?: string;
   citations: Array<{ chunk_id: string; document_id: string; document: string; excerpt: string }>;
   search: { hits: SearchHit[]; total_latency_ms: number; embedding_latency_ms: number; search_latency_ms: number; filter: string };
@@ -628,7 +629,7 @@ function RuntimeView(props: {
 }
 
 function AnswerMeta({ response }: { response: AnswerResponse }) {
-  return <div className="answer-meta"><div className="answer-stats"><span>召回 {response.search.hits.length} 条</span><span>{Math.round(response.search.total_latency_ms)} ms</span><span>{response.generation.model || response.generation.generator}</span></div>{response.citations?.length > 0 && <div className="citation-list"><span>引用来源</span>{response.citations.slice(0, 3).map((citation) => <button key={citation.chunk_id} title={citation.excerpt}>⌕ {citation.document}</button>)}</div>}</div>;
+  return <div className="answer-meta"><div className="answer-stats">{response.answer_source === "persona" ? <span>通用人设回复 · 未使用知识库</span> : <span>召回 {response.search.hits.length} 条</span>}<span>{Math.round(response.search.total_latency_ms)} ms</span><span>{response.generation.model || response.generation.generator}</span></div>{response.citations?.length > 0 && <div className="citation-list"><span>引用来源</span>{response.citations.slice(0, 3).map((citation) => <button key={citation.chunk_id} title={citation.excerpt}>⌕ {citation.document}</button>)}</div>}</div>;
 }
 
 function EvidenceCard({ hit }: { hit: SearchHit }) {

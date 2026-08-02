@@ -168,6 +168,63 @@ func TestServiceSkipsModelWhenRetrievalIsEmpty(t *testing.T) {
 	}
 }
 
+func TestServiceRoutesGeneralConversationToPersonaGenerator(t *testing.T) {
+	searcher := &stubSearcher{err: errors.New("Milvus must not be called for persona")}
+	grounded := &stubGenerator{err: errors.New("grounded generator must not be called")}
+	persona := &stubGenerator{generation: Generation{Output: Output{
+		Answerable: true, Answer: "你好，我是 RAG Desk。",
+	}, PromptVersion: PersonaPromptVersion}}
+	service, err := NewServiceWithOptions(searcher, grounded, Options{GeneralGenerator: persona})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := service.Answer(context.Background(), milvus.Query{Text: "你好，你是谁？"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !response.Answerable || response.AnswerSource != "persona" || response.Answer != "你好，我是 RAG Desk。" ||
+		len(response.Citations) != 0 || searcher.calls != 0 || grounded.calls != 0 || persona.calls != 1 || persona.lastRequest.Mode != ModePersona {
+		t.Fatalf("general query was not routed to persona: response=%#v grounded=%d persona=%d request=%#v", response, grounded.calls, persona.calls, persona.lastRequest)
+	}
+}
+
+func TestServiceKeepsUnknownDomainQuestionGrounded(t *testing.T) {
+	searcher := &stubSearcher{}
+	grounded := &stubGenerator{generation: Generation{Output: Output{
+		Answerable: false, Answer: "知识库中没有找到足够证据。", RefusalReason: "insufficient_evidence",
+	}}}
+	persona := &stubGenerator{err: errors.New("persona generator must not be called")}
+	service, err := NewServiceWithOptions(searcher, grounded, Options{GeneralGenerator: persona})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := service.Answer(context.Background(), milvus.Query{Text: "private queue"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Answerable || response.AnswerSource != "rag" || persona.calls != 0 || grounded.calls != 0 || response.RefusalReason != "no_retrieval_evidence" {
+		t.Fatalf("unknown domain question left grounded path: response=%#v", response)
+	}
+}
+
+func TestIsGeneralQueryConservativeRouting(t *testing.T) {
+	cases := map[string]bool{
+		"你好":            true,
+		"你能做什么？":        true,
+		"帮我写一个 Go 程序":   true,
+		"什么是 RAG？":      true,
+		"如何申请企业单点登录？":   false,
+		"private queue": false,
+		"如何导出报表？":       false,
+		"请解释一下向量数据库":    false,
+	}
+	for query, want := range cases {
+		if got := IsGeneralQuery(query); got != want {
+			t.Fatalf("IsGeneralQuery(%q)=%t, want %t", query, got, want)
+		}
+	}
+}
+
 func TestServiceRejectsInvalidRefusalContract(t *testing.T) {
 	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{{
 		ChunkID: "doc-a#c001", DocumentID: "doc-a", Content: "irrelevant",
