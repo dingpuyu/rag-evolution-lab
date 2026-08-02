@@ -5,6 +5,9 @@
 .env.*
 !.env.example
 
+# Local Compose overrides may contain secret paths or credentials.
+deploy/stack/docker-compose.remote-secrets.yml
+
 bin/
 dist/
 coverage/
