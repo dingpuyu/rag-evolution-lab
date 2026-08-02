@@ -57,7 +57,7 @@ make stack-up
 Phase 1 已完成：
 
 - Go CLI 与统一 Pipeline 接口
-- 13 篇 AcmeCloud 合成文档
+- 23 篇 AcmeCloud 合成文档，覆盖身份、报表、API、存储、计费、运维、安全与集成 8 个知识域
 - 20 条 Development Golden Query
 - 基础 Markdown Chunker，共生成 38 个 Chunk
 - V0 Keyword Baseline
@@ -136,9 +136,9 @@ Phase 5 已完成首轮工程基线实验：
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 
-面向业务体验的独立客服门户已完成：
+面向业务体验的企业 Agent 工作台已完成：
 
-- `/portal` 提供登录、知识库选择、Milvus 检索预览、流式回答与引用展示
+- `/portal` 提供登录、应用/环境选择、多轮 Agent 对话、工具调用、人工确认、Milvus 检索与引用展示
 - 租户管理员可创建带 `viewer` / `admin` 策略的知识库，并向自有租户库导入资料
 - 权限与审计页面展示服务端 Claims、PostgreSQL membership、数据集策略和请求决策
 - 详细启动方式与验收步骤见 [RAG Desk 企业智能客服门户](docs/customer-portal.md)

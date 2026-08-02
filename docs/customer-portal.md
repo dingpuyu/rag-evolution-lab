@@ -1,6 +1,6 @@
-# RAG Desk 企业智能客服门户
+# RAG Desk 企业 Agent 工作台
 
-`web/app/portal` 是项目面向业务使用者的独立体验入口。工程实验室仍然保留在 `/`，客服门户位于 `/portal`。
+`web/app/portal` 是项目面向业务使用者的唯一对话入口。工程实验室仍然保留在 `/`，企业 Agent 工作台位于 `/portal`。
 
 ## 启动
 
@@ -22,11 +22,13 @@ npm run dev
 ## 能力闭环
 
 1. 登录/注册：本地 HS256 演示账号，生产模式沿用后端 OIDC/RS256 Verifier。
-2. 智能客服：选择可见知识库，通过 `/answer/stream` 实时展示回答、召回数量、耗时、模型和引用。
-3. 只看检索：直接观察 Milvus Top-K、距离、版本、可见性和租户字段。
+2. 企业 Agent 工作台：统一处理知识问答、服务状态、权限查询和工单草稿；LangGraph 负责状态，Go Gateway 负责授权 RAG。
+3. Agent Trace：直接观察规划步骤、工具调用、Milvus Top-K、引用、版本、可见性和租户边界。
 4. 知识库：租户管理员创建租户知识库，并在创建时设置 `viewer` / `admin` 允许角色；平台管理员可创建公开库。
 5. 导入资料：租户管理员只能向自己拥有的租户知识库写入资料。提交后进入异步 Job，门户看板实时展示 validating → chunking → embedding → indexing → verifying、Worker 心跳、尝试次数和写后校验；失败任务可在页面重试，运行任务可人工取消。
 6. 权限与审计：显示当前 Claims、PostgreSQL membership、知识库策略和平台管理员的请求审计。
+
+当前演示语料包含 23 篇 AcmeCloud 文档、78 个 Chunk，覆盖身份、报表、API、存储、计费、运维、安全和集成八个公开知识域；Tenant A/B 仍各自保留独立的运维知识库绑定。
 
 ## 演示账号
 

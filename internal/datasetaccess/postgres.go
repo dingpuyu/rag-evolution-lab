@@ -221,9 +221,16 @@ func (store *PostgresStore) Authorize(ctx context.Context, id string, identity a
 			WHERE d.id=$1 AND d.status='active' AND d.tenant_id=$2 AND EXISTS (
 				SELECT 1 FROM knowledge_bindings b WHERE b.app_id=$3 AND b.dataset_id=d.id AND b.status='active')
 			GROUP BY d.id`, strings.TrimSpace(id), identity.TenantID, identity.ApplicationID).Scan(
-			&dataset.ID,&dataset.Name,&dataset.Description,&dataset.Product,&dataset.Visibility,&dataset.OwnerTenant,&dataset.Status,&dataset.CreatedBy,&roles)
-		if err == nil { if roles != "" { dataset.AllowedRoles = strings.Split(roles, ",") }; return dataset, nil }
-		if err != sql.ErrNoRows { return Dataset{}, err }
+			&dataset.ID, &dataset.Name, &dataset.Description, &dataset.Product, &dataset.Visibility, &dataset.OwnerTenant, &dataset.Status, &dataset.CreatedBy, &roles)
+		if err == nil {
+			if roles != "" {
+				dataset.AllowedRoles = strings.Split(roles, ",")
+			}
+			return dataset, nil
+		}
+		if err != sql.ErrNoRows {
+			return Dataset{}, err
+		}
 	}
 	datasets, err := store.Visible(ctx, identity)
 	if err != nil {
@@ -465,6 +472,17 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			VALUES ($1,$2,$3,'tenant support knowledge',10,'active',$4,'system')
 			ON CONFLICT (app_id,environment_id,dataset_id) DO NOTHING`, application.id, environmentID, application.dataset, policy); err != nil {
 			return err
+		}
+		for _, publicDataset := range []string{
+			"public-identity", "public-reports", "public-api-platform", "public-storage",
+			"public-billing", "public-operations", "public-security", "public-integrations",
+		} {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO knowledge_bindings (app_id,environment_id,dataset_id,purpose,priority,status,policy,created_by)
+				VALUES ($1,$2,$3,'shared public product knowledge',20,'active',$4,'system')
+				ON CONFLICT (app_id,environment_id,dataset_id) DO NOTHING`, application.id, environmentID, publicDataset, policy); err != nil {
+				return err
+			}
 		}
 	}
 	return tx.Commit()

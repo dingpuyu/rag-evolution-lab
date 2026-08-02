@@ -176,3 +176,35 @@ func TestGatewayAppliesRewriteRerankAndPersistsTraceLifecycle(t *testing.T) {
 		t.Fatalf("answer trace was not completed: answer=%#v traces=%#v", answer, traces.records)
 	}
 }
+
+type crossBindingSearcher struct{}
+
+func (crossBindingSearcher) Search(_ context.Context, query milvus.Query) (milvus.SearchResult, error) {
+	content := "通用知识说明"
+	if query.Product == "reports" {
+		content = "安全审计字段包括操作人、时间戳和资源标识"
+	}
+	return milvus.SearchResult{Query: query.Text, Collection: "lifecycle", Embedder: "test", Dimensions: 3, Metric: "COSINE", Hits: []milvus.SearchHit{
+		{ChunkID: query.Product + "-noise", DocumentID: query.Product + "-noise-doc", Title: query.Product, Content: "通用知识说明", Distance: 0.2},
+		{ChunkID: query.Product + "-evidence", DocumentID: query.Product + "-doc", Title: query.Product, Content: content, Distance: 0.4},
+	}}, nil
+}
+
+func TestSearchGloballyMergesRerankedBindingsBeforeTopK(t *testing.T) {
+	service, err := New(crossBindingSearcher{}, fakeDatasetStore{catalog: datasetaccess.Defaults()}, fakeApps{bindings: []datasetaccess.KnowledgeBinding{
+		{DatasetID: "public-identity", Status: "active", Priority: 1, Policy: datasetaccess.RetrievalPolicy{TopK: 1, CandidateK: 2, Rerank: true}},
+		{DatasetID: "public-reports", Status: "active", Priority: 2, Policy: datasetaccess.RetrievalPolicy{TopK: 1, CandidateK: 2, Rerank: true}},
+	}}, generation.ExtractiveGenerator{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := service.Search(context.Background(), auth.Identity{Subject: "viewer", TenantID: "tenant_a", Roles: []string{"viewer"}}, Request{
+		AppID: "tenant_a-support", Query: "安全审计字段", TopK: 1,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Result.Hits) != 1 || result.Result.Hits[0].DocumentID != "reports-doc" {
+		t.Fatalf("global rerank was not applied before TopK: bindings=%#v hits=%#v", result.Bindings, result.Result.Hits)
+	}
+}

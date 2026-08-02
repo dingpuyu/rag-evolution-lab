@@ -95,23 +95,26 @@ func (value *flexibleInt64) UnmarshalJSON(data []byte) error {
 }
 
 type Record struct {
-	ChunkID        string    `json:"chunk_id"`
-	DocumentID     string    `json:"document_id"`
-	Title          string    `json:"title"`
-	Content        string    `json:"content"`
-	TenantID       string    `json:"tenant_id"`
-	AllowedTenants []string  `json:"allowed_tenants,omitempty"`
-	AllowedRoles   []string  `json:"allowed_roles,omitempty"`
-	Product        string    `json:"product"`
-	Version        string    `json:"version"`
-	Status         string    `json:"status"`
-	Visibility     string    `json:"visibility"`
-	ContentHash    string    `json:"content_hash,omitempty"`
-	EmbeddingModel string    `json:"embedding_model,omitempty"`
-	EmbeddingVer   string    `json:"embedding_version,omitempty"`
-	DocumentVer    string    `json:"document_version,omitempty"`
-	SourceRevision int64     `json:"source_revision,omitempty"`
-	IndexedAt      int64     `json:"indexed_at,omitempty"`
+	ChunkID        string   `json:"chunk_id"`
+	DocumentID     string   `json:"document_id"`
+	Title          string   `json:"title"`
+	Content        string   `json:"content"`
+	TenantID       string   `json:"tenant_id"`
+	AllowedTenants []string `json:"allowed_tenants,omitempty"`
+	AllowedRoles   []string `json:"allowed_roles,omitempty"`
+	Product        string   `json:"product"`
+	Version        string   `json:"version"`
+	Status         string   `json:"status"`
+	Visibility     string   `json:"visibility"`
+	ContentHash    string   `json:"content_hash,omitempty"`
+	EmbeddingModel string   `json:"embedding_model,omitempty"`
+	EmbeddingVer   string   `json:"embedding_version,omitempty"`
+	DocumentVer    string   `json:"document_version,omitempty"`
+	// Int64 fields are required by Milvus when dynamic fields are disabled.
+	// Do not omit zero values: the v2 REST row encoder otherwise sends an empty
+	// string for a missing scalar and Milvus rejects the whole batch.
+	SourceRevision int64     `json:"source_revision"`
+	IndexedAt      int64     `json:"indexed_at"`
 	Embedding      []float64 `json:"embedding"`
 }
 
@@ -148,6 +151,11 @@ type SearchHit struct {
 	Status         string      `json:"status"`
 	Visibility     string      `json:"visibility"`
 	Distance       float64     `json:"distance"`
+	// RerankScore is populated only inside the gateway after a local or hosted
+	// reranker runs. It is intentionally hidden from the Milvus/API payload;
+	// the gateway uses it to merge independently reranked bindings globally.
+	RerankScore    float64 `json:"-"`
+	RerankScoreSet bool    `json:"-"`
 }
 
 // stringArray accepts both the intuitive JSON array used by mocks and the
@@ -313,7 +321,31 @@ func (c *Client) Upsert(ctx context.Context, collection string, records []Record
 }
 
 func (c *Client) FlushCollection(ctx context.Context, collection string) error {
-	return c.post(ctx, "/v2/vectordb/collections/flush", map[string]any{"collectionName": collection}, nil)
+	// Milvus applies a deliberately low-rate limiter to flush operations. A
+	// document lifecycle update flushes before its read-after-write verify, so
+	// back off here instead of turning a harmless burst of imports into a
+	// failed ingestion job.
+	delays := []time.Duration{0, 2 * time.Second, 4 * time.Second, 8 * time.Second, 12 * time.Second}
+	var lastErr error
+	for index, delay := range delays {
+		if index > 0 {
+			timer := time.NewTimer(delay)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return ctx.Err()
+			case <-timer.C:
+			}
+		}
+		lastErr = c.post(ctx, "/v2/vectordb/collections/flush", map[string]any{"collectionName": collection}, nil)
+		if lastErr == nil {
+			return nil
+		}
+		if !strings.Contains(strings.ToLower(lastErr.Error()), "rate limit") {
+			return lastErr
+		}
+	}
+	return lastErr
 }
 
 func (c *Client) QueryEntities(ctx context.Context, collection, filter string, limit int) ([]Entity, error) {

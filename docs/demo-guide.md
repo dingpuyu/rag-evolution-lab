@@ -13,7 +13,7 @@ go run ./cmd/raglab validate --split v4-challenge
 Expected dataset summary:
 
 ```text
-valid documents=13 golden_cases=20
+valid documents=23 golden_cases=20
 ```
 
 ## 2. Compare aggregate metrics

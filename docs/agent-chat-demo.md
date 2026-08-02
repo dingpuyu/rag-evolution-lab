@@ -1,6 +1,6 @@
 # Agent 对话工作台体验
 
-门户里的 `IT 服务台 Agent` 是一个完整的应用级对话入口，不是单次 Demo 表单。它把身份、应用/环境、LangGraph 状态、工具调用和 Go RAG Gateway 串在一条请求链路上。
+门户里的「企业 Agent 工作台」是唯一的业务对话入口，不是单次 Demo 表单。它把知识问答、服务状态、权限查询和工单动作统一到一条应用级 Agent 链路中，并串起身份、应用/环境、LangGraph 状态、工具调用和 Go RAG Gateway。
 
 ## 启动
 
@@ -11,7 +11,7 @@ make stack-up
 
 默认端口是 `http://localhost:3000/portal`；如果本机 `.env` 将端口改为 `RAGLAB_WEB_PORT=13000`，则访问 `http://localhost:13000/portal`。Agent 服务默认监听 `8090`，健康检查为 `http://localhost:8090/healthz`。
 
-登录后从左侧进入「IT 服务台 Agent」。平台管理员可以选择应用和环境；每次请求都会把当前登录 Token 传给 Agent，再由 Go Gateway 重新校验应用绑定、租户和数据集权限。
+登录后默认进入「企业 Agent 工作台」。平台管理员可以选择应用和环境；每次请求都会把当前登录 Token 传给 Agent，再由 Go Gateway 重新校验应用绑定、租户和数据集权限。
 
 ## 建议体验顺序
 

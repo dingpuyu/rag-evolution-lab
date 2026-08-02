@@ -177,6 +177,7 @@ func (s *Service) Seed(ctx context.Context, chunks []domain.Chunk) (SeedResult, 
 	}
 	records := make([]Record, len(chunks))
 	documents := make(map[string]struct{})
+	indexedAt := time.Now().UnixMilli()
 	for index, chunk := range chunks {
 		documents[chunk.DocumentID] = struct{}{}
 		tenant := "public"
@@ -188,7 +189,8 @@ func (s *Service) Seed(ctx context.Context, chunks []domain.Chunk) (SeedResult, 
 			Content: chunk.Content, TenantID: tenant, Product: chunk.Product, Version: chunk.Version,
 			AllowedTenants: append([]string(nil), chunk.AllowedTenants...),
 			AllowedRoles:   append([]string(nil), chunk.AllowedRoles...),
-			Status:         chunk.Status, Visibility: chunk.Visibility, Embedding: vectors[index],
+			Status:         chunk.Status, Visibility: chunk.Visibility, SourceRevision: 1,
+			IndexedAt: indexedAt, Embedding: vectors[index],
 		}
 	}
 	rows, err := s.client.Upsert(ctx, s.collection, records)

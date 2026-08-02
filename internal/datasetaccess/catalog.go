@@ -75,6 +75,12 @@ func Defaults() *Catalog {
 	return New([]Dataset{
 		{ID: "public-identity", Name: "身份与单点登录", Description: "公开的 SSO、SAML 与 OIDC 产品文档", Product: "identity", Visibility: "public", Status: "active"},
 		{ID: "public-reports", Name: "报表中心", Description: "公开的报表导出与权限说明", Product: "reports", Visibility: "public", Status: "active"},
+		{ID: "public-api-platform", Name: "API 与开发者平台", Description: "API 限流、错误码与重试规范", Product: "api-gateway", Visibility: "public", Status: "active"},
+		{ID: "public-storage", Name: "文件与存储", Description: "文件上传、备份与跨区域复制说明", Product: "storage", Visibility: "public", Status: "active"},
+		{ID: "public-billing", Name: "套餐与计费", Description: "套餐能力、额度和计费规则", Product: "billing", Visibility: "public", Status: "active"},
+		{ID: "public-operations", Name: "服务运行与故障", Description: "服务状态、事件编号与故障判断指南", Product: "operations", Visibility: "public", Status: "active"},
+		{ID: "public-security", Name: "安全与审计", Description: "MFA、最小权限和审计留痕规范", Product: "security", Visibility: "public", Status: "active"},
+		{ID: "public-integrations", Name: "集成与 Webhook", Description: "Webhook 签名、幂等和重试约定", Product: "integrations", Visibility: "public", Status: "active"},
 		{ID: "tenant-a-operations", Name: "Tenant A 运维知识库", Description: "Tenant A 管理员专属运行手册", Product: "tenant-operations", Visibility: "tenant", OwnerTenant: "tenant_a", AllowedRoles: []string{"admin"}, Status: "active"},
 		{ID: "tenant-b-operations", Name: "Tenant B 运维知识库", Description: "Tenant B 管理员专属运行手册", Product: "tenant-operations", Visibility: "tenant", OwnerTenant: "tenant_b", AllowedRoles: []string{"admin"}, Status: "active"},
 	})

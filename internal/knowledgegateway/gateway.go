@@ -434,9 +434,21 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 			hits = append(hits, hit)
 		}
 	}
-	if !hasRerankedResults(results) {
-		sort.SliceStable(hits, func(i, j int) bool { return hits[i].Distance < hits[j].Distance })
-	}
+	// Each binding is reranked independently. Preserve that ordering inside a
+	// binding, but still perform a global merge before applying the application's
+	// final TopK; otherwise the first binding would consume the whole answer
+	// budget even when a later knowledge domain has stronger evidence.
+	sort.SliceStable(hits, func(i, j int) bool {
+		if hits[i].RerankScoreSet || hits[j].RerankScoreSet {
+			if hits[i].RerankScoreSet != hits[j].RerankScoreSet {
+				return hits[i].RerankScoreSet
+			}
+			if hits[i].RerankScore != hits[j].RerankScore {
+				return hits[i].RerankScore > hits[j].RerankScore
+			}
+		}
+		return hits[i].Distance < hits[j].Distance
+	})
 	if len(hits) > topK {
 		hits = hits[:topK]
 	}
@@ -446,15 +458,6 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 	merged.TotalLatencyMS = milliseconds(elapsed)
 	merged.Hits = hits
 	return merged
-}
-
-func hasRerankedResults(results []milvus.SearchResult) bool {
-	for _, result := range results {
-		if result.RerankApplied {
-			return true
-		}
-	}
-	return false
 }
 
 func milliseconds(duration time.Duration) float64 { return float64(duration.Microseconds()) / 1000 }

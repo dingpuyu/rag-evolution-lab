@@ -25,7 +25,7 @@ RAGLAB_GENERATION_MODEL=deepseek-chat
 
 1. 在“知识库”确认当前身份可见的知识空间。
 2. 在“导入资料”选择 Markdown/纯文本文件，或直接粘贴正文；确认文档 ID、版本和源修订号后提交。
-3. 在导入任务面板观察 `VALIDATE → CHUNK → EMBED → INDEX → VERIFY`，任务完成后回到“智能客服”。
+3. 在导入任务面板观察 `VALIDATE → CHUNK → EMBED → INDEX → VERIFY`，任务完成后回到“企业 Agent 工作台”。
 4. 选择刚才的知识库，点击示例问题或直接提问。回答完成后，右侧会自动展示本次召回的 chunks、相似度、过滤条件和来源引用。
 5. 点击“只看检索”可以单独观察召回质量，不经过生成模型。
 

@@ -215,7 +215,55 @@ func runMilvusSeed(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	writeJSON(result)
+	// The enterprise Dataset API and Application Gateway query the lifecycle
+	// alias rather than the legacy demo collection. Keep this command as the
+	// one-command local bootstrap by applying the same corpus to that managed
+	// collection as well. Re-running it is safe: revisions advance for
+	// documents already present in the local lifecycle state file.
+	lifecycleCollection := environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1")
+	lifecycleAlias := environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active")
+	lifecycleState := environmentOr("RAGLAB_LIFECYCLE_STATE", "/var/lib/raglab/lifecycle/state.json")
+	lifecycleVersion := environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1")
+	lifecycle, lifecycleErr := milvus.NewLifecycleService(milvus.NewClient(milvus.Config{BaseURL: *milvusURL}), embedder, milvus.LifecycleConfig{
+		Collection: lifecycleCollection, Alias: lifecycleAlias, EmbeddingVersion: lifecycleVersion,
+		StatePath: lifecycleState, ChunkRunes: 700,
+	})
+	if lifecycleErr != nil {
+		fatal(lifecycleErr)
+	}
+	lifecycleResults := make([]milvus.LifecycleResult, 0, len(documents))
+	for _, document := range documents {
+		revision := int64(1)
+		if state, ok := lifecycle.Status().Documents[document.ID]; ok && state.Revision >= revision {
+			revision = state.Revision + 1
+		}
+		change := milvus.LifecycleChange{
+			EventID: fmt.Sprintf("corpus-seed-%s-r%d", document.ID, revision), Operation: milvus.OperationUpsert,
+			Revision: revision, DocumentID: document.ID,
+			Document: &milvus.LifecycleDocument{
+				ID: document.ID, Title: document.Title, Content: document.Content, Product: document.Product,
+				Version: document.Version, Status: document.Status, Visibility: document.Visibility,
+				AllowedTenants: append([]string(nil), document.AllowedTenants...), AllowedRoles: append([]string(nil), document.AllowedRoles...),
+			},
+		}
+		lifecycleResult, applyErr := lifecycle.Apply(ctx, change)
+		if applyErr != nil {
+			fatal(fmt.Errorf("seed lifecycle document %q: %w", document.ID, applyErr))
+		}
+		lifecycleResults = append(lifecycleResults, lifecycleResult)
+	}
+	writeJSON(map[string]any{
+		"collection": result, "lifecycle_collection": lifecycleCollection, "lifecycle_alias": lifecycleAlias,
+		"lifecycle_documents": len(lifecycleResults), "lifecycle_chunks": sumLifecycleChunks(lifecycleResults),
+	})
+}
+
+func sumLifecycleChunks(results []milvus.LifecycleResult) int {
+	total := 0
+	for _, result := range results {
+		total += result.CurrentChunks
+	}
+	return total
 }
 
 func runLabServer(args []string) {

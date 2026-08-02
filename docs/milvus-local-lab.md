@@ -61,7 +61,7 @@ make milvus-seed
 
 命令执行的完整过程是：
 
-1. 加载 13 篇 AcmeCloud 文档并切成 38 个稳定 Chunk；
+1. 加载 23 篇 AcmeCloud 文档并切成 78 个稳定 Chunk；
 2. 批量调用 Ollama `/api/embed` 得到 2560 维 Document Embedding；
 3. 重建 `raglab_chunks_qwen3` Collection；
 4. 创建 HNSW/COSINE 索引；
@@ -115,7 +115,7 @@ curl -X POST http://127.0.0.1:8080/api/v1/milvus/search \
 | 项目 | 结果 |
 |---|---|
 | Collection | `raglab_chunks_qwen3` |
-| 数据 | 13 documents / 38 chunks / 38 rows |
+| 数据 | 23 documents / 78 chunks / 78 rows |
 | 向量 | 2560d FloatVector |
 | 索引 | HNSW / COSINE / `LoadStateLoaded` |
 | Query | `E1027 错误应该如何重试？` |

@@ -81,6 +81,8 @@ func (reranker HeuristicReranker) Rerank(ctx context.Context, query string, hits
 	result := make([]milvus.SearchHit, 0, len(ranked))
 	for _, candidate := range ranked {
 		if hit, ok := byID[candidate.Chunk.ID]; ok {
+			hit.RerankScore = candidate.Score
+			hit.RerankScoreSet = true
 			result = append(result, hit)
 		}
 	}
