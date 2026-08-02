@@ -190,7 +190,7 @@
     "doc_id": "tenant-a-internal-runbook-v2.3",
     "title": "Tenant A 内部运维手册",
     "doc_type": "troubleshooting",
-    "product": "operations",
+    "product": "tenant-operations",
     "version": "2.3",
     "status": "active",
     "effective_at": "2026-04-01T00:00:00Z",
@@ -202,6 +202,23 @@
     "source": "synthetic",
     "quality": "reviewed",
     "path": "documents/tenant-a-runbook-v2.3.md"
+  },
+  {
+    "doc_id": "tenant-b-internal-runbook-v2.3",
+    "title": "Tenant B 内部运维手册",
+    "doc_type": "troubleshooting",
+    "product": "tenant-operations",
+    "version": "2.3",
+    "status": "active",
+    "effective_at": "2026-04-01T00:00:00Z",
+    "expires_at": null,
+    "language": "mixed",
+    "visibility": "tenant",
+    "allowed_tenants": ["tenant_b"],
+    "allowed_roles": ["admin"],
+    "source": "synthetic",
+    "quality": "reviewed",
+    "path": "documents/tenant-b-runbook-v2.3.md"
   },
   {
     "doc_id": "support-ticket-legacy-export",

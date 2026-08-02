@@ -56,6 +56,12 @@ func (service *LifecycleService) Catalog(ctx context.Context) (Catalog, error) {
 	return (&Service{client: service.client, embedder: service.embedder, collection: service.config.Collection}).Catalog(ctx)
 }
 
+// CatalogForQuery applies the same dataset authorization filter to the
+// lifecycle collection used by the enterprise portal.
+func (service *LifecycleService) CatalogForQuery(ctx context.Context, query Query) (Catalog, error) {
+	return (&Service{client: service.client, embedder: service.embedder, collection: service.config.Collection}).CatalogForQuery(ctx, query)
+}
+
 type LifecycleDocument struct {
 	ID             string   `json:"document_id"`
 	Title          string   `json:"title"`

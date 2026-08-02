@@ -33,6 +33,22 @@ func (api *DatasetAPI) list(writer http.ResponseWriter, request *http.Request) {
 	})
 }
 
+// documents returns a metadata-only inventory for one authorized dataset.
+// The product/ACL filter is resolved from the server-side dataset policy; the
+// caller cannot supply a Milvus filter or inspect another dataset's rows.
+func (api *DatasetAPI) documents(writer http.ResponseWriter, request *http.Request) {
+	dataset, identity, ok := api.authorizeDataset(writer, request)
+	if !ok {
+		return
+	}
+	catalog, err := api.service.CatalogForQuery(request.Context(), buildDatasetQuery(dataset, identity, "", 0))
+	if err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "dataset_catalog_unavailable", err.Error())
+		return
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"dataset": dataset, "catalog": catalog})
+}
+
 func (api *DatasetAPI) search(writer http.ResponseWriter, request *http.Request) {
 	dataset, identity, ok := api.authorizeDataset(writer, request)
 	if !ok {
@@ -166,6 +182,16 @@ func buildDatasetQuery(dataset datasetaccess.Dataset, identity auth.Identity, te
 		query.Tenant = "public"
 		query.Role = "viewer"
 		query.AccessScope = "public_only"
+	} else if identity.HasRole("platform_admin") {
+		// Platform operators may inspect a tenant space, but the Milvus filter
+		// still evaluates that space with its owner tenant and an allowed role.
+		// This keeps the detail/search path bounded to the selected dataset.
+		query.Tenant = dataset.OwnerTenant
+		query.Role = "admin"
+		if len(dataset.AllowedRoles) > 0 {
+			query.Role = dataset.AllowedRoles[0]
+		}
+		query.AccessScope = "tenant_only"
 	} else {
 		query.Tenant = identity.TenantID
 		query.Role = identity.PrimaryRole()

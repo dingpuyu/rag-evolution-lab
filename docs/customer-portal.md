@@ -28,13 +28,21 @@ npm run dev
 5. 导入资料：租户管理员只能向自己拥有的租户知识库写入资料。提交后进入异步 Job，门户看板实时展示 validating → chunking → embedding → indexing → verifying、Worker 心跳、尝试次数和写后校验；失败任务可在页面重试，运行任务可人工取消。
 6. 权限与审计：显示当前 Claims、PostgreSQL membership、知识库策略和平台管理员的请求审计。
 
-当前演示语料包含 23 篇 AcmeCloud 文档、78 个 Chunk，覆盖身份、报表、API、存储、计费、运维、安全和集成八个公开知识域；Tenant A/B 仍各自保留独立的运维知识库绑定。
+当前演示语料包含 24 篇 AcmeCloud 文档、80 个 Chunk，覆盖身份、报表、API、存储、计费、运维、安全和集成八个公开知识域；Tenant A/B 现在各自有独立的运维手册并通过租户 ACL 隔离。
 
 平台管理员登录后进入“知识库”页，可以在“向量库入库目录”看到当前生命周期 Collection 的实际库存：文档标题、文档 ID、产品/版本、可见性、每篇文档的 Chunk 数，以及 Collection、Embedding 模型、向量维度和总行数。目录接口只返回元数据，不返回正文，并且服务端只允许 `platform_admin` 访问：
 
 ```text
 GET /api/v1/milvus/catalog
 ```
+
+点击某个知识空间后，门户会调用数据集级目录接口，只返回当前空间且经过租户/角色过滤的资料：
+
+```text
+GET /api/v1/datasets/{dataset_id}/documents
+```
+
+平台管理员查看租户空间时也会沿用该空间的 owner tenant 和允许角色过滤，不会因为管理员身份把其他空间的内容混进来。
 
 当前生产配置使用 DashScope OpenAI-compatible `text-embedding-v4`、1024 维向量，生命周期 Collection 为 `raglab_lifecycle_qwen_v4_1024`，别名为 `raglab_knowledge_qwen_v4_1024`。旧的 2560 维 Collection 保留用于回滚/对比，不会混入当前目录。
 

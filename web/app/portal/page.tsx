@@ -75,6 +75,7 @@ type VectorCatalog = {
   document_count: number;
   documents: StoredDocument[];
 };
+type DatasetCatalogResponse = { dataset: Dataset; catalog: VectorCatalog };
 type ChunkPreview = { id: string; parent_id: string; parent_sequence: number; source_page: number; sequence: number; heading_path?: string[]; content: string; parent_content: string };
 type ChunkPreviewResponse = { chunker_version: string; max_runes: number; overlap_runes: number; parent_count: number; child_count: number; pages: number[]; chunks: ChunkPreview[] };
 type AnswerResponse = {
@@ -130,6 +131,9 @@ export default function CustomerPortal() {
   const [view, setView] = useState<"knowledge" | "ingest" | "access" | "apps" | "agent" | "runtime">("agent");
   const [datasets, setDatasets] = useState<Dataset[]>([]);
   const [catalog, setCatalog] = useState<VectorCatalog | null>(null);
+  const [datasetCatalog, setDatasetCatalog] = useState<DatasetCatalogResponse | null>(null);
+  const [datasetCatalogLoading, setDatasetCatalogLoading] = useState(false);
+  const [datasetCatalogError, setDatasetCatalogError] = useState("");
   const [selectedDataset, setSelectedDataset] = useState("");
   const [query, setQuery] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -201,6 +205,11 @@ export default function CustomerPortal() {
     if (datasets.length && !datasets.some((dataset) => dataset.id === selectedDataset)) setSelectedDataset(datasets[0].id);
   }, [datasets, selectedDataset]);
 
+  useEffect(() => {
+    if (!datasetCatalog) return;
+    window.document.querySelector(".catalog-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [datasetCatalog]);
+
   async function api(path: string, init: RequestInit = {}, token = session?.access_token) {
     const headers = new Headers(init.headers);
     headers.set("Content-Type", "application/json");
@@ -239,6 +248,8 @@ export default function CustomerPortal() {
 
   async function loadWorkspace(active: Session) {
     try {
+      setDatasetCatalog(null);
+      setDatasetCatalogError("");
       const response = await api("/api/v1/datasets", {}, active.access_token);
       const body = (await response.json()) as { datasets: Dataset[] };
       setDatasets(body.datasets ?? []);
@@ -257,6 +268,26 @@ export default function CustomerPortal() {
       setCatalog((await response.json()) as VectorCatalog);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "入库目录加载失败");
+    }
+  }
+
+  async function openDataset(datasetID: string, token = session?.access_token) {
+    if (!token || !datasetID) return;
+    setSelectedDataset(datasetID);
+    const dataset = datasets.find((item) => item.id === datasetID);
+    setNotice(`正在读取「${dataset?.name ?? datasetID}」已入库资料…`);
+    setDatasetCatalogLoading(true);
+    setDatasetCatalogError("");
+    try {
+      const response = await api(`/api/v1/datasets/${encodeURIComponent(datasetID)}/documents`, {}, token);
+      setDatasetCatalog((await response.json()) as DatasetCatalogResponse);
+      setNotice(`已加载「${dataset?.name ?? datasetID}」的入库资料。`);
+    } catch (error) {
+      setDatasetCatalog(null);
+      setDatasetCatalogError(error instanceof Error ? error.message : "空间内容加载失败");
+      setNotice(error instanceof Error ? error.message : "空间内容加载失败");
+    } finally {
+      setDatasetCatalogLoading(false);
     }
   }
 
@@ -721,7 +752,7 @@ export default function CustomerPortal() {
         {view === "agent" && <AgentView applications={applications} environments={environments} selectedApplication={selectedApplication} setSelectedApplication={setSelectedApplication} selectedEnvironment={selectedEnvironment} setSelectedEnvironment={setSelectedEnvironment} query={agentQuery} setQuery={setAgentQuery} messages={agentMessages} answer={agentAnswer} busy={agentBusy} ask={() => void askAgent()} confirming={agentConfirming} confirm={(response, query) => void confirmAgent(response, query)} clear={clearAgentConversation} />}
         {view === "apps" && <ApplicationView applications={applications} environments={environments} selectedApplication={selectedApplication} setSelectedApplication={setSelectedApplication} selectedEnvironment={selectedEnvironment} setSelectedEnvironment={setSelectedEnvironment} current={currentApplication} query={appQuery} setQuery={setAppQuery} answer={appAnswer} busy={appBusy} ask={() => void askApplication()} />}
         {view === "runtime" && <RuntimeView applications={applications} environments={environments} selectedApplication={selectedApplication} setSelectedApplication={setSelectedApplication} selectedEnvironment={selectedEnvironment} setSelectedEnvironment={setSelectedEnvironment} builds={indexBuilds} releases={indexReleases} credentials={credentials} trace={runtimeTrace} loading={runtimeLoading} error={runtimeError} buildForm={buildForm} setBuildForm={setBuildForm} submitBuild={submitIndexBuild} publish={publishIndex} rollback={rollbackIndex} credentialName={credentialName} setCredentialName={setCredentialName} credentialScopes={credentialScopes} toggleCredentialScope={toggleCredentialScope} createCredential={createCredential} secret={credentialSecret} revokeCredential={revokeCredential} />}
-        {view === "knowledge" && <KnowledgeView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isAdmin={isAdmin} form={newDataset} setForm={setNewDataset} toggleRole={toggleRole} create={createKnowledgeBase} catalog={catalog} refreshCatalog={() => void loadCatalog()} />}
+        {view === "knowledge" && <KnowledgeView datasets={datasets} selected={selectedDataset} setSelected={(datasetID) => { setSelectedDataset(datasetID); void openDataset(datasetID); }} datasetCatalog={datasetCatalog} datasetCatalogLoading={datasetCatalogLoading} datasetCatalogError={datasetCatalogError} isAdmin={isAdmin} form={newDataset} setForm={setNewDataset} toggleRole={toggleRole} create={createKnowledgeBase} catalog={datasetCatalog?.catalog ?? catalog} refreshCatalog={() => void openDataset(selectedDataset)} />}
         {view === "ingest" && <><IngestView datasets={datasets} selected={selectedDataset} setSelected={setSelectedDataset} isPlatformAdmin={isPlatformAdmin} document={document} setDocument={(next) => { setDocument(next); setChunkPreview(null); }} loadFile={(file) => void loadDocumentFile(file)} submit={importDocument} importing={importing} preview={previewDocument} previewBusy={previewBusy} chunkPreview={chunkPreview} /><IngestionTaskBoard summary={ingestionSummary} error={ingestionError} refreshing={ingestionRefreshing} refresh={() => void refreshDatasetJobs()} mutate={mutateDatasetJob} /></>}
         {view === "access" && <AccessView session={session} datasets={datasets} memberships={memberships} audit={audit} isPlatformAdmin={isPlatformAdmin} />}
       </section>
@@ -808,7 +839,7 @@ function EvidenceCard({ hit }: { hit: SearchHit }) {
   return <article className="evidence-card"><div className="evidence-top"><span>{hit.title}</span><b>{hit.distance.toFixed(3)}</b></div><p>{hit.content.slice(0, 170)}{hit.content.length > 170 ? "…" : ""}</p><small><span>{hit.visibility === "public" ? "PUBLIC" : hit.tenant_id}</span><span>{hit.version || "active"}</span></small></article>;
 }
 
-function KnowledgeView(props: { datasets: Dataset[]; selected: string; setSelected: (value: string) => void; isAdmin: boolean; form: { name: string; slug: string; description: string; visibility: string; allowed_roles: string[] }; setForm: (form: { name: string; slug: string; description: string; visibility: string; allowed_roles: string[] }) => void; toggleRole: (role: string) => void; create: (event: FormEvent) => void; catalog?: VectorCatalog | null; refreshCatalog: () => void }) {
+function KnowledgeView(props: { datasets: Dataset[]; selected: string; setSelected: (value: string) => void; datasetCatalog?: DatasetCatalogResponse | null; datasetCatalogLoading: boolean; datasetCatalogError: string; isAdmin: boolean; form: { name: string; slug: string; description: string; visibility: string; allowed_roles: string[] }; setForm: (form: { name: string; slug: string; description: string; visibility: string; allowed_roles: string[] }) => void; toggleRole: (role: string) => void; create: (event: FormEvent) => void; catalog?: VectorCatalog | null; refreshCatalog: () => void }) {
   return <div className="content-page"><div className="page-intro"><div><span className="section-kicker">AUTHORIZED DATASETS</span><h2>知识库目录</h2><p>每次搜索都会在服务端重新校验数据集、租户和角色，前端不会持有“可见全部数据”的权限。</p></div><span className="metric-pill">{props.datasets.length} 个可见空间</span></div><div className="dataset-grid">{props.datasets.map((dataset) => <button className={`dataset-card ${props.selected === dataset.id ? "selected" : ""}`} key={dataset.id} onClick={() => props.setSelected(dataset.id)}><div className="dataset-icon">{dataset.visibility === "public" ? "◌" : "⌂"}</div><div className="dataset-card-main"><div className="dataset-title"><h3>{dataset.name}</h3><span className={dataset.visibility === "public" ? "public-tag" : "tenant-tag"}>{dataset.visibility === "public" ? "公开" : "租户隔离"}</span></div><p>{dataset.description}</p><small>{dataset.id} · {dataset.allowed_roles?.join(" / ") || "viewer"}</small></div><span className="arrow">→</span></button>)}</div>{props.catalog && <section className="create-panel catalog-panel"><div className="panel-heading"><div><span className="section-kicker">MILVUS CATALOG / PLATFORM ADMIN</span><h3>向量库入库目录</h3></div><button type="button" className="ghost-button" onClick={props.refreshCatalog}>刷新目录</button></div><div className="catalog-summary"><span><b>{props.catalog.document_count}</b> 文档</span><span><b>{props.catalog.rows}</b> chunks</span><span><b>{props.catalog.dimensions}</b> 维向量</span><span>{props.catalog.embedder}</span></div><div className="catalog-collection"><code>{props.catalog.collection}</code><span>仅展示元数据；正文仍需走授权检索</span></div><div className="catalog-documents">{props.catalog.documents.map((document) => <div className="catalog-document" key={document.document_id}><div className="catalog-document-main"><strong>{document.title || document.document_id}</strong><small>{document.document_id} · {document.product || "通用"} · {document.version || "未标版本"}</small></div><span className="catalog-document-status">{document.chunks} chunks · {document.visibility || "tenant"}</span></div>)}</div></section>}{props.isAdmin && <form className="create-panel" onSubmit={props.create}><div className="panel-heading"><div><span className="section-kicker">CONTROL PLANE</span><h3>创建一个知识空间</h3></div><span className="lock-badge">ADMIN ONLY</span></div><div className="form-grid"><label>名称<input value={props.form.name} onChange={(event) => props.setForm({ ...props.form, name: event.target.value })} placeholder="例如：售后服务手册" required /></label><label>Slug<input value={props.form.slug} onChange={(event) => props.setForm({ ...props.form, slug: event.target.value })} placeholder="after-sales" pattern="[a-z0-9]+(?:-[a-z0-9]+)*" required /></label><label className="wide">描述<input value={props.form.description} onChange={(event) => props.setForm({ ...props.form, description: event.target.value })} placeholder="描述这个知识库服务的业务范围" /></label><label>可见范围<select value={props.form.visibility} onChange={(event) => props.setForm({ ...props.form, visibility: event.target.value })}><option value="tenant">当前租户</option><option value="public">公开（平台管理员）</option></select></label><div className="role-picker"><span>允许角色</span><div><button type="button" className={props.form.allowed_roles.includes("viewer") ? "chosen" : ""} onClick={() => props.toggleRole("viewer")}>Viewer</button><button type="button" className={props.form.allowed_roles.includes("admin") ? "chosen" : ""} onClick={() => props.toggleRole("admin")}>Admin</button></div></div></div><button className="primary-button compact" type="submit">创建知识库 <span>→</span></button></form>}</div>;
 }
 

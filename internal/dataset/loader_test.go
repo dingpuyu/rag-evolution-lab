@@ -11,8 +11,8 @@ func TestLoadCorpusAndGoldenSplits(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(documents) != 23 {
-		t.Fatalf("expected 23 documents, got %d", len(documents))
+	if len(documents) != 24 {
+		t.Fatalf("expected 24 documents, got %d", len(documents))
 	}
 	cases, err := LoadGolden(filepath.Join(root, "golden"), "development")
 	if err != nil {

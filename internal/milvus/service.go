@@ -176,7 +176,22 @@ func (s *Service) Catalog(ctx context.Context) (Catalog, error) {
 	if err != nil {
 		return Catalog{}, err
 	}
-	entities, err := s.client.QueryEntities(ctx, s.collection, "source_revision > 0", 16_384)
+	return s.catalogWithStatus(ctx, status, "source_revision > 0")
+}
+
+// CatalogForQuery returns a metadata-only inventory constrained by the same
+// tenant/product/status policy used for dataset search. It is the safe detail
+// view behind the portal's dataset cards.
+func (s *Service) CatalogForQuery(ctx context.Context, query Query) (Catalog, error) {
+	status, err := s.Status(ctx)
+	if err != nil {
+		return Catalog{}, err
+	}
+	return s.catalogWithStatus(ctx, status, "("+buildFilter(query)+") and source_revision > 0")
+}
+
+func (s *Service) catalogWithStatus(ctx context.Context, status Status, filter string) (Catalog, error) {
+	entities, err := s.client.QueryEntities(ctx, s.collection, filter, 16_384)
 	if err != nil {
 		return Catalog{}, fmt.Errorf("list stored documents: %w", err)
 	}
@@ -213,7 +228,7 @@ func (s *Service) Catalog(ctx context.Context) (Catalog, error) {
 	})
 	return Catalog{
 		Collection: status.Collection, Embedder: status.Embedder, Dimensions: status.Dimensions,
-		Rows: status.RowCount, DocumentCount: len(documents), Documents: documents,
+		Rows: int64(len(entities)), DocumentCount: len(documents), Documents: documents,
 	}, nil
 }
 
