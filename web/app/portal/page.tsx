@@ -75,7 +75,7 @@ type RuntimeTrace = { trace_id: string; app_id: string; environment_id: string; 
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8080";
 const DEMOS = [
-  { label: "平台管理员", email: "admin@raglab.local", password: "RagLab-Platform-2026!" },
+  { label: "平台管理员", email: "admin@raglab.local", password: "change-this-admin-password" },
   { label: "Tenant A 管理员", email: "alice@tenant-a.local", password: "RagLab-Alice-2026!" },
   { label: "Tenant B 管理员", email: "bob@tenant-b.local", password: "RagLab-Bob-2026!" },
 ];
