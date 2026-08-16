@@ -84,6 +84,20 @@ func TestChunkerPageAwareParentChildProvenance(t *testing.T) {
 	}
 }
 
+func TestChunkerPreservesSheetAndCellRangeProvenance(t *testing.T) {
+	document := domain.Document{ID: "matrix", Content: "<!-- sheet: 兼容矩阵; range: A1:D8 -->\n## 配件\n\nWL-M2 | 2.6.2"}
+	chunks := (Chunker{MaxRunes: 100, PageAware: true}).Chunk(document)
+	if len(chunks) != 1 {
+		t.Fatalf("expected one chunk, got %d", len(chunks))
+	}
+	if chunks[0].SourceSheet != "兼容矩阵" || chunks[0].SourceCellRange != "A1:D8" {
+		t.Fatalf("spreadsheet provenance lost: %#v", chunks[0])
+	}
+	if strings.Contains(chunks[0].Content, "<!-- sheet:") {
+		t.Fatalf("marker leaked into retrieval content: %q", chunks[0].Content)
+	}
+}
+
 func TestChunkerOverlapIsDeterministicAndSharedByParent(t *testing.T) {
 	document := domain.Document{ID: "long", Content: "abcdefghijklmnopqrstuvwx"}
 	chunks := (Chunker{MaxRunes: 10, OverlapRunes: 3}).Chunk(document)

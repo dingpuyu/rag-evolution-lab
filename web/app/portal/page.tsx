@@ -835,6 +835,7 @@ function AnswerMeta({ response }: { response: AnswerResponse }) {
   return <div className="answer-meta"><div className="answer-stats">{response.answer_source === "persona" ? <span>通用人设回复 · 未使用知识库</span> : <span>召回 {response.search.hits.length} 条</span>}<span>{Math.round(response.search.total_latency_ms)} ms</span><span>{response.generation.model || response.generation.generator}</span></div>{response.citations?.length > 0 && <div className="citation-list"><span>引用来源</span>{response.citations.slice(0, 3).map((citation) => <button key={citation.chunk_id} title={citation.excerpt}>⌕ {citation.document}</button>)}</div>}</div>;
 }
 
+// The ingestion lifecycle enforced by the API is VALIDATE → EMBED → INDEX → VERIFY.
 function EvidenceCard({ hit }: { hit: SearchHit }) {
   return <article className="evidence-card"><div className="evidence-top"><span>{hit.title}</span><b>{hit.distance.toFixed(3)}</b></div><p>{hit.content.slice(0, 170)}{hit.content.length > 170 ? "…" : ""}</p><small><span>{hit.visibility === "public" ? "PUBLIC" : hit.tenant_id}</span><span>{hit.version || "active"}</span></small></article>;
 }

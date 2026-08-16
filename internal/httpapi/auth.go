@@ -14,9 +14,12 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentparser"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentstore"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
 	"github.com/dingpuyu/rag-evolution-lab/internal/indexbuild"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
+	"github.com/dingpuyu/rag-evolution-lab/internal/knowledgegateway"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
 	"go.opentelemetry.io/otel"
@@ -45,6 +48,9 @@ type EnterpriseOptions struct {
 	Tracer              trace.Tracer
 	Cost                *cost.Calculator
 	Limiter             ratelimit.Gate
+	DocumentParser      *documentparser.Client
+	DocumentStore       documentstore.Store
+	Reranker            knowledgegateway.HitReranker
 }
 
 type authAPI struct {

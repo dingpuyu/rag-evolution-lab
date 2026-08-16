@@ -1,4 +1,4 @@
-.PHONY: fmt test agent-test validate validate-v4 medical-validate medical-eval medical-compare ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
+.PHONY: fmt test agent-test parser-test validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-smoke ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
 DOCKER_COMPOSE ?= docker-compose
 STACK_ENV_FILE = $(if $(wildcard .env),--env-file .env,)
@@ -14,6 +14,9 @@ test:
 agent-test:
 	cd services/agent-orchestrator && uv run --extra test pytest
 
+parser-test:
+	cd services/document-parser && uv run --extra test pytest
+
 validate:
 	go run ./cmd/raglab validate
 
@@ -26,8 +29,24 @@ medical-validate:
 medical-eval:
 	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline $${PIPELINE:-v5-rerank} --split development
 
+medical-eval-all:
+	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab validate --split development
+	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab validate --split regression
+	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline $${PIPELINE:-v5-rerank} --split development
+	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline $${PIPELINE:-v5-rerank} --split regression
+
 medical-compare:
 	RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab compare --baseline v0-keyword --candidate v5-rerank --split development
+
+medical-up: stack-up
+	@echo "PulseCare 医疗设备 Agent: http://localhost:$${RAGLAB_WEB_PORT:-3000}/medical"
+
+medical-bootstrap:
+	cd services/document-parser && uv run python ../../scripts/generate_medical_formats.py
+	python3 scripts/medical_bootstrap.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080}
+
+medical-smoke:
+	python3 scripts/medical_smoke.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080} --agent $${RAGLAB_AGENT_URL:-http://127.0.0.1:8090}
 
 ingest:
 	go run ./cmd/raglab ingest

@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_correction_wrong_version",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "conflict_resolution",
+  "query": "VSM-100 Pro 2.6.0、批次 L26A03 是否还受 FC-2026-04 影响？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["field-correction-fc-2026-04"], "relevant_chunk_ids": [], "required_facts": ["软件 2.6", "不在本通知范围"], "forbidden_facts": ["属于适用范围"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "批次和型号匹配但版本不适用。"
+}

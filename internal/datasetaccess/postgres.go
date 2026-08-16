@@ -524,6 +524,35 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			}
 		}
 	}
+	for _, application := range []struct {
+		id, tenant, privateDataset string
+	}{
+		{"tenant_a-medical-device-agent", "tenant_a", "tenant-a-medical-runbook"},
+		{"tenant_b-medical-device-agent", "tenant_b", "tenant-b-medical-runbook"},
+	} {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO applications (app_id,tenant_id,name,slug,description,status,created_by)
+			VALUES ($1,$2,'PulseCare 医疗设备运维 Agent','medical-device-agent',$3,'active','system')
+			ON CONFLICT (app_id) DO NOTHING`, application.id, application.tenant,
+			"面向医学工程与设备运维人员的虚构医疗设备知识问答应用"); err != nil {
+			return err
+		}
+		environmentID := application.id + "-dev"
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO app_environments (environment_id,app_id,name,config_version,status)
+			VALUES ($1,$2,'dev','medical-v1','active') ON CONFLICT (environment_id) DO NOTHING`, environmentID, application.id); err != nil {
+			return err
+		}
+		policy, _ := json.Marshal(RetrievalPolicy{TopK: 5, CandidateK: 20, Rerank: true, QueryRewrite: true, TokenBudget: 5000, AllowFallback: true})
+		for priority, datasetID := range []string{"public-medical-device", application.privateDataset} {
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO knowledge_bindings (app_id,environment_id,dataset_id,purpose,priority,status,policy,created_by)
+				VALUES ($1,$2,$3,'medical device operations knowledge',$4,'active',$5,'system')
+				ON CONFLICT (app_id,environment_id,dataset_id) DO NOTHING`, application.id, environmentID, datasetID, 20-priority*10, policy); err != nil {
+				return err
+			}
+		}
+	}
 	return tx.Commit()
 }
 
@@ -760,6 +789,33 @@ CREATE TABLE IF NOT EXISTS index_builds (
 );
 CREATE INDEX IF NOT EXISTS index_builds_scope_idx ON index_builds(app_id, environment_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS index_builds_pending_idx ON index_builds(status, created_at);
+CREATE TABLE IF NOT EXISTS knowledge_document_revisions (
+	dataset_id text NOT NULL REFERENCES datasets(id) ON DELETE CASCADE,
+	document_id text NOT NULL,
+	title text NOT NULL,
+	source_revision bigint NOT NULL,
+	document_version text NOT NULL DEFAULT '',
+	file_name text NOT NULL,
+	content_type text NOT NULL DEFAULT '',
+	source_uri text NOT NULL,
+	ir_uri text NOT NULL DEFAULT '',
+	source_hash text NOT NULL,
+	parser_status text NOT NULL,
+	index_status text NOT NULL,
+	job_id text NOT NULL DEFAULT '',
+	block_count integer NOT NULL DEFAULT 0,
+	chunk_count integer NOT NULL DEFAULT 0,
+	index_version text NOT NULL DEFAULT '',
+	metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+	warnings jsonb NOT NULL DEFAULT '[]'::jsonb,
+	last_error text NOT NULL DEFAULT '',
+	created_by text NOT NULL,
+	created_at timestamptz NOT NULL DEFAULT now(),
+	updated_at timestamptz NOT NULL DEFAULT now(),
+	PRIMARY KEY (dataset_id, document_id, source_revision)
+);
+CREATE INDEX IF NOT EXISTS knowledge_document_revisions_dataset_status_idx
+	ON knowledge_document_revisions(dataset_id, index_status, updated_at DESC);
 `
 
 var _ Store = (*PostgresStore)(nil)

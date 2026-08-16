@@ -37,6 +37,7 @@ type LifecycleConfig struct {
 	EmbeddingVersion string
 	StatePath        string
 	ChunkRunes       int
+	HybridSearch     bool
 	Now              func() time.Time
 }
 
@@ -63,15 +64,35 @@ func (service *LifecycleService) CatalogForQuery(ctx context.Context, query Quer
 }
 
 type LifecycleDocument struct {
-	ID             string   `json:"document_id"`
-	Title          string   `json:"title"`
-	Content        string   `json:"content"`
-	Product        string   `json:"product"`
-	Version        string   `json:"version"`
-	Status         string   `json:"status"`
-	Visibility     string   `json:"visibility"`
-	AllowedTenants []string `json:"allowed_tenants"`
-	AllowedRoles   []string `json:"allowed_roles"`
+	ID                  string   `json:"document_id"`
+	DatasetID           string   `json:"dataset_id"`
+	Title               string   `json:"title"`
+	Content             string   `json:"content"`
+	Product             string   `json:"product"`
+	Version             string   `json:"version"`
+	Status              string   `json:"status"`
+	Visibility          string   `json:"visibility"`
+	AllowedTenants      []string `json:"allowed_tenants"`
+	AllowedRoles        []string `json:"allowed_roles"`
+	Domain              string   `json:"domain,omitempty"`
+	Manufacturer        string   `json:"manufacturer,omitempty"`
+	ProductFamily       string   `json:"product_family,omitempty"`
+	ModelCodes          []string `json:"model_codes,omitempty"`
+	SoftwareVersionFrom string   `json:"software_version_from,omitempty"`
+	SoftwareVersionTo   string   `json:"software_version_to,omitempty"`
+	HardwareRevision    string   `json:"hardware_revision,omitempty"`
+	Region              string   `json:"region,omitempty"`
+	Language            string   `json:"language,omitempty"`
+	EffectiveFrom       string   `json:"effective_from,omitempty"`
+	EffectiveTo         string   `json:"effective_to,omitempty"`
+	AuthorityLevel      string   `json:"authority_level,omitempty"`
+	DocumentRevision    string   `json:"document_revision,omitempty"`
+	Supersedes          []string `json:"supersedes,omitempty"`
+	SourceFile          string   `json:"source_file,omitempty"`
+	SourceSheet         string   `json:"source_sheet,omitempty"`
+	SourceCellRange     string   `json:"source_cell_range,omitempty"`
+	DeviceIdentifiers   []string `json:"device_identifiers,omitempty"`
+	AffectedLots        []string `json:"affected_lots,omitempty"`
 }
 
 type LifecycleChange struct {
@@ -151,7 +172,7 @@ func NewLifecycleService(client *Client, embedder retrieval.Embedder, config Lif
 		config.Now = time.Now
 	}
 	service := &LifecycleService{
-		client: client, embedder: embedder, chunker: ingest.Chunker{MaxRunes: config.ChunkRunes}, config: config,
+		client: client, embedder: embedder, chunker: ingest.Chunker{MaxRunes: config.ChunkRunes, OverlapRunes: 80, PageAware: true}, config: config,
 		state: lifecycleState{SchemaVersion: 1, Events: make(map[string]persistedLifecycleEvent), Documents: make(map[string]DocumentState)},
 	}
 	if err := service.loadState(); err != nil {
@@ -297,15 +318,27 @@ func (service *LifecycleService) Search(ctx context.Context, query Query) (Searc
 		collection = service.config.Alias
 	}
 	searchStarted := time.Now()
-	hits, err := service.client.Search(ctx, SearchRequest{
-		Collection: collection, Vector: vector, Filter: filter, Limit: query.TopK,
-	})
+	var hits []SearchHit
+	if service.config.HybridSearch {
+		hits, err = service.client.HybridSearch(ctx, HybridSearchRequest{
+			Collection: collection, Vector: vector, QueryText: query.Text, Filter: filter,
+			Limit: query.TopK, CandidateK: min(query.TopK*4, 80), RRFK: 60,
+		})
+		if err != nil {
+			return SearchResult{}, fmt.Errorf("Milvus hybrid search failed; publish a collection with BM25 sparse schema or disable hybrid retrieval: %w", err)
+		}
+	} else {
+		hits, err = service.client.Search(ctx, SearchRequest{
+			Collection: collection, Vector: vector, Filter: filter, Limit: query.TopK,
+		})
+	}
 	if err != nil {
 		return SearchResult{}, err
 	}
+	applyExactIdentifierBoost(query.Text, hits)
 	return SearchResult{
 		Query: query.Text, Collection: collection, Embedder: service.embedder.Name(), Dimensions: len(vector),
-		Metric: "COSINE", Filter: filter, EmbeddingLatencyMS: milliseconds(embedLatency),
+		Metric: retrievalMetric(service.config.HybridSearch), Filter: filter, EmbeddingLatencyMS: milliseconds(embedLatency),
 		SearchLatencyMS: milliseconds(time.Since(searchStarted)), TotalLatencyMS: milliseconds(time.Since(totalStarted)), Hits: hits,
 	}, nil
 }
@@ -333,7 +366,7 @@ func (service *LifecycleService) ValidateCollection(ctx context.Context, collect
 		"chunk_id": false, "document_id": false, "title": false, "content": false,
 		"tenant_id": false, "allowed_tenants": false, "allowed_roles": false,
 		"product": false, "version": false, "status": false, "visibility": false,
-		"embedding": false, "embedding_model": false, "embedding_version": false,
+		"embedding": false, "sparse": false, "embedding_model": false, "embedding_version": false,
 	}
 	for _, field := range description.Fields {
 		if _, required := requiredFields[field.Name]; required {
@@ -416,6 +449,32 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 		Version: document.Version, Status: document.Status, Visibility: document.Visibility,
 		AllowedTenants: document.AllowedTenants, AllowedRoles: document.AllowedRoles,
 	})
+	for index := range chunks {
+		chunks[index].DatasetID = document.DatasetID
+		chunks[index].Domain = document.Domain
+		chunks[index].Manufacturer = document.Manufacturer
+		chunks[index].ProductFamily = document.ProductFamily
+		chunks[index].ModelCodes = append([]string(nil), document.ModelCodes...)
+		chunks[index].SoftwareVersionFrom = document.SoftwareVersionFrom
+		chunks[index].SoftwareVersionTo = document.SoftwareVersionTo
+		chunks[index].HardwareRevision = document.HardwareRevision
+		chunks[index].Region = document.Region
+		chunks[index].Language = document.Language
+		chunks[index].EffectiveFrom = document.EffectiveFrom
+		chunks[index].EffectiveTo = document.EffectiveTo
+		chunks[index].AuthorityLevel = document.AuthorityLevel
+		chunks[index].DocumentRevision = document.DocumentRevision
+		chunks[index].Supersedes = append([]string(nil), document.Supersedes...)
+		chunks[index].SourceFile = document.SourceFile
+		if chunks[index].SourceSheet == "" {
+			chunks[index].SourceSheet = document.SourceSheet
+		}
+		if chunks[index].SourceCellRange == "" {
+			chunks[index].SourceCellRange = document.SourceCellRange
+		}
+		chunks[index].DeviceIdentifiers = append([]string(nil), document.DeviceIdentifiers...)
+		chunks[index].AffectedLots = append([]string(nil), document.AffectedLots...)
+	}
 	if len(chunks) == 0 {
 		return LifecycleResult{}, fmt.Errorf("document %q produced no chunks", documentID)
 	}
@@ -456,9 +515,17 @@ func (service *LifecycleService) applyUpsert(ctx context.Context, change Lifecyc
 			tenant = chunk.AllowedTenants[0]
 		}
 		records[index] = Record{
-			ChunkID: chunk.ID, DocumentID: documentID, Title: chunk.DocumentTitle, Content: chunk.Content,
+			ChunkID: chunk.ID, DocumentID: documentID, DatasetID: chunk.DatasetID, Title: chunk.DocumentTitle, Content: chunk.Content,
 			TenantID: tenant, AllowedTenants: append([]string(nil), chunk.AllowedTenants...),
 			AllowedRoles: append([]string(nil), chunk.AllowedRoles...), Product: chunk.Product,
+			Domain: chunk.Domain, Manufacturer: chunk.Manufacturer, ProductFamily: chunk.ProductFamily,
+			ModelCodes: append([]string(nil), chunk.ModelCodes...), HardwareRevision: chunk.HardwareRevision,
+			SoftwareVersionFrom: chunk.SoftwareVersionFrom, SoftwareVersionTo: chunk.SoftwareVersionTo,
+			Region: chunk.Region, Language: chunk.Language, EffectiveFrom: chunk.EffectiveFrom, EffectiveTo: chunk.EffectiveTo, AuthorityLevel: chunk.AuthorityLevel,
+			DocumentRevision: chunk.DocumentRevision, SourceFile: chunk.SourceFile, SourcePage: int64(chunk.SourcePage),
+			Supersedes:  append([]string(nil), chunk.Supersedes...),
+			SourceSheet: chunk.SourceSheet, SourceCellRange: chunk.SourceCellRange, HeadingPath: append([]string(nil), chunk.HeadingPath...),
+			DeviceIdentifiers: append([]string(nil), chunk.DeviceIdentifiers...), AffectedLots: append([]string(nil), chunk.AffectedLots...),
 			Version: chunk.Version, Status: chunk.Status, Visibility: chunk.Visibility,
 			ContentHash:    contentHash(chunk.DocumentTitle + "\n" + chunk.Content),
 			EmbeddingModel: service.embedder.Name(), EmbeddingVer: service.config.EmbeddingVersion,
@@ -550,7 +617,8 @@ func (service *LifecycleService) ensureCollection(ctx context.Context, dimension
 		return err
 	}
 	required := map[string]bool{
-		"chunk_id": false, "document_id": false, "embedding": false, "content_hash": false,
+		"chunk_id": false, "document_id": false, "embedding": false, "sparse": false, "content_hash": false,
+		"dataset_id": false, "domain": false, "model_codes": false,
 		"embedding_model": false, "embedding_version": false, "document_version": false,
 		"source_revision": false, "indexed_at": false,
 	}

@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_exact_vsm200_log215",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "exact_match",
+  "query": "VSM-200 3.1 报 LOG-EXP-215 是介质空间不足吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm200", "version": "3.1"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm200-error-codes-fw3.1"], "relevant_chunk_ids": [], "required_facts": ["ServiceBundle 超过 512 MB"], "forbidden_facts": ["导出介质可用空间不足"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "同码异义：VSM-200。"
+}

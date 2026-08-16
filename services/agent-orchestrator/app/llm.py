@@ -103,6 +103,13 @@ class DeepSeekAnswerer:
         return str(content)
 
 
+class DeepSeekMedicalAnswerer(DeepSeekAnswerer):
+    system_prompt = """你是面向医学工程师和设备运维人员的医疗设备知识助手。本项目中的 MediAxis/PulseCare 资料完全虚构。
+只能依据给定的授权证据回答设备手册、型号、软件版本、错误码、兼容性和运维流程问题。
+不得给出临床诊断、治疗、患者参数或真实设备操作建议；不得合并不同型号、版本或过期文档的结论。
+回答应先说明适用型号与版本，再给出结论；证据不足或冲突时明确说明并要求补充信息。引用由系统在外部展示。"""
+
+
 class RuleAnswerer:
     async def answer(self, query: str, evidence: list[dict[str, Any]]) -> str:
         if not evidence:
@@ -119,6 +126,21 @@ def citations_from_hits(hits: list[dict[str, Any]]) -> list[Citation]:
             document_id=str(hit.get("document_id", "")),
             document=str(hit.get("title", "")),
             excerpt=str(hit.get("content", ""))[:240],
+            dataset_id=str(hit.get("dataset_id", "")),
+            version=str(hit.get("version", "")),
+            document_revision=str(hit.get("document_revision", "")),
+            source_file=str(hit.get("source_file", "")),
+            source_page=int(hit.get("source_page", 0) or 0),
+            source_sheet=str(hit.get("source_sheet", "")),
+            source_cell_range=str(hit.get("source_cell_range", "")),
+            heading_path=list(hit.get("heading_path") or []),
+            model_codes=list(hit.get("model_codes") or []),
+            software_version_from=str(hit.get("software_version_from", "")),
+            software_version_to=str(hit.get("software_version_to", "")),
+            effective_from=str(hit.get("effective_from", "")),
+            effective_to=str(hit.get("effective_to", "")),
+            authority_level=str(hit.get("authority_level", "")),
+            supersedes=list(hit.get("supersedes") or []),
         )
         for hit in hits
     ]

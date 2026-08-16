@@ -49,7 +49,7 @@ func TestCreateCollectionUsesExplicitHNSWCosineSchema(t *testing.T) {
 			t.Fatalf("ACL field %s must allow public rows to omit empty arrays: %#v", name, field)
 		}
 	}
-	for _, name := range []string{"content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at"} {
+	for _, name := range []string{"dataset_id", "domain", "model_codes", "software_version_from", "software_version_to", "effective_from", "effective_to", "document_revision", "supersedes", "source_file", "source_page", "heading_path", "content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at", "sparse"} {
 		if fieldByName[name] == nil {
 			t.Fatalf("lifecycle field %s is missing", name)
 		}
@@ -58,6 +58,13 @@ func TestCreateCollectionUsesExplicitHNSWCosineSchema(t *testing.T) {
 	params := vector["elementTypeParams"].(map[string]any)
 	if params["dim"] != "2560" {
 		t.Fatalf("unexpected vector dimensions: %#v", params)
+	}
+	functions := schema["functions"].([]any)
+	if len(functions) != 1 || functions[0].(map[string]any)["type"] != "BM25" {
+		t.Fatalf("BM25 function is missing: %#v", functions)
+	}
+	if len(indexes) != 2 || indexes[1].(map[string]any)["indexType"] != "SPARSE_INVERTED_INDEX" {
+		t.Fatalf("sparse BM25 index is missing: %#v", indexes)
 	}
 }
 
@@ -166,6 +173,44 @@ func TestSearchSendsFilterAndDecodesHits(t *testing.T) {
 	}
 	if len(hits) != 1 || hits[0].ChunkID != "doc#c001" || hits[0].Distance != 0.91 {
 		t.Fatalf("unexpected hits: %#v", hits)
+	}
+}
+
+func TestHybridSearchSendsDenseBM25AndRRF(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/v2/vectordb/entities/hybrid_search" {
+			t.Fatalf("unexpected path %s", request.URL.Path)
+		}
+		var payload map[string]any
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		searches := payload["search"].([]any)
+		if len(searches) != 2 || searches[0].(map[string]any)["annsField"] != "embedding" || searches[1].(map[string]any)["annsField"] != "sparse" {
+			t.Fatalf("unexpected hybrid branches: %#v", searches)
+		}
+		if searches[1].(map[string]any)["filter"] != `dataset_id == "medical"` {
+			t.Fatalf("ACL filter must be present on every branch: %#v", searches)
+		}
+		rerank := payload["rerank"].(map[string]any)
+		if rerank["strategy"] != "rrf" || rerank["params"].(map[string]any)["k"] != float64(60) {
+			t.Fatalf("unexpected RRF contract: %#v", rerank)
+		}
+		_ = json.NewEncoder(writer).Encode(map[string]any{
+			"code": 0, "data": []map[string]any{{"chunk_id": "exact", "distance": 0.032}, {"chunk_id": "semantic", "distance": 0.021}},
+		})
+	}))
+	defer server.Close()
+
+	hits, err := NewClient(Config{BaseURL: server.URL}).HybridSearch(context.Background(), HybridSearchRequest{
+		Collection: "medical_v2", Vector: []float64{0.1, 0.2}, QueryText: "SYS-NET-042",
+		Filter: `dataset_id == "medical"`, Limit: 2, CandidateK: 8,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 2 || hits[0].FusionScore != 0.032 || hits[0].Distance != 0 || hits[0].RecallSources[2] != "rrf" {
+		t.Fatalf("unexpected hybrid hits: %#v", hits)
 	}
 }
 

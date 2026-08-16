@@ -81,8 +81,11 @@ func Defaults() *Catalog {
 		{ID: "public-operations", Name: "服务运行与故障", Description: "服务状态、事件编号与故障判断指南", Product: "operations", Visibility: "public", Status: "active"},
 		{ID: "public-security", Name: "安全与审计", Description: "MFA、最小权限和审计留痕规范", Product: "security", Visibility: "public", Status: "active"},
 		{ID: "public-integrations", Name: "集成与 Webhook", Description: "Webhook 签名、幂等和重试约定", Product: "integrations", Visibility: "public", Status: "active"},
+		{ID: "public-medical-device", Name: "PulseCare 公共设备资料", Description: "虚构医疗设备的手册、错误码、版本说明和现场更正通知", Product: "medical-device-public", Visibility: "public", Status: "active"},
 		{ID: "tenant-a-operations", Name: "Tenant A 运维知识库", Description: "Tenant A 管理员专属运行手册", Product: "tenant-operations", Visibility: "tenant", OwnerTenant: "tenant_a", AllowedRoles: []string{"admin"}, Status: "active"},
 		{ID: "tenant-b-operations", Name: "Tenant B 运维知识库", Description: "Tenant B 管理员专属运行手册", Product: "tenant-operations", Visibility: "tenant", OwnerTenant: "tenant_b", AllowedRoles: []string{"admin"}, Status: "active"},
+		{ID: "tenant-a-medical-runbook", Name: "Tenant A 医疗设备运维 Runbook", Description: "Tenant A 医学工程团队专属的虚构运维资料", Product: "medical-device-private", Visibility: "tenant", OwnerTenant: "tenant_a", AllowedRoles: []string{"admin"}, Status: "active"},
+		{ID: "tenant-b-medical-runbook", Name: "Tenant B 医疗设备运维 Runbook", Description: "Tenant B 医学工程团队专属的虚构运维资料", Product: "medical-device-private", Visibility: "tenant", OwnerTenant: "tenant_b", AllowedRoles: []string{"admin"}, Status: "active"},
 	})
 }
 

@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_hard_negative_hub_c4p",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "conflict_resolution",
+  "query": "VSM-100 Pro 2.6.1 能使用 HUB-C4 还是 HUB-C4P？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-pro-compatibility-fw2.6"], "relevant_chunk_ids": [], "required_facts": ["HUB-C4P", "2.6.1"], "forbidden_facts": ["HUB-C4 兼容"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "相似配件代码 Hard Negative。"
+}

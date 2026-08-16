@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_access_tenant_b_connector",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "access_control",
+  "query": "SH-TRAIN-LAB 资产同步使用哪个连接器？",
+  "context": {"tenant_id": "tenant_b", "user_role": "admin", "product": "pulsecare-biomed", "version": "2026.1"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["tenant-b-biomed-runbook-2026"], "relevant_chunk_ids": [], "required_facts": ["biomed-stage-b"], "forbidden_facts": ["biomed-stage-a"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "Tenant B 私有连接器。"
+}

@@ -1,26 +1,54 @@
 package httpapi
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"path"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentparser"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
 type datasetDocumentInput struct {
-	DocumentID     string `json:"document_id"`
-	Title          string `json:"title"`
-	Content        string `json:"content"`
-	Version        string `json:"version"`
-	SourceRevision int64  `json:"source_revision"`
-	EventID        string `json:"event_id"`
-	Operation      string `json:"operation"`
+	DocumentID      string                  `json:"document_id"`
+	Title           string                  `json:"title"`
+	Content         string                  `json:"content"`
+	Version         string                  `json:"version"`
+	SourceRevision  int64                   `json:"source_revision"`
+	EventID         string                  `json:"event_id"`
+	Operation       string                  `json:"operation"`
+	MedicalMetadata medicalDocumentMetadata `json:"medical_metadata,omitempty"`
+}
+
+type medicalDocumentMetadata struct {
+	Domain              string   `json:"domain,omitempty"`
+	Manufacturer        string   `json:"manufacturer,omitempty"`
+	ProductFamily       string   `json:"product_family,omitempty"`
+	ModelCodes          []string `json:"model_codes,omitempty"`
+	SoftwareVersionFrom string   `json:"software_version_from,omitempty"`
+	SoftwareVersionTo   string   `json:"software_version_to,omitempty"`
+	HardwareRevision    string   `json:"hardware_revision,omitempty"`
+	Region              string   `json:"region,omitempty"`
+	Language            string   `json:"language,omitempty"`
+	EffectiveFrom       string   `json:"effective_from,omitempty"`
+	EffectiveTo         string   `json:"effective_to,omitempty"`
+	AuthorityLevel      string   `json:"authority_level,omitempty"`
+	DocumentRevision    string   `json:"document_revision,omitempty"`
+	Supersedes          []string `json:"supersedes,omitempty"`
+	SourceFile          string   `json:"source_file,omitempty"`
+	DeviceIdentifiers   []string `json:"device_identifiers,omitempty"`
+	AffectedLots        []string `json:"affected_lots,omitempty"`
 }
 
 type documentPreviewInput struct {
@@ -39,6 +67,183 @@ type documentPreviewChunk struct {
 	HeadingPath    []string `json:"heading_path,omitempty"`
 	Content        string   `json:"content"`
 	ParentContent  string   `json:"parent_content"`
+}
+
+type documentUploadMetadata struct {
+	DocumentID          string   `json:"document_id"`
+	Title               string   `json:"title"`
+	Version             string   `json:"version"`
+	SourceRevision      int64    `json:"source_revision"`
+	Domain              string   `json:"domain"`
+	Manufacturer        string   `json:"manufacturer"`
+	ProductFamily       string   `json:"product_family"`
+	ModelCodes          []string `json:"model_codes"`
+	SoftwareVersionFrom string   `json:"software_version_from"`
+	SoftwareVersionTo   string   `json:"software_version_to"`
+	HardwareRevision    string   `json:"hardware_revision"`
+	Region              string   `json:"region"`
+	Language            string   `json:"language"`
+	EffectiveFrom       string   `json:"effective_from"`
+	EffectiveTo         string   `json:"effective_to"`
+	AuthorityLevel      string   `json:"authority_level"`
+	DocumentRevision    string   `json:"document_revision"`
+	Supersedes          []string `json:"supersedes"`
+	DeviceIdentifiers   []string `json:"device_identifiers"`
+	AffectedLots        []string `json:"affected_lots"`
+}
+
+func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.Request) {
+	dataset, identity, ok := api.authorizeDataset(writer, request)
+	if !ok {
+		return
+	}
+	if !identity.HasRole("platform_admin") && (!identity.HasRole("admin") || dataset.Visibility != "tenant" || dataset.OwnerTenant != identity.TenantID) {
+		writeError(writer, http.StatusForbidden, "document_forbidden", "only the owning tenant administrator may upload documents")
+		return
+	}
+	if api.parser == nil || api.documentStore == nil || api.ingestionJobs == nil {
+		writeError(writer, http.StatusServiceUnavailable, "document_pipeline_unavailable", "document parser, object store and ingestion worker must be configured")
+		return
+	}
+	request.Body = http.MaxBytesReader(writer, request.Body, 52<<20)
+	if err := request.ParseMultipartForm(52 << 20); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_multipart", err.Error())
+		return
+	}
+	file, header, err := request.FormFile("file")
+	if err != nil {
+		writeError(writer, http.StatusBadRequest, "file_required", "multipart field file is required")
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, (50<<20)+1))
+	if err != nil || len(data) == 0 {
+		writeError(writer, http.StatusBadRequest, "invalid_document", "document is empty or unreadable")
+		return
+	}
+	if len(data) > 50<<20 {
+		writeError(writer, http.StatusRequestEntityTooLarge, "document_too_large", "document must not exceed 50 MiB")
+		return
+	}
+	var metadata documentUploadMetadata
+	decoder := json.NewDecoder(strings.NewReader(request.FormValue("metadata")))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&metadata); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_metadata", err.Error())
+		return
+	}
+	metadata.DocumentID = strings.TrimSpace(metadata.DocumentID)
+	metadata.Title = strings.TrimSpace(metadata.Title)
+	if metadata.DocumentID == "" || len(metadata.DocumentID) > 200 || metadata.Title == "" {
+		writeError(writer, http.StatusBadRequest, "invalid_metadata", "document_id and title are required")
+		return
+	}
+	if metadata.SourceRevision <= 0 {
+		metadata.SourceRevision = 1
+	}
+	filename := path.Base(header.Filename)
+	contentType := header.Header.Get("Content-Type")
+	objectKey := strings.Join([]string{identity.TenantID, dataset.ID, strings.ReplaceAll(metadata.DocumentID, "/", "_"), "r" + strconv.FormatInt(metadata.SourceRevision, 10), filename}, "/")
+	sourceURI, err := api.documentStore.Put(request.Context(), objectKey, contentType, data)
+	if err != nil {
+		writeError(writer, http.StatusServiceUnavailable, "document_store_failed", err.Error())
+		return
+	}
+	documentIR, err := api.parser.Parse(request.Context(), filename, contentType, data)
+	if err != nil {
+		writeError(writer, http.StatusUnprocessableEntity, "document_parse_failed", err.Error())
+		return
+	}
+	irData, _ := json.Marshal(documentIR)
+	irURI, _ := api.documentStore.Put(request.Context(), objectKey+".document-ir.json", "application/json", irData)
+	registry, hasRegistry := api.store.(datasetaccess.DocumentRegistry)
+	registryRecord := datasetaccess.KnowledgeDocumentRevision{
+		DatasetID: dataset.ID, DocumentID: metadata.DocumentID, Title: metadata.Title,
+		SourceRevision: metadata.SourceRevision, DocumentVersion: metadata.Version,
+		FileName: filename, ContentType: contentType, SourceURI: sourceURI, IRURI: irURI,
+		SourceHash: fmt.Sprintf("%x", sha256.Sum256(data)), ParserStatus: documentIR.Status,
+		IndexStatus: "parsed", BlockCount: len(documentIR.Blocks), Metadata: map[string]any{
+			"domain": metadata.Domain, "manufacturer": metadata.Manufacturer, "product_family": metadata.ProductFamily,
+			"model_codes": metadata.ModelCodes, "software_version_from": metadata.SoftwareVersionFrom, "software_version_to": metadata.SoftwareVersionTo,
+			"hardware_revision": metadata.HardwareRevision, "region": metadata.Region, "language": metadata.Language,
+			"effective_from": metadata.EffectiveFrom, "effective_to": metadata.EffectiveTo,
+			"authority_level": metadata.AuthorityLevel, "document_revision": metadata.DocumentRevision, "supersedes": metadata.Supersedes,
+			"device_identifiers": metadata.DeviceIdentifiers, "affected_lots": metadata.AffectedLots,
+		}, Warnings: documentIR.Warnings, CreatedBy: identity.Subject,
+	}
+	if documentIR.Status == "ocr_required" {
+		registryRecord.IndexStatus = "blocked"
+		registryRecord.LastError = "OCR is required before this revision can be indexed"
+		if hasRegistry {
+			_ = registry.UpsertKnowledgeDocument(request.Context(), registryRecord)
+		}
+		writeJSON(writer, http.StatusUnprocessableEntity, map[string]any{
+			"status": "ocr_required", "source_uri": sourceURI, "warnings": documentIR.Warnings, "preview": previewIRBlocks(documentIR.Blocks, 20),
+		})
+		return
+	}
+	visibility := dataset.Visibility
+	roles := append([]string(nil), dataset.AllowedRoles...)
+	if len(roles) == 0 {
+		roles = []string{"viewer", "admin", "platform_admin"}
+	}
+	allowedTenants := []string(nil)
+	if visibility == "tenant" {
+		allowedTenants = []string{dataset.OwnerTenant}
+	}
+	firstSheet, firstRange := "", ""
+	for _, block := range documentIR.Blocks {
+		if firstSheet == "" && block.Provenance.Sheet != "" {
+			firstSheet, firstRange = block.Provenance.Sheet, block.Provenance.CellRange
+		}
+	}
+	hash := fmt.Sprintf("%x", sha256.Sum256(data))
+	idempotencyKey := fmt.Sprintf("upload:%s:%s:%d:%s", dataset.ID, metadata.DocumentID, metadata.SourceRevision, hash[:16])
+	job, duplicate, err := api.ingestionJobs.Submit(ingestionjob.SubmitRequest{
+		IdempotencyKey: idempotencyKey, TenantID: identity.TenantID, DatasetID: dataset.ID, CreatedBy: identity.Subject,
+		Change: milvus.LifecycleChange{
+			EventID: idempotencyKey, Operation: milvus.OperationUpsert, Revision: metadata.SourceRevision,
+			Document: &milvus.LifecycleDocument{
+				ID: metadata.DocumentID, DatasetID: dataset.ID, Title: metadata.Title, Content: documentIR.Markdown(), Product: dataset.Product,
+				Version: metadata.Version, Status: "active", Visibility: visibility, AllowedTenants: allowedTenants, AllowedRoles: roles,
+				Domain: metadata.Domain, Manufacturer: metadata.Manufacturer, ProductFamily: metadata.ProductFamily, ModelCodes: metadata.ModelCodes,
+				SoftwareVersionFrom: metadata.SoftwareVersionFrom, SoftwareVersionTo: metadata.SoftwareVersionTo,
+				HardwareRevision: metadata.HardwareRevision, Region: metadata.Region, Language: metadata.Language,
+				EffectiveFrom: metadata.EffectiveFrom, EffectiveTo: metadata.EffectiveTo, AuthorityLevel: metadata.AuthorityLevel,
+				DocumentRevision: metadata.DocumentRevision, Supersedes: metadata.Supersedes, SourceFile: sourceURI, SourceSheet: firstSheet, SourceCellRange: firstRange,
+				DeviceIdentifiers: metadata.DeviceIdentifiers, AffectedLots: metadata.AffectedLots,
+			},
+		},
+	})
+	if err != nil {
+		registryRecord.IndexStatus = "failed"
+		registryRecord.LastError = err.Error()
+		if hasRegistry {
+			_ = registry.UpsertKnowledgeDocument(request.Context(), registryRecord)
+		}
+		writeError(writer, http.StatusUnprocessableEntity, "document_ingest_failed", err.Error())
+		return
+	}
+	registryRecord.JobID = job.ID
+	registryRecord.IndexStatus = job.Status
+	if hasRegistry {
+		if err := registry.UpsertKnowledgeDocument(request.Context(), registryRecord); err != nil {
+			writeError(writer, http.StatusServiceUnavailable, "document_registry_failed", err.Error())
+			return
+		}
+	}
+	writeJSON(writer, http.StatusAccepted, map[string]any{
+		"job_id": job.ID, "status": job.Status, "duplicate": duplicate, "document_id": metadata.DocumentID,
+		"source_uri": sourceURI, "parser_status": documentIR.Status, "blocks": len(documentIR.Blocks), "warnings": documentIR.Warnings,
+		"preview": previewIRBlocks(documentIR.Blocks, 20),
+	})
+}
+
+func previewIRBlocks(blocks []documentparser.Block, limit int) []documentparser.Block {
+	if limit <= 0 || len(blocks) <= limit {
+		return blocks
+	}
+	return blocks[:limit]
 }
 
 func (api *DatasetAPI) document(writer http.ResponseWriter, request *http.Request) {
@@ -99,9 +304,17 @@ func (api *DatasetAPI) document(writer http.ResponseWriter, request *http.Reques
 			tenants = []string{dataset.OwnerTenant}
 		}
 		change.Document = &milvus.LifecycleDocument{
-			ID: input.DocumentID, Title: input.Title, Content: input.Content, Product: dataset.Product,
+			ID: input.DocumentID, DatasetID: dataset.ID, Title: input.Title, Content: input.Content, Product: dataset.Product,
 			Version: input.Version, Status: "active", Visibility: visibility,
 			AllowedTenants: tenants, AllowedRoles: roles,
+			Domain: input.MedicalMetadata.Domain, Manufacturer: input.MedicalMetadata.Manufacturer,
+			ProductFamily: input.MedicalMetadata.ProductFamily, ModelCodes: input.MedicalMetadata.ModelCodes,
+			SoftwareVersionFrom: input.MedicalMetadata.SoftwareVersionFrom, SoftwareVersionTo: input.MedicalMetadata.SoftwareVersionTo,
+			HardwareRevision: input.MedicalMetadata.HardwareRevision, Region: input.MedicalMetadata.Region,
+			Language: input.MedicalMetadata.Language, EffectiveFrom: input.MedicalMetadata.EffectiveFrom, EffectiveTo: input.MedicalMetadata.EffectiveTo,
+			AuthorityLevel:   input.MedicalMetadata.AuthorityLevel,
+			DocumentRevision: input.MedicalMetadata.DocumentRevision, Supersedes: input.MedicalMetadata.Supersedes, SourceFile: input.MedicalMetadata.SourceFile,
+			DeviceIdentifiers: input.MedicalMetadata.DeviceIdentifiers, AffectedLots: input.MedicalMetadata.AffectedLots,
 		}
 	}
 	result, err := api.service.Apply(request.Context(), change)

@@ -21,6 +21,8 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/cost"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentparser"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentstore"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/embeddinglab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/evaluation"
@@ -29,6 +31,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/indexbuild"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
+	"github.com/dingpuyu/rag-evolution-lab/internal/knowledgegateway"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
@@ -306,6 +309,7 @@ func runLabServer(args []string) {
 	scaleVersion := flags.String("scale-version", "v2", "100K scale collection version")
 	lifecycleCollection := flags.String("lifecycle-collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "incremental knowledge collection")
 	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
+	hybridSearch := flags.Bool("hybrid-search", environmentBool("RAGLAB_HYBRID_SEARCH", true), "use Milvus dense + BM25 reciprocal-rank fusion")
 	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
 	generationProviderDefault := strings.TrimSpace(os.Getenv("RAGLAB_GENERATION_PROVIDER"))
 	if generationProviderDefault == "" {
@@ -342,6 +346,17 @@ func runLabServer(args []string) {
 	tokenQuota := flags.Int("token-quota-per-minute", environmentInt("RAGLAB_TOKEN_QUOTA_PER_MINUTE", 100000), "per-tenant/application token quota per minute")
 	costInput := flags.Float64("cost-input-usd-per-1m", environmentFloat("RAGLAB_COST_INPUT_USD_PER_1M", 0), "input token cost in USD per million")
 	costOutput := flags.Float64("cost-output-usd-per-1m", environmentFloat("RAGLAB_COST_OUTPUT_USD_PER_1M", 0), "output token cost in USD per million")
+	documentParserURL := flags.String("document-parser-url", environmentOr("RAGLAB_DOCUMENT_PARSER_URL", "http://127.0.0.1:8070"), "Document IR parser service URL")
+	documentStoreEndpoint := flags.String("document-store-endpoint", environmentOr("RAGLAB_DOCUMENT_STORE_ENDPOINT", "127.0.0.1:9000"), "S3-compatible document object store endpoint")
+	documentStoreAccessKey := flags.String("document-store-access-key", environmentOr("RAGLAB_DOCUMENT_STORE_ACCESS_KEY", "minioadmin"), "document object store access key")
+	documentStoreSecretKey := flags.String("document-store-secret-key", environmentOr("RAGLAB_DOCUMENT_STORE_SECRET_KEY", "minioadmin"), "document object store secret key")
+	documentStoreBucket := flags.String("document-store-bucket", environmentOr("RAGLAB_DOCUMENT_STORE_BUCKET", "raglab-documents"), "document object store bucket")
+	documentStoreTLS := flags.Bool("document-store-tls", environmentBool("RAGLAB_DOCUMENT_STORE_TLS", false), "use TLS for document object store")
+	rerankBackend := flags.String("rerank-backend", environmentOr("RAGLAB_RERANK_BACKEND", "heuristic"), "reranker: heuristic or qwen")
+	rerankURL := flags.String("rerank-url", environmentOr("RAGLAB_RERANK_URL", "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"), "qwen rerank endpoint")
+	rerankAPIKey := flags.String("rerank-api-key", firstNonEmptyEnv("RAGLAB_RERANK_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY"), "qwen rerank API key")
+	rerankModel := flags.String("rerank-model", environmentOr("RAGLAB_RERANK_MODEL", "qwen3-rerank"), "qwen rerank model")
+	rerankStrict := flags.Bool("rerank-strict", environmentBool("RAGLAB_RERANK_STRICT", false), "fail retrieval instead of using the deterministic fallback")
 	_ = flags.Parse(args)
 	telemetryProvider, telemetryErr := telemetry.Setup(context.Background(), telemetry.Config{Enabled: strings.TrimSpace(*otelEndpoint) != "", Endpoint: *otelEndpoint, ServiceName: *otelServiceName})
 	if telemetryErr != nil {
@@ -405,7 +420,7 @@ func runLabServer(args []string) {
 	}
 	lifecycleService, err := milvus.NewLifecycleService(milvusClient, embedder, milvus.LifecycleConfig{
 		Collection: *lifecycleCollection, Alias: *lifecycleAlias, EmbeddingVersion: *embeddingVersion,
-		StatePath: *lifecycleState, ChunkRunes: 700,
+		StatePath: *lifecycleState, ChunkRunes: 700, HybridSearch: *hybridSearch,
 	})
 	if err != nil {
 		fatal(err)
@@ -455,6 +470,28 @@ func runLabServer(args []string) {
 		fatal(err)
 	}
 	defer ingestionJobs.Close()
+	documentArchive, err := documentstore.NewMinIO(documentstore.Config{
+		Endpoint: *documentStoreEndpoint, AccessKey: *documentStoreAccessKey, SecretKey: *documentStoreSecretKey,
+		Bucket: *documentStoreBucket, UseTLS: *documentStoreTLS,
+	})
+	if err != nil {
+		fatal(err)
+	}
+	documentParser := documentparser.New(*documentParserURL)
+	var gatewayReranker knowledgegateway.HitReranker
+	switch strings.ToLower(strings.TrimSpace(*rerankBackend)) {
+	case "", "heuristic", "mock":
+		gatewayReranker = knowledgegateway.NewHeuristicReranker()
+	case "qwen", "qwen3-rerank":
+		gatewayReranker, err = knowledgegateway.NewQwenReranker(knowledgegateway.QwenRerankerConfig{
+			URL: *rerankURL, APIKey: *rerankAPIKey, Model: *rerankModel, StrictMode: *rerankStrict,
+		})
+		if err != nil {
+			fatal(err)
+		}
+	default:
+		fatal(fmt.Errorf("unknown rerank backend %q", *rerankBackend))
+	}
 	scaleGenerator, err := scalebench.NewGenerator(scalebench.DatasetConfig{
 		Chunks: 100_000, Dimensions: 1024, Topics: 1_000, Tenants: 100,
 		Seed: 20260723, Profile: scalebench.ProfileHardV2,
@@ -474,7 +511,7 @@ func runLabServer(args []string) {
 	provider := strings.ToLower(strings.TrimSpace(*generationProvider))
 	if strings.TrimSpace(*generationModel) == "" {
 		if provider == "deepseek" {
-			*generationModel = "deepseek-v4-pro"
+			*generationModel = "deepseek-chat"
 		} else if provider == "openai" || provider == "openai-compatible" {
 			*generationModel = "deepseek-chat"
 		} else {
@@ -566,7 +603,9 @@ func runLabServer(args []string) {
 			return nil
 		}(),
 		Tracer: gatewayTracer, Cost: gatewayCost, Limiter: gatewayLimiter,
-		Generator: generationGenerator,
+		Generator:      generationGenerator,
+		DocumentParser: documentParser, DocumentStore: documentArchive,
+		Reranker: gatewayReranker,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)

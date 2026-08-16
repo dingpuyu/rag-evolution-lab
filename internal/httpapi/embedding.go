@@ -130,12 +130,13 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		if answerErr != nil {
 			return nil, answerErr
 		}
-		datasetAPI := &DatasetAPI{store: datasetStore, service: lifecycleService, answerService: answerService}
+		datasetAPI := &DatasetAPI{store: datasetStore, service: lifecycleService, answerService: answerService, parser: enterprise.DocumentParser, documentStore: enterprise.DocumentStore, ingestionJobs: enterprise.IngestionJobs}
 		mux.Handle("GET /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.list)))
 		mux.Handle("POST /api/v1/datasets", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.create)))
 		mux.Handle("GET /api/v1/datasets/{dataset_id}/documents", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.documents)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.document)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents/preview", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.previewDocument)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents/uploads", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.uploadDocument)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answer)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer/stream", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answerStream)))
@@ -157,7 +158,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 			}
 			gateway, gatewayErr := knowledgegateway.NewWithOptions(lifecycleService, datasetStore, enterprise.ApplicationStore, generator, knowledgegateway.Options{
 				IndexStore: enterprise.IndexStore, TraceStore: enterprise.QueryTraceStore, Tracer: enterprise.Tracer,
-				Cost: enterprise.Cost, Limiter: enterprise.Limiter,
+				Cost: enterprise.Cost, Limiter: enterprise.Limiter, Reranker: enterprise.Reranker,
 			})
 			if gatewayErr != nil {
 				return nil, gatewayErr

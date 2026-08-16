@@ -52,4 +52,14 @@ func TestLoadMedicalDeviceDomain(t *testing.T) {
 	if err := Validate(documents, cases); err != nil {
 		t.Fatalf("validate medical-device domain: %v", err)
 	}
+	regression, err := LoadGolden(filepath.Join(root, "golden"), "regression")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(regression) != 19 {
+		t.Fatalf("expected 19 medical-device regression cases, got %d", len(regression))
+	}
+	if err := Validate(documents, regression); err != nil {
+		t.Fatalf("validate medical-device regression: %v", err)
+	}
 }

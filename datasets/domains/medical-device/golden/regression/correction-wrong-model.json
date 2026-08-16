@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_correction_wrong_model",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "conflict_resolution",
+  "query": "VSM-100 标准型 2.5.2、批次 L26A04 是否属于 FC-2026-04？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.5"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["field-correction-fc-2026-04"], "relevant_chunk_ids": [], "required_facts": ["VSM-100 标准型", "不在本通知范围"], "forbidden_facts": ["inspection_required"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "批次相同但型号不适用。"
+}

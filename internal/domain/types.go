@@ -22,33 +22,55 @@ type Document struct {
 }
 
 type Chunk struct {
-	ID             string
-	DocumentID     string
-	DocumentTitle  string
-	Content        string
-	ParentID       string
-	ParentContent  string
-	ParentSequence int
-	SourcePage     int
-	Sequence       int
-	HeadingPath    []string
-	Product        string
-	Version        string
-	Status         string
-	Visibility     string
-	AllowedTenants []string
-	AllowedRoles   []string
-	Quality        string
+	ID                  string
+	DocumentID          string
+	DocumentTitle       string
+	Content             string
+	ParentID            string
+	ParentContent       string
+	ParentSequence      int
+	SourcePage          int
+	Sequence            int
+	HeadingPath         []string
+	DatasetID           string
+	Domain              string
+	Manufacturer        string
+	ProductFamily       string
+	ModelCodes          []string
+	SoftwareVersionFrom string
+	SoftwareVersionTo   string
+	HardwareRevision    string
+	Region              string
+	Language            string
+	EffectiveFrom       string
+	EffectiveTo         string
+	AuthorityLevel      string
+	DocumentRevision    string
+	Supersedes          []string
+	SourceFile          string
+	SourceSheet         string
+	SourceCellRange     string
+	DeviceIdentifiers   []string
+	AffectedLots        []string
+	Product             string
+	Version             string
+	Status              string
+	Visibility          string
+	AllowedTenants      []string
+	AllowedRoles        []string
+	Quality             string
 }
 
 type QueryRequest struct {
-	Query    string
-	Pipeline string
-	TenantID string
-	UserRole string
-	Product  string
-	Version  string
-	TopK     int
+	Query     string
+	Pipeline  string
+	TenantID  string
+	UserRole  string
+	Product   string
+	Version   string
+	DatasetID string
+	ModelCode string
+	TopK      int
 }
 
 type RetrievedChunk struct {

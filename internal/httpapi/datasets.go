@@ -10,7 +10,10 @@ import (
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentparser"
+	"github.com/dingpuyu/rag-evolution-lab/internal/documentstore"
 	"github.com/dingpuyu/rag-evolution-lab/internal/generation"
+	"github.com/dingpuyu/rag-evolution-lab/internal/ingestionjob"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
@@ -18,6 +21,9 @@ type DatasetAPI struct {
 	store         datasetaccess.Store
 	service       *milvus.LifecycleService
 	answerService *generation.Service
+	parser        *documentparser.Client
+	documentStore documentstore.Store
+	ingestionJobs *ingestionjob.Service
 }
 
 func (api *DatasetAPI) list(writer http.ResponseWriter, request *http.Request) {
@@ -50,7 +56,34 @@ func (api *DatasetAPI) documents(writer http.ResponseWriter, request *http.Reque
 		writeError(writer, http.StatusServiceUnavailable, "dataset_catalog_unavailable", err.Error())
 		return
 	}
-	writeJSON(writer, http.StatusOK, map[string]any{"dataset": dataset, "catalog": catalog})
+	uploads := []datasetaccess.KnowledgeDocumentRevision{}
+	if registry, ok := api.store.(datasetaccess.DocumentRegistry); ok {
+		uploads, err = registry.ListKnowledgeDocuments(request.Context(), dataset.ID)
+		if err != nil {
+			writeError(writer, http.StatusServiceUnavailable, "document_registry_unavailable", err.Error())
+			return
+		}
+	}
+	// The durable ingestion job table is the source of truth for live index
+	// progress. Overlay it on document metadata without duplicating worker state.
+	if api.ingestionJobs != nil {
+		for index := range uploads {
+			if uploads[index].JobID == "" {
+				continue
+			}
+			job, jobErr := api.ingestionJobs.Get(uploads[index].JobID)
+			if jobErr != nil {
+				continue
+			}
+			uploads[index].IndexStatus = job.Status
+			uploads[index].LastError = job.LastError
+			if job.Result != nil {
+				uploads[index].ChunkCount = job.Result.CurrentChunks
+				uploads[index].IndexVersion = job.Result.EmbeddingVersion
+			}
+		}
+	}
+	writeJSON(writer, http.StatusOK, map[string]any{"dataset": dataset, "catalog": catalog, "uploads": uploads})
 }
 
 func (api *DatasetAPI) search(writer http.ResponseWriter, request *http.Request) {
@@ -181,7 +214,7 @@ func decodeDatasetQuery(writer http.ResponseWriter, request *http.Request) (data
 }
 
 func buildDatasetQuery(dataset datasetaccess.Dataset, identity auth.Identity, text string, topK int) milvus.Query {
-	query := milvus.Query{Text: text, TopK: topK, Product: dataset.Product, Status: "active"}
+	query := milvus.Query{Text: text, TopK: topK, DatasetID: dataset.ID, Product: dataset.Product, Status: "active"}
 	if dataset.Visibility == "public" {
 		query.Tenant = "public"
 		query.Role = "viewer"

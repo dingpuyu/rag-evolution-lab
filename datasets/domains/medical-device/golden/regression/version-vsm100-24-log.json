@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_version_vsm100_24_log",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "version_filter",
+  "query": "VSM-100 2.4 怎么导出诊断日志，文件后缀是什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.4"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-operator-fw2.4"], "relevant_chunk_ids": [], "required_facts": ["系统设置", ".vlog", "128 MB"], "forbidden_facts": [".pcdiag", "256 MB"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "历史版本显式查询。"
+}

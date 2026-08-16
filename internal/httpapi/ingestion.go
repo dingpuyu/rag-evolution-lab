@@ -148,6 +148,7 @@ func (api *IngestionAPI) submitDataset(writer http.ResponseWriter, request *http
 			return
 		}
 		input.Change.Document.Product = dataset.Product
+		input.Change.Document.DatasetID = dataset.ID
 		input.Change.Document.Visibility = dataset.Visibility
 		input.Change.Document.AllowedRoles = append([]string(nil), dataset.AllowedRoles...)
 		if dataset.Visibility == "tenant" {

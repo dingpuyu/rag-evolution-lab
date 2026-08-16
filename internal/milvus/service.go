@@ -3,6 +3,7 @@ package milvus
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -53,6 +54,7 @@ type SeedResult struct {
 // content remains available through authorized search/citation paths.
 type StoredDocument struct {
 	DocumentID       string `json:"document_id"`
+	DatasetID        string `json:"dataset_id,omitempty"`
 	Title            string `json:"title"`
 	TenantID         string `json:"tenant_id,omitempty"`
 	Product          string `json:"product,omitempty"`
@@ -75,12 +77,15 @@ type Catalog struct {
 }
 
 type Query struct {
-	Text    string `json:"query"`
-	Tenant  string `json:"tenant_id"`
-	Role    string `json:"user_role"`
-	Product string `json:"product"`
-	Status  string `json:"status"`
-	TopK    int    `json:"top_k"`
+	Text      string `json:"query"`
+	Tenant    string `json:"tenant_id"`
+	Role      string `json:"user_role"`
+	Product   string `json:"product"`
+	DatasetID string `json:"dataset_id,omitempty"`
+	ModelCode string `json:"model_code,omitempty"`
+	Version   string `json:"version,omitempty"`
+	Status    string `json:"status"`
+	TopK      int    `json:"top_k"`
 	// Collection is assigned by the trusted application index resolver. It is
 	// excluded from JSON so callers cannot choose an arbitrary physical index.
 	Collection string `json:"-"`
@@ -204,7 +209,7 @@ func (s *Service) catalogWithStatus(ctx context.Context, status Status, filter s
 		document := byDocument[documentID]
 		if document == nil {
 			document = &StoredDocument{
-				DocumentID: documentID, Title: entity.Title, TenantID: entity.TenantID,
+				DocumentID: documentID, DatasetID: entity.DatasetID, Title: entity.Title, TenantID: entity.TenantID,
 				Product: entity.Product, Version: entity.Version, Status: entity.Status,
 				Visibility: entity.Visibility, IndexedAt: entity.IndexedAt,
 				EmbeddingModel: entity.EmbeddingModel, EmbeddingVersion: entity.EmbeddingVer,
@@ -344,8 +349,17 @@ func buildFilter(query Query) string {
 		}
 	}
 	filters := []string{access}
+	if datasetID := strings.TrimSpace(query.DatasetID); datasetID != "" {
+		filters = append(filters, "dataset_id == \""+escapeFilter(datasetID)+"\"")
+	}
 	if product := strings.TrimSpace(query.Product); product != "" {
 		filters = append(filters, "product == \""+escapeFilter(product)+"\"")
+	}
+	if modelCode := strings.TrimSpace(query.ModelCode); modelCode != "" {
+		filters = append(filters, "array_contains(model_codes, \""+escapeFilter(modelCode)+"\")")
+	}
+	if version := strings.TrimSpace(query.Version); version != "" {
+		filters = append(filters, "version == \""+escapeFilter(version)+"\"")
 	}
 	status := strings.TrimSpace(query.Status)
 	if status == "" {
@@ -369,4 +383,53 @@ func contains(values []string, target string) bool {
 
 func milliseconds(duration time.Duration) float64 {
 	return float64(duration.Microseconds()) / 1000
+}
+
+var exactIdentifierPattern = regexp.MustCompile(`(?i)\b[a-z][a-z0-9]*(?:[-_.][a-z0-9]+)+\b`)
+
+// applyExactIdentifierBoost is intentionally deterministic. It never invents
+// or rewrites identifiers; it only rewards candidates that contain the exact
+// model/error/version/batch tokens present in the query.
+func applyExactIdentifierBoost(query string, hits []SearchHit) {
+	identifiers := exactIdentifierPattern.FindAllString(query, -1)
+	if len(identifiers) == 0 || len(hits) < 2 {
+		return
+	}
+	for index := range hits {
+		haystack := strings.ToLower(strings.Join([]string{
+			hits[index].Title, hits[index].Content, strings.Join(hits[index].ModelCodes, " "),
+			strings.Join(hits[index].DeviceIdentifiers, " "), strings.Join(hits[index].AffectedLots, " "),
+			hits[index].Version,
+		}, " "))
+		for _, identifier := range identifiers {
+			if strings.Contains(haystack, strings.ToLower(identifier)) {
+				hits[index].ExactMatches = append(hits[index].ExactMatches, identifier)
+			}
+		}
+		if len(hits[index].ExactMatches) > 0 {
+			hits[index].RecallSources = appendUnique(hits[index].RecallSources, "exact_identifier")
+		}
+	}
+	sort.SliceStable(hits, func(i, j int) bool {
+		if len(hits[i].ExactMatches) != len(hits[j].ExactMatches) {
+			return len(hits[i].ExactMatches) > len(hits[j].ExactMatches)
+		}
+		return hits[i].Distance < hits[j].Distance
+	})
+}
+
+func appendUnique(values []string, value string) []string {
+	for _, candidate := range values {
+		if candidate == value {
+			return values
+		}
+	}
+	return append(values, value)
+}
+
+func retrievalMetric(hybrid bool) string {
+	if hybrid {
+		return "RRF(DENSE_COSINE,BM25)+EXACT"
+	}
+	return "COSINE"
 }

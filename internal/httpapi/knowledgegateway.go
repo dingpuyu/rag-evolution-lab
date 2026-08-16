@@ -19,9 +19,10 @@ type KnowledgeGatewayAPI struct {
 }
 
 type gatewayQueryInput struct {
-	EnvironmentID string `json:"environment_id,omitempty"`
-	Query         string `json:"query"`
-	TopK          int    `json:"top_k,omitempty"`
+	EnvironmentID string                         `json:"environment_id,omitempty"`
+	Query         string                         `json:"query"`
+	TopK          int                            `json:"top_k,omitempty"`
+	DeviceContext knowledgegateway.DeviceContext `json:"device_context,omitempty"`
 }
 
 func (api *KnowledgeGatewayAPI) query(writer http.ResponseWriter, request *http.Request) {
@@ -31,7 +32,7 @@ func (api *KnowledgeGatewayAPI) query(writer http.ResponseWriter, request *http.
 	}
 	identity := identityFromContext(request.Context())
 	result, err := api.service.Search(request.Context(), identity, knowledgegateway.Request{
-		AppID: request.PathValue("app_id"), EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK,
+		AppID: request.PathValue("app_id"), EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK, DeviceContext: input.DeviceContext,
 	})
 	if err != nil {
 		writeGatewayError(writer, err)
@@ -47,7 +48,7 @@ func (api *KnowledgeGatewayAPI) answer(writer http.ResponseWriter, request *http
 	}
 	identity := identityFromContext(request.Context())
 	result, err := api.service.Answer(request.Context(), identity, knowledgegateway.Request{
-		AppID: request.PathValue("app_id"), EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK,
+		AppID: request.PathValue("app_id"), EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK, DeviceContext: input.DeviceContext,
 	})
 	if err != nil {
 		writeGatewayError(writer, err)
@@ -89,7 +90,7 @@ func (api *KnowledgeGatewayAPI) answerStream(writer http.ResponseWriter, request
 		return nil
 	}
 	result, err := api.service.AnswerWithProgress(request.Context(), identity, knowledgegateway.Request{
-		AppID: appID, EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK,
+		AppID: appID, EnvironmentID: input.EnvironmentID, Query: input.Query, TopK: input.TopK, DeviceContext: input.DeviceContext,
 	}, send)
 	if err != nil {
 		_ = send(generation.ProgressEvent{Type: "error", Error: err.Error()})

@@ -10,7 +10,8 @@ from langgraph.types import interrupt
 
 from .gateway import GatewayError, KnowledgeGatewayClient
 from .llm import Answerer, Planner, RuleAnswerer, RulePlanner, citations_from_hits
-from .models import Action, AgentResponse, AgentResult, AgentState, AgentStep
+from .medical import assess_field_correction, resolve_medical_query, verify_medical_evidence
+from .models import Action, AgentResponse, AgentResult, AgentState, AgentStep, DeviceContext
 
 
 @dataclass
@@ -18,6 +19,7 @@ class RequestContext:
     authorization: str
     app_id: str
     environment_id: str
+    device_context: DeviceContext
 
 
 class AgentRuntime:
@@ -28,14 +30,17 @@ class AgentRuntime:
         gateway: KnowledgeGatewayClient,
         planner: Planner,
         answerer: Answerer,
+        medical_answerer: Answerer | None = None,
         max_steps: int = 4,
     ) -> None:
         self.gateway = gateway
         self.planner = planner
         self.answerer = answerer
+        self.medical_answerer = medical_answerer or answerer
         self.max_steps = max_steps
         self.contexts: dict[str, RequestContext] = {}
         builder = StateGraph(AgentState)
+        builder.add_node("entry", self._entry)
         builder.add_node("plan", self._plan)
         builder.add_node("knowledge_search", self._knowledge_search)
         builder.add_node("knowledge_answer", self._knowledge_answer)
@@ -44,7 +49,15 @@ class AgentRuntime:
         builder.add_node("ticket_draft", self._ticket_draft)
         builder.add_node("final", self._final)
         builder.add_node("clarify", self._clarify)
-        builder.add_edge(START, "plan")
+        builder.add_node("medical_resolve", self._medical_resolve)
+        builder.add_node("medical_persona", self._medical_persona)
+        builder.add_node("medical_refuse", self._medical_refuse)
+        builder.add_node("medical_clarify", self._medical_clarify)
+        builder.add_node("medical_search", self._medical_search)
+        builder.add_node("medical_verify", self._medical_verify)
+        builder.add_node("medical_answer", self._medical_answer)
+        builder.add_edge(START, "entry")
+        builder.add_conditional_edges("entry", self._entry_route, {"plan": "plan", "medical_resolve": "medical_resolve"})
         builder.add_conditional_edges(
             "plan",
             self._route,
@@ -60,7 +73,29 @@ class AgentRuntime:
         builder.add_edge("knowledge_search", "knowledge_answer")
         for node in ("knowledge_answer", "service_status", "account_access", "ticket_draft", "final", "clarify"):
             builder.add_edge(node, END)
+        builder.add_conditional_edges(
+            "medical_resolve",
+            self._medical_route,
+            {
+                "medical_persona": "medical_persona",
+                "medical_refuse": "medical_refuse",
+                "medical_clarify": "medical_clarify",
+                "medical_search": "medical_search",
+            },
+        )
+        builder.add_edge("medical_search", "medical_verify")
+        builder.add_edge("medical_verify", "medical_answer")
+        for node in ("medical_persona", "medical_refuse", "medical_clarify", "medical_answer"):
+            builder.add_edge(node, END)
         self.graph = builder.compile(checkpointer=MemorySaver())
+
+    async def _entry(self, state: AgentState) -> dict[str, Any]:
+        context = self._context(state)
+        return {"is_medical": "medical-device-agent" in context.app_id}
+
+    @staticmethod
+    def _entry_route(state: AgentState) -> str:
+        return "medical_resolve" if state.get("is_medical") else "plan"
 
     def _context(self, state: AgentState) -> RequestContext:
         thread_id = str(state["thread_id"])
@@ -125,6 +160,144 @@ class AgentRuntime:
             tool_calls=["knowledge_search"],
         )
         return {"response": result.model_dump()}
+
+    async def _medical_resolve(self, state: AgentState) -> dict[str, Any]:
+        resolution = resolve_medical_query(str(state["query"]), self._context(state).device_context)
+        return {
+            "medical_intent": resolution.intent,
+            "reason_code": resolution.reason_code,
+            "resolved_context": resolution.context.model_dump(),
+            "candidate_entities": resolution.candidates,
+        }
+
+    @staticmethod
+    def _medical_route(state: AgentState) -> str:
+        intent = str(state.get("medical_intent", "knowledge"))
+        if intent == "persona":
+            return "medical_persona"
+        if intent == "refuse":
+            return "medical_refuse"
+        if intent == "clarify":
+            return "medical_clarify"
+        return "medical_search"
+
+    async def _medical_persona(self, state: AgentState) -> dict[str, Any]:
+        result = AgentResult(
+            status="completed",
+            decision="answer",
+            reason_code="capability_introduction",
+            answer_source="persona",
+            answer="你好，我是 PulseCare 医疗设备运维知识助手，可以基于授权资料查询型号、软件版本、错误码、配件兼容性和现场更正通知。我不提供临床诊断、治疗或患者参数建议。",
+            resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
+        )
+        return {"response": result.model_dump()}
+
+    async def _medical_refuse(self, state: AgentState) -> dict[str, Any]:
+        result = AgentResult(
+            status="refused",
+            decision="refuse",
+            reason_code=str(state.get("reason_code", "clinical_boundary")),
+            answer_source="persona",
+            answer="这个问题涉及临床诊断、治疗或患者参数设定，超出设备运维知识助手的安全边界。请遵循真实设备说明书、机构临床流程，并由具备资质的专业人员判断。",
+            resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
+        )
+        return {"response": result.model_dump()}
+
+    async def _medical_clarify(self, state: AgentState) -> dict[str, Any]:
+        candidates = list(state.get("candidate_entities", []))
+        if str(state.get("reason_code")) == "missing_applicability_context":
+            answer = "判断现场更正通知是否适用前，请补充：" + "、".join(candidates) + "。"
+        else:
+            answer = "该问题在不同型号上的答案可能不同，请先确认设备型号。可选型号：" + "、".join(candidates) + "。"
+        result = AgentResult(
+            status="needs_clarification",
+            decision="clarify",
+            reason_code=str(state.get("reason_code", "ambiguous_device_context")),
+            answer_source="tool",
+            answer=answer,
+            resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
+            candidate_entities=candidates,
+            tool_calls=["resolve_device_context"],
+        )
+        return {"response": result.model_dump()}
+
+    async def _medical_search(self, state: AgentState) -> dict[str, Any]:
+        context = self._context(state)
+        resolved = DeviceContext.model_validate(state.get("resolved_context", {}))
+        gateway_context = resolved.model_dump()
+        if state.get("medical_intent") == "field_correction":
+            # The notice covers a version range, so an exact version scalar filter
+            # would incorrectly hide the governing document.
+            gateway_context["software_version"] = ""
+        try:
+            payload = await self.gateway.search(
+                context.app_id,
+                context.environment_id,
+                str(state["query"]),
+                context.authorization,
+                device_context=gateway_context,
+            )
+            hits = [hit.model_dump() for hit in self.gateway.hits(payload)]
+            trace_id = str(payload.get("trace_id", ""))
+            observation = {"tool": "knowledge_search", "status": "ok", "summary": f"授权检索命中 {len(hits)} 条医疗设备证据"}
+        except GatewayError as exc:
+            hits, trace_id = [], ""
+            observation = {"tool": "knowledge_search", "status": "error", "summary": str(exc)}
+        step = AgentStep(step=1, action={"type": "knowledge_search", "arguments": gateway_context}, observation=observation).model_dump(exclude_none=True)
+        return {"evidence": hits, "trace_id": trace_id, "gateway_error": "" if observation["status"] == "ok" else observation["summary"], "steps": [step], "observations": [observation]}
+
+    async def _medical_answer(self, state: AgentState) -> dict[str, Any]:
+        evidence = list(state.get("evidence", []))
+        resolved = DeviceContext.model_validate(state.get("resolved_context", {}))
+        steps = [AgentStep.model_validate(step) for step in state.get("steps", [])]
+        if state.get("gateway_error"):
+            result = AgentResult(
+                status="needs_clarification", decision="clarify", reason_code="knowledge_gateway_unavailable",
+                answer="授权知识库当前不可用，系统不会绕过权限或使用模型记忆回答。请稍后重试。",
+                answer_source="tool", resolved_context=resolved, steps=steps, tool_calls=["knowledge_search"],
+            )
+            return {"response": result.model_dump()}
+        if not evidence:
+            result = AgentResult(
+                status="needs_clarification", decision="clarify", reason_code="insufficient_evidence",
+                answer="当前授权资料中没有找到与该型号和版本匹配的可靠证据。请检查型号、软件版本，或联系知识库管理员补充资料。",
+                answer_source="rag", resolved_context=resolved, steps=steps, tool_calls=["knowledge_search"], trace_id=str(state.get("trace_id", "")),
+            )
+            return {"response": result.model_dump()}
+        citations = citations_from_hits(evidence)
+        if state.get("medical_intent") == "field_correction":
+            outcome, explanation = assess_field_correction(resolved)
+            answer = {
+                "applies": "判定结果：适用。",
+                "does_not_apply": "判定结果：不适用。",
+                "needs_information": "判定结果：信息不足。",
+            }[outcome] + explanation + "该结论只针对本项目中的虚构通知 FC-2026-04。"
+            decision = "clarify" if outcome == "needs_information" else "answer"
+            result = AgentResult(
+                status="needs_clarification" if decision == "clarify" else "completed",
+                decision=decision, reason_code=f"field_correction_{outcome}", answer=answer,
+                answer_source="tool", resolved_context=resolved, citations=citations, steps=steps,
+                tool_calls=["knowledge_search", "assess_field_correction"], trace_id=str(state.get("trace_id", "")),
+            )
+            return {"response": result.model_dump()}
+        answer = await self.medical_answerer.answer(str(state["query"]), evidence)
+        result = AgentResult(
+            status="completed", decision="answer", reason_code="grounded_medical_answer", answer=answer,
+            answer_source="rag", resolved_context=resolved, citations=citations, steps=steps,
+            tool_calls=["resolve_device_context", "knowledge_search", "verify_evidence"], trace_id=str(state.get("trace_id", "")),
+        )
+        return {"response": result.model_dump()}
+
+    async def _medical_verify(self, state: AgentState) -> dict[str, Any]:
+        resolved = DeviceContext.model_validate(state.get("resolved_context", {}))
+        evidence, reason = verify_medical_evidence(resolved, list(state.get("evidence", [])))
+        steps = list(state.get("steps", []))
+        steps.append(AgentStep(
+            step=len(steps) + 1,
+            action={"type": "verify_evidence", "arguments": resolved.model_dump()},
+            observation={"tool": "verify_evidence", "status": "ok" if evidence else "rejected", "summary": reason},
+        ).model_dump(exclude_none=True))
+        return {"evidence": evidence, "evidence_verification": reason, "steps": steps}
 
     async def _service_status(self, state: AgentState) -> dict[str, Any]:
         action = Action.model_validate(state["action"])
@@ -223,9 +396,10 @@ class AgentRuntime:
         authorization: str,
         thread_id: str | None = None,
         confirmation: bool | None = None,
+        device_context: DeviceContext | None = None,
     ) -> AgentResponse:
         thread_id = thread_id or f"thread-{uuid.uuid4().hex}"
-        self.contexts[thread_id] = RequestContext(authorization=authorization, app_id=app_id, environment_id=environment_id)
+        self.contexts[thread_id] = RequestContext(authorization=authorization, app_id=app_id, environment_id=environment_id, device_context=device_context or DeviceContext())
         config = {"configurable": {"thread_id": thread_id}}
         if confirmation is True:
             from langgraph.types import Command
@@ -258,9 +432,11 @@ class AgentRuntime:
 def build_runtime(gateway: KnowledgeGatewayClient, llm: Any, max_steps: int = 4) -> AgentRuntime:
     planner: Planner = RulePlanner()
     answerer: Answerer = RuleAnswerer()
+    medical_answerer: Answerer = answerer
     if llm is not None:
-        from .llm import DeepSeekAnswerer, DeepSeekPlanner
+        from .llm import DeepSeekAnswerer, DeepSeekMedicalAnswerer, DeepSeekPlanner
 
         planner = DeepSeekPlanner(llm, fallback=planner)
         answerer = DeepSeekAnswerer(llm)
-    return AgentRuntime(gateway=gateway, planner=planner, answerer=answerer, max_steps=max_steps)
+        medical_answerer = DeepSeekMedicalAnswerer(llm)
+    return AgentRuntime(gateway=gateway, planner=planner, answerer=answerer, medical_answerer=medical_answerer, max_steps=max_steps)

@@ -15,6 +15,16 @@ make stack-up
 
 然后打开 <http://localhost:3000/portal>（如果你在 `.env` 中使用了 `RAGLAB_WEB_PORT=13000`，则打开 `http://localhost:13000/portal`）。默认档位使用确定性 Hash Embedding 和抽取式回答，不依赖外部模型；接入本地 Ollama 与 DeepSeek 的配置、端口冲突处理、数据卷和清理方式见 [一键部署指南](docs/quick-deploy.md)。主流程体验步骤见 [RAG 主流程体验指南](docs/rag-core-demo.md)，完整 Agent 对话体验见 [Agent 对话工作台](docs/agent-chat-demo.md)。
 
+医疗设备垂直场景可直接运行：
+
+```bash
+make medical-up
+make medical-bootstrap
+make medical-smoke
+```
+
+随后打开 <http://localhost:3000/medical>（端口以 `.env` 为准）。该页面包含受控问答、Document IR 多格式接入、知识目录、40 条 Golden Cases 检索评测、10 条 Agent 决策评测和 Bad Case 人工复核。资料、品牌、型号、错误码和通知均为虚构内容，不能用于真实设备或临床决策。架构与验收方式见 [医疗设备知识问答 Agent](docs/medical-device-agent.md)。
+
 ## 项目目标
 
 - 系统探索 RAG 的核心原理、常见问题和工程实践。

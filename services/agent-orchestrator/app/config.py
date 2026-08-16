@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     raglab_api_url: str = "http://127.0.0.1:8080"
+    raglab_postgres_url: str = ""
     deepseek_api_key: str = ""
     raglab_generation_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"

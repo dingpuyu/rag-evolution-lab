@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_semantic_service_role",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "semantic_paraphrase",
+  "query": "VSM-100 2.6 进入网口设置需要什么测试角色？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-operator-fw2.6"], "relevant_chunk_ids": [], "required_facts": ["service_admin"], "forbidden_facts": ["无需角色"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "角色关键字与菜单段落。"
+}

@@ -31,10 +31,18 @@ type Searcher interface {
 }
 
 type Request struct {
-	AppID         string `json:"app_id,omitempty"`
-	EnvironmentID string `json:"environment_id,omitempty"`
-	Query         string `json:"query"`
-	TopK          int    `json:"top_k,omitempty"`
+	AppID         string        `json:"app_id,omitempty"`
+	EnvironmentID string        `json:"environment_id,omitempty"`
+	Query         string        `json:"query"`
+	TopK          int           `json:"top_k,omitempty"`
+	DeviceContext DeviceContext `json:"device_context,omitempty"`
+}
+
+type DeviceContext struct {
+	ModelCode       string `json:"model_code,omitempty"`
+	SoftwareVersion string `json:"software_version,omitempty"`
+	LotOrBatch      string `json:"lot_or_batch,omitempty"`
+	Region          string `json:"region,omitempty"`
 }
 
 type BindingTrace struct {
@@ -57,13 +65,18 @@ type RerankTrace struct {
 }
 
 type SearchResponse struct {
-	AppID          string              `json:"app_id"`
-	EnvironmentID  string              `json:"environment_id"`
-	TraceID        string              `json:"trace_id,omitempty"`
-	RewrittenQuery string              `json:"rewritten_query,omitempty"`
-	Bindings       []BindingTrace      `json:"bindings"`
-	Result         milvus.SearchResult `json:"result"`
-	TraceRecord    querytrace.Record   `json:"-"`
+	AppID             string              `json:"app_id"`
+	EnvironmentID     string              `json:"environment_id"`
+	Decision          string              `json:"decision"`
+	ReasonCode        string              `json:"reason_code"`
+	ResolvedContext   DeviceContext       `json:"resolved_context"`
+	CandidateEntities []string            `json:"candidate_entities,omitempty"`
+	TraceID           string              `json:"trace_id,omitempty"`
+	RewrittenQuery    string              `json:"rewritten_query,omitempty"`
+	Bindings          []BindingTrace      `json:"bindings"`
+	Result            milvus.SearchResult `json:"result"`
+	Evidence          []milvus.SearchHit  `json:"evidence"`
+	TraceRecord       querytrace.Record   `json:"-"`
 }
 
 type AnswerResponse struct {
@@ -218,6 +231,8 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 			}
 		}
 		query := buildQuery(dataset, identity, effectiveQuery, limit)
+		query.ModelCode = strings.TrimSpace(request.DeviceContext.ModelCode)
+		query.Version = strings.TrimSpace(request.DeviceContext.SoftwareVersion)
 		query.Collection = indexRelease.Collection
 		retrievalCtx, retrievalSpan := service.tracer.Start(ctx, "rag.retrieval", trace.WithAttributes(attribute.String("rag.dataset_id", binding.DatasetID), attribute.Int("rag.candidate_k", limit)))
 		result, err := service.searcher.Search(retrievalCtx, query)
@@ -295,8 +310,33 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 			return SearchResponse{}, fmt.Errorf("persist query trace: %w", err)
 		}
 	}
-	return SearchResponse{AppID: appID, EnvironmentID: environmentID, TraceID: record.TraceID, RewrittenQuery: rewrittenQuery,
-		Bindings: traces, Result: merged, TraceRecord: record}, nil
+	decision, reasonCode := "answer", "evidence_ready"
+	if len(merged.Hits) == 0 {
+		decision, reasonCode = "clarify", "insufficient_evidence"
+	}
+	return SearchResponse{AppID: appID, EnvironmentID: environmentID, Decision: decision, ReasonCode: reasonCode,
+		ResolvedContext: request.DeviceContext, CandidateEntities: candidateModels(merged.Hits),
+		TraceID: record.TraceID, RewrittenQuery: rewrittenQuery, Bindings: traces, Result: merged, Evidence: merged.Hits, TraceRecord: record}, nil
+}
+
+func candidateModels(hits []milvus.SearchHit) []string {
+	seen := make(map[string]struct{})
+	models := make([]string, 0)
+	for _, hit := range hits {
+		for _, model := range hit.ModelCodes {
+			model = strings.TrimSpace(model)
+			if model == "" {
+				continue
+			}
+			if _, ok := seen[model]; ok {
+				continue
+			}
+			seen[model] = struct{}{}
+			models = append(models, model)
+		}
+	}
+	sort.Strings(models)
+	return models
 }
 
 func (service *Service) Answer(ctx context.Context, identity auth.Identity, request Request) (AnswerResponse, error) {
@@ -402,7 +442,7 @@ func (searcher staticSearcher) Search(context.Context, milvus.Query) (milvus.Sea
 }
 
 func buildQuery(dataset datasetaccess.Dataset, identity auth.Identity, text string, topK int) milvus.Query {
-	query := milvus.Query{Text: text, TopK: topK, Product: dataset.Product, Status: "active"}
+	query := milvus.Query{Text: text, TopK: topK, DatasetID: dataset.ID, Product: dataset.Product, Status: "active"}
 	if dataset.Visibility == "public" {
 		query.Tenant, query.Role, query.AccessScope = "public", "viewer", "public_only"
 	} else {

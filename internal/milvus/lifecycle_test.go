@@ -63,9 +63,9 @@ func (mock *lifecycleMilvusMock) serveHTTP(t *testing.T, writer http.ResponseWri
 		writeMockResponse(t, writer, map[string]any{})
 	case "/v2/vectordb/collections/describe":
 		fields := []map[string]any{
-			{"name": "chunk_id"}, {"name": "document_id"}, {"name": "content_hash"},
+			{"name": "chunk_id"}, {"name": "document_id"}, {"name": "dataset_id"}, {"name": "domain"}, {"name": "model_codes"}, {"name": "content_hash"},
 			{"name": "embedding_model"}, {"name": "embedding_version"}, {"name": "document_version"},
-			{"name": "source_revision"}, {"name": "indexed_at"},
+			{"name": "source_revision"}, {"name": "indexed_at"}, {"name": "sparse"},
 			{"name": "embedding", "params": []map[string]string{{"key": "dim", "value": integerString(mock.dimensions)}}},
 		}
 		writeMockResponse(t, writer, map[string]any{"collectionName": "lifecycle_v1", "fields": fields})
@@ -156,7 +156,7 @@ func TestLifecycleUpsertUpdateDeleteIdempotencyAndRevisionOrdering(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if result.CurrentChunks != 2 || result.PreviousChunks != 0 || !result.Verified || mock.aliases != 1 {
+	if result.CurrentChunks != 1 || result.PreviousChunks != 0 || !result.Verified || mock.aliases != 1 {
 		t.Fatalf("unexpected first result=%#v aliases=%d", result, mock.aliases)
 	}
 	duplicate, err := service.Apply(context.Background(), first)
@@ -175,7 +175,7 @@ func TestLifecycleUpsertUpdateDeleteIdempotencyAndRevisionOrdering(t *testing.T)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if updated.PreviousChunks != 2 || updated.CurrentChunks != 1 || updated.DeletedChunks != 1 {
+	if updated.PreviousChunks != 1 || updated.CurrentChunks != 1 || updated.DeletedChunks != 0 {
 		t.Fatalf("stale chunk was not removed: %#v", updated)
 	}
 	if _, err := service.Apply(context.Background(), LifecycleChange{
@@ -206,7 +206,7 @@ func TestLifecycleUpsertUpdateDeleteIdempotencyAndRevisionOrdering(t *testing.T)
 	replayed, err := restarted.Apply(context.Background(), LifecycleChange{
 		EventID: "evt-3", Operation: OperationDelete, Revision: 3, DocumentID: "doc-1",
 	})
-	if err != nil || !replayed.Duplicate || mock.deletes != 2 {
+	if err != nil || !replayed.Duplicate || mock.deletes != 1 {
 		t.Fatalf("persisted idempotency failed: result=%#v deletes=%d err=%v", replayed, mock.deletes, err)
 	}
 	status := restarted.Status()
@@ -266,6 +266,7 @@ func TestLifecycleValidatesIndexStateBeforeAliasSwitch(t *testing.T) {
 					{"name": "tenant_id"}, {"name": "allowed_tenants"}, {"name": "allowed_roles"}, {"name": "product"},
 					{"name": "version"}, {"name": "status"}, {"name": "visibility"},
 					{"name": "embedding_model"}, {"name": "embedding_version"},
+					{"name": "sparse"},
 					{"name": "embedding", "params": []map[string]string{{"key": "dim", "value": "8"}}},
 				},
 				"indexes": []map[string]any{{"fieldName": "embedding", "indexName": "embedding_hnsw"}},

@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_clarify_network_model",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "unanswerable",
+  "query": "PulseCare 的网络设置入口在哪里？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": null, "version": null},
+  "expected": {"answerable": false, "relevant_doc_ids": [], "relevant_chunk_ids": [], "required_facts": [], "forbidden_facts": ["默认使用维护中心", "默认使用设备中心"], "minimum_citations": 0, "expected_refusal_reason": "需要补充完整型号和软件版本"},
+  "notes": "多个型号答案不同，应澄清。"
+}

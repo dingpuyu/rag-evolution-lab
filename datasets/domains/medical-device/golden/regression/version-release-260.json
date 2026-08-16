@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_version_release_260",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "version_filter",
+  "query": "VSM-100 系列 2.6.0 引入了哪些维护界面变化？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-family", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-family-release-fw2.6"], "relevant_chunk_ids": [], "required_facts": ["维护中心", ".pcdiag"], "forbidden_facts": ["2.6.2 才引入维护中心"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "版本发布说明定位。"
+}

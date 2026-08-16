@@ -24,6 +24,9 @@
 RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab validate --split development
 RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline v0-keyword --split development
 RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline v5-rerank --split development
+RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline v5-rerank --split regression
+# 或一次验证并运行 21 条 Development + 19 条 Regression：
+make medical-eval-all
 ```
 
 首轮结果与两个刻意保留的 Bad Case 见 [Development Baseline](eval/baseline-2026-08-16.md)。

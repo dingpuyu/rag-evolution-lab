@@ -38,41 +38,47 @@ func (c Chunker) Chunk(document domain.Document) []domain.Chunk {
 			section.parentID = fmt.Sprintf("%s#p%03d", document.ID, section.parentSequence)
 		}
 		chunks = append(chunks, domain.Chunk{
-			ID:             fmt.Sprintf("%s#c%03d", document.ID, index+1),
-			DocumentID:     document.ID,
-			DocumentTitle:  document.Title,
-			Content:        section.content,
-			ParentID:       section.parentID,
-			ParentContent:  section.parentContent,
-			ParentSequence: section.parentSequence,
-			SourcePage:     section.sourcePage,
-			Sequence:       index + 1,
-			HeadingPath:    append([]string(nil), section.headings...),
-			Product:        document.Product,
-			Version:        document.Version,
-			Status:         document.Status,
-			Visibility:     document.Visibility,
-			AllowedTenants: append([]string(nil), document.AllowedTenants...),
-			AllowedRoles:   append([]string(nil), document.AllowedRoles...),
-			Quality:        document.Quality,
+			ID:              fmt.Sprintf("%s#c%03d", document.ID, index+1),
+			DocumentID:      document.ID,
+			DocumentTitle:   document.Title,
+			Content:         section.content,
+			ParentID:        section.parentID,
+			ParentContent:   section.parentContent,
+			ParentSequence:  section.parentSequence,
+			SourcePage:      section.sourcePage,
+			SourceSheet:     section.sourceSheet,
+			SourceCellRange: section.sourceCellRange,
+			Sequence:        index + 1,
+			HeadingPath:     append([]string(nil), section.headings...),
+			Product:         document.Product,
+			Version:         document.Version,
+			Status:          document.Status,
+			Visibility:      document.Visibility,
+			AllowedTenants:  append([]string(nil), document.AllowedTenants...),
+			AllowedRoles:    append([]string(nil), document.AllowedRoles...),
+			Quality:         document.Quality,
 		})
 	}
 	return chunks
 }
 
 type section struct {
-	headings       []string
-	content        string
-	parentID       string
-	parentContent  string
-	parentSequence int
-	sourcePage     int
+	headings        []string
+	content         string
+	parentID        string
+	parentContent   string
+	parentSequence  int
+	sourcePage      int
+	sourceSheet     string
+	sourceCellRange string
 }
 
 type parentSection struct {
-	headings   []string
-	content    string
-	sourcePage int
+	headings        []string
+	content         string
+	sourcePage      int
+	sourceSheet     string
+	sourceCellRange string
 }
 
 // splitMarkdown is retained as the compatibility helper used by the original
@@ -99,12 +105,14 @@ func splitMarkdownWithOptions(content string, maxRunes, overlap int, pageAware b
 		for _, part := range parts {
 			childIndex++
 			result = append(result, section{
-				headings:       append([]string(nil), parent.headings...),
-				content:        strings.TrimSpace(prefix + part),
-				parentID:       parentID,
-				parentContent:  parentContent,
-				parentSequence: parentIndex + 1,
-				sourcePage:     parent.sourcePage,
+				headings:        append([]string(nil), parent.headings...),
+				content:         strings.TrimSpace(prefix + part),
+				parentID:        parentID,
+				parentContent:   parentContent,
+				parentSequence:  parentIndex + 1,
+				sourcePage:      parent.sourcePage,
+				sourceSheet:     parent.sourceSheet,
+				sourceCellRange: parent.sourceCellRange,
 			})
 		}
 	}
@@ -165,6 +173,8 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 	var headings []string
 	var current strings.Builder
 	currentSourcePage := currentPage
+	currentSourceSheet := ""
+	currentSourceCellRange := ""
 
 	flush := func() {
 		text := strings.TrimSpace(current.String())
@@ -173,9 +183,11 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 			return
 		}
 		result = append(result, parentSection{
-			headings:   append([]string(nil), headings...),
-			content:    text,
-			sourcePage: currentSourcePage,
+			headings:        append([]string(nil), headings...),
+			content:         text,
+			sourcePage:      currentSourcePage,
+			sourceSheet:     currentSourceSheet,
+			sourceCellRange: currentSourceCellRange,
 		})
 		current.Reset()
 	}
@@ -199,6 +211,11 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 				block, markerPage = stripPageMarker(block)
 				if markerPage > 0 {
 					currentPage = markerPage
+				}
+				var markerSheet, markerRange string
+				block, markerSheet, markerRange = stripSheetMarker(block)
+				if markerSheet != "" {
+					currentSourceSheet, currentSourceCellRange = markerSheet, markerRange
 				}
 				block = strings.TrimSpace(block)
 				if block == "" {
@@ -232,6 +249,28 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 		flush()
 	}
 	return result
+}
+
+func stripSheetMarker(block string) (string, string, string) {
+	const prefix = "<!-- sheet:"
+	start := strings.Index(block, prefix)
+	if start < 0 {
+		return block, "", ""
+	}
+	rest := block[start+len(prefix):]
+	end := strings.Index(rest, "-->")
+	if end < 0 {
+		return block, "", ""
+	}
+	marker := strings.TrimSpace(rest[:end])
+	parts := strings.SplitN(marker, "; range:", 2)
+	sheet := strings.TrimSpace(parts[0])
+	cellRange := ""
+	if len(parts) == 2 {
+		cellRange = strings.TrimSpace(parts[1])
+	}
+	cleaned := strings.TrimSpace(block[:start] + " " + rest[end+3:])
+	return cleaned, sheet, cellRange
 }
 
 func stripPageMarker(block string) (string, int) {

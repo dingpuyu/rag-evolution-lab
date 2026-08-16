@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_correction_needs_version",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "unanswerable",
+  "query": "VSM-100 Pro 批次 L26A04 是否受 FC-2026-04 影响？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": null},
+  "expected": {"answerable": false, "relevant_doc_ids": [], "relevant_chunk_ids": [], "required_facts": [], "forbidden_facts": ["直接判定适用", "直接判定不适用"], "minimum_citations": 0, "expected_refusal_reason": "需要补充软件版本和设备标识"},
+  "notes": "确定性适用性工具必须返回 needs_information。"
+}

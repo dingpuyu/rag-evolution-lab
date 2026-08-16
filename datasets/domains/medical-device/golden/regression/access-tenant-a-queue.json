@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_access_tenant_a_queue",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "access_control",
+  "query": "Tenant A 命中 FC-2026-04 后内部工单路由到哪里？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-biomed", "version": "2026.1"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["tenant-a-biomed-runbook-2026"], "relevant_chunk_ids": [], "required_facts": ["tenant-a-inspection"], "forbidden_facts": ["tenant-b-inspection"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "Tenant A 私有队列。"
+}

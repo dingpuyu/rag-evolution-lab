@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_hard_negative_battery_pro",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "conflict_resolution",
+  "query": "VSM-100 Pro 可以使用 BAT-B1 标准测试电池吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-pro-compatibility-fw2.6"], "relevant_chunk_ids": [], "required_facts": ["BAT-B1P", "BAT-B1 不兼容"], "forbidden_facts": ["BAT-B1 支持 Pro"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "配件后缀不能丢失。"
+}

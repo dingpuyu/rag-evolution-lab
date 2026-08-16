@@ -1,0 +1,10 @@
+{
+  "id": "medical_regression_exact_vsm100_log215",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "exact_match",
+  "query": "VSM-100 2.6 的 LOG-EXP-215 怎么处理？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {"answerable": true, "relevant_doc_ids": ["vsm100-error-codes-fw2.6"], "relevant_chunk_ids": [], "required_facts": ["导出介质可用空间不足", "清理测试文件"], "forbidden_facts": ["超过 512 MB"], "minimum_citations": 1, "expected_refusal_reason": null},
+  "notes": "同码异义：VSM-100。"
+}

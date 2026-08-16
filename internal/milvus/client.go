@@ -95,21 +95,43 @@ func (value *flexibleInt64) UnmarshalJSON(data []byte) error {
 }
 
 type Record struct {
-	ChunkID        string   `json:"chunk_id"`
-	DocumentID     string   `json:"document_id"`
-	Title          string   `json:"title"`
-	Content        string   `json:"content"`
-	TenantID       string   `json:"tenant_id"`
-	AllowedTenants []string `json:"allowed_tenants,omitempty"`
-	AllowedRoles   []string `json:"allowed_roles,omitempty"`
-	Product        string   `json:"product"`
-	Version        string   `json:"version"`
-	Status         string   `json:"status"`
-	Visibility     string   `json:"visibility"`
-	ContentHash    string   `json:"content_hash,omitempty"`
-	EmbeddingModel string   `json:"embedding_model,omitempty"`
-	EmbeddingVer   string   `json:"embedding_version,omitempty"`
-	DocumentVer    string   `json:"document_version,omitempty"`
+	ChunkID             string   `json:"chunk_id"`
+	DocumentID          string   `json:"document_id"`
+	DatasetID           string   `json:"dataset_id"`
+	Title               string   `json:"title"`
+	Content             string   `json:"content"`
+	TenantID            string   `json:"tenant_id"`
+	AllowedTenants      []string `json:"allowed_tenants,omitempty"`
+	AllowedRoles        []string `json:"allowed_roles,omitempty"`
+	Domain              string   `json:"domain"`
+	Manufacturer        string   `json:"manufacturer"`
+	ProductFamily       string   `json:"product_family"`
+	ModelCodes          []string `json:"model_codes,omitempty"`
+	SoftwareVersionFrom string   `json:"software_version_from"`
+	SoftwareVersionTo   string   `json:"software_version_to"`
+	HardwareRevision    string   `json:"hardware_revision"`
+	Region              string   `json:"region"`
+	Language            string   `json:"language"`
+	EffectiveFrom       string   `json:"effective_from"`
+	EffectiveTo         string   `json:"effective_to"`
+	AuthorityLevel      string   `json:"authority_level"`
+	DocumentRevision    string   `json:"document_revision"`
+	Supersedes          []string `json:"supersedes,omitempty"`
+	SourceFile          string   `json:"source_file"`
+	SourcePage          int64    `json:"source_page"`
+	SourceSheet         string   `json:"source_sheet"`
+	SourceCellRange     string   `json:"source_cell_range"`
+	HeadingPath         []string `json:"heading_path,omitempty"`
+	DeviceIdentifiers   []string `json:"device_identifiers,omitempty"`
+	AffectedLots        []string `json:"affected_lots,omitempty"`
+	Product             string   `json:"product"`
+	Version             string   `json:"version"`
+	Status              string   `json:"status"`
+	Visibility          string   `json:"visibility"`
+	ContentHash         string   `json:"content_hash,omitempty"`
+	EmbeddingModel      string   `json:"embedding_model,omitempty"`
+	EmbeddingVer        string   `json:"embedding_version,omitempty"`
+	DocumentVer         string   `json:"document_version,omitempty"`
 	// Int64 fields are required by Milvus when dynamic fields are disabled.
 	// Do not omit zero values: the v2 REST row encoder otherwise sends an empty
 	// string for a missing scalar and Milvus rejects the whole batch.
@@ -121,6 +143,7 @@ type Record struct {
 type Entity struct {
 	ChunkID        string `json:"chunk_id"`
 	DocumentID     string `json:"document_id"`
+	DatasetID      string `json:"dataset_id"`
 	Title          string `json:"title"`
 	TenantID       string `json:"tenant_id"`
 	Product        string `json:"product"`
@@ -144,19 +167,59 @@ type SearchRequest struct {
 	Exact      bool
 }
 
+// HybridSearchRequest executes Milvus-side reciprocal-rank fusion over the
+// dense embedding and the BM25 sparse vector generated from content. QueryText
+// deliberately remains the original/rewrite-safe text so equipment model,
+// error-code and batch identifiers reach the lexical branch unchanged.
+type HybridSearchRequest struct {
+	Collection string
+	Vector     []float64
+	QueryText  string
+	Filter     string
+	Limit      int
+	CandidateK int
+	EF         int
+	RRFK       int
+}
+
 type SearchHit struct {
-	ChunkID        string      `json:"chunk_id"`
-	DocumentID     string      `json:"document_id"`
-	Title          string      `json:"title"`
-	Content        string      `json:"content"`
-	TenantID       string      `json:"tenant_id"`
-	AllowedTenants stringArray `json:"allowed_tenants"`
-	AllowedRoles   stringArray `json:"allowed_roles"`
-	Product        string      `json:"product"`
-	Version        string      `json:"version"`
-	Status         string      `json:"status"`
-	Visibility     string      `json:"visibility"`
-	Distance       float64     `json:"distance"`
+	ChunkID             string      `json:"chunk_id"`
+	DocumentID          string      `json:"document_id"`
+	DatasetID           string      `json:"dataset_id"`
+	Title               string      `json:"title"`
+	Content             string      `json:"content"`
+	TenantID            string      `json:"tenant_id"`
+	AllowedTenants      stringArray `json:"allowed_tenants"`
+	AllowedRoles        stringArray `json:"allowed_roles"`
+	Domain              string      `json:"domain"`
+	Manufacturer        string      `json:"manufacturer"`
+	ProductFamily       string      `json:"product_family"`
+	ModelCodes          stringArray `json:"model_codes"`
+	SoftwareVersionFrom string      `json:"software_version_from"`
+	SoftwareVersionTo   string      `json:"software_version_to"`
+	HardwareRevision    string      `json:"hardware_revision"`
+	Region              string      `json:"region"`
+	Language            string      `json:"language"`
+	EffectiveFrom       string      `json:"effective_from"`
+	EffectiveTo         string      `json:"effective_to"`
+	AuthorityLevel      string      `json:"authority_level"`
+	DocumentRevision    string      `json:"document_revision"`
+	Supersedes          stringArray `json:"supersedes"`
+	SourceFile          string      `json:"source_file"`
+	SourcePage          int64       `json:"source_page"`
+	SourceSheet         string      `json:"source_sheet"`
+	SourceCellRange     string      `json:"source_cell_range"`
+	HeadingPath         stringArray `json:"heading_path"`
+	DeviceIdentifiers   stringArray `json:"device_identifiers"`
+	AffectedLots        stringArray `json:"affected_lots"`
+	Product             string      `json:"product"`
+	Version             string      `json:"version"`
+	Status              string      `json:"status"`
+	Visibility          string      `json:"visibility"`
+	Distance            float64     `json:"distance"`
+	FusionScore         float64     `json:"fusion_score,omitempty"`
+	RecallSources       []string    `json:"recall_sources,omitempty"`
+	ExactMatches        []string    `json:"exact_matches,omitempty"`
 	// RerankScore is populated only inside the gateway after a local or hosted
 	// reranker runs. It is intentionally hidden from the Milvus/API payload;
 	// the gateway uses it to merge independently reranked bindings globally.
@@ -281,14 +344,43 @@ func (c *Client) CreateCollectionWithOptions(ctx context.Context, collection str
 		"schema": map[string]any{
 			"autoId":             false,
 			"enableDynamicField": false,
+			"functions": []map[string]any{
+				{
+					"name": "content_bm25", "description": "BM25 sparse vectors generated from document content",
+					"type": "BM25", "inputFieldNames": []string{"content"}, "outputFieldNames": []string{"sparse"},
+					"params": map[string]any{},
+				},
+			},
 			"fields": []map[string]any{
 				{"fieldName": "chunk_id", "dataType": "VarChar", "isPrimary": true, "elementTypeParams": map[string]string{"max_length": "256"}},
 				{"fieldName": "document_id", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "256"}},
+				{"fieldName": "dataset_id", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "256"}},
 				{"fieldName": "title", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "512"}},
-				{"fieldName": "content", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "8192"}},
+				{"fieldName": "content", "dataType": "VarChar", "elementTypeParams": map[string]any{"max_length": "8192", "enable_analyzer": true, "enable_match": true}},
 				{"fieldName": "tenant_id", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
 				{"fieldName": "allowed_tenants", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "16", "max_length": "128"}},
 				{"fieldName": "allowed_roles", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "16", "max_length": "128"}},
+				{"fieldName": "domain", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
+				{"fieldName": "manufacturer", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
+				{"fieldName": "product_family", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
+				{"fieldName": "model_codes", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "32", "max_length": "128"}},
+				{"fieldName": "software_version_from", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "software_version_to", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "hardware_revision", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "region", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "language", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
+				{"fieldName": "effective_from", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
+				{"fieldName": "effective_to", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
+				{"fieldName": "authority_level", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "document_revision", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
+				{"fieldName": "supersedes", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "32", "max_length": "256"}},
+				{"fieldName": "source_file", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "512"}},
+				{"fieldName": "source_page", "dataType": "Int64"},
+				{"fieldName": "source_sheet", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "256"}},
+				{"fieldName": "source_cell_range", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
+				{"fieldName": "heading_path", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "32", "max_length": "256"}},
+				{"fieldName": "device_identifiers", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "32", "max_length": "128"}},
+				{"fieldName": "affected_lots", "dataType": "Array", "elementDataType": "VarChar", "nullable": true, "elementTypeParams": map[string]string{"max_capacity": "64", "max_length": "128"}},
 				{"fieldName": "product", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "128"}},
 				{"fieldName": "version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
 				{"fieldName": "status", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "32"}},
@@ -299,6 +391,7 @@ func (c *Client) CreateCollectionWithOptions(ctx context.Context, collection str
 				{"fieldName": "document_version", "dataType": "VarChar", "elementTypeParams": map[string]string{"max_length": "64"}},
 				{"fieldName": "source_revision", "dataType": "Int64"},
 				{"fieldName": "indexed_at", "dataType": "Int64"},
+				{"fieldName": "sparse", "dataType": "SparseFloatVector"},
 				{"fieldName": "embedding", "dataType": "FloatVector", "elementTypeParams": map[string]string{"dim": fmt.Sprint(options.Dimensions)}},
 			},
 		},
@@ -309,6 +402,10 @@ func (c *Client) CreateCollectionWithOptions(ctx context.Context, collection str
 				"indexType":  indexType,
 				"metricType": metricType,
 				"params":     indexParameters,
+			},
+			{
+				"fieldName": "sparse", "indexName": "sparse_bm25", "indexType": "SPARSE_INVERTED_INDEX",
+				"metricType": "BM25", "params": map[string]any{},
 			},
 		},
 	}
@@ -366,7 +463,7 @@ func (c *Client) QueryEntities(ctx context.Context, collection, filter string, l
 		"collectionName": collection,
 		"filter":         filter,
 		"outputFields": []string{
-			"chunk_id", "document_id", "title", "tenant_id", "product", "version", "status", "visibility",
+			"chunk_id", "document_id", "dataset_id", "title", "tenant_id", "product", "version", "status", "visibility",
 			"content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at",
 		},
 		"limit":            limit,
@@ -423,7 +520,7 @@ func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, 
 		"data":           [][]float64{input.Vector},
 		"annsField":      "embedding",
 		"limit":          limit,
-		"outputFields":   []string{"chunk_id", "document_id", "title", "content", "tenant_id", "allowed_tenants", "allowed_roles", "product", "version", "status", "visibility"},
+		"outputFields":   searchOutputFields(),
 		"searchParams": map[string]any{
 			"metricType": "COSINE",
 			"params":     searchParameters,
@@ -437,6 +534,66 @@ func (c *Client) Search(ctx context.Context, input SearchRequest) ([]SearchHit, 
 		return nil, err
 	}
 	return hits, nil
+}
+
+// HybridSearch lets Milvus fuse two independently ranked candidate lists.
+// The REST API returns an RRF relevance score in distance; callers in this
+// repository historically treat a smaller Distance as better, so preserve the
+// raw score in FusionScore and normalize Distance to the stable result rank.
+func (c *Client) HybridSearch(ctx context.Context, input HybridSearchRequest) ([]SearchHit, error) {
+	limit := input.Limit
+	if limit <= 0 || limit > 50 {
+		limit = 5
+	}
+	candidateK := input.CandidateK
+	if candidateK < limit {
+		candidateK = limit
+	}
+	if candidateK <= 0 || candidateK > 100 {
+		candidateK = min(limit*4, 100)
+	}
+	ef := input.EF
+	if ef <= 0 {
+		ef = 64
+	}
+	rrfK := input.RRFK
+	if rrfK <= 0 {
+		rrfK = 60
+	}
+	filter := strings.TrimSpace(input.Filter)
+	dense := map[string]any{
+		"data": [][]float64{input.Vector}, "annsField": "embedding", "limit": candidateK,
+		"searchParams": map[string]any{"metricType": "COSINE", "params": map[string]any{"ef": ef}},
+	}
+	sparse := map[string]any{
+		"data": []string{input.QueryText}, "annsField": "sparse", "limit": candidateK,
+		"searchParams": map[string]any{"metricType": "BM25", "params": map[string]any{}},
+	}
+	if filter != "" {
+		dense["filter"] = filter
+		sparse["filter"] = filter
+	}
+	payload := map[string]any{
+		"collectionName": input.Collection,
+		"search":         []map[string]any{dense, sparse},
+		"rerank":         map[string]any{"strategy": "rrf", "params": map[string]any{"k": rrfK}},
+		"limit":          limit,
+		"outputFields":   searchOutputFields(),
+	}
+	var hits []SearchHit
+	if err := c.post(ctx, "/v2/vectordb/entities/hybrid_search", payload, &hits); err != nil {
+		return nil, err
+	}
+	for index := range hits {
+		hits[index].FusionScore = hits[index].Distance
+		hits[index].Distance = float64(index)
+		hits[index].RecallSources = []string{"dense", "bm25", "rrf"}
+	}
+	return hits, nil
+}
+
+func searchOutputFields() []string {
+	return []string{"chunk_id", "document_id", "dataset_id", "title", "content", "tenant_id", "allowed_tenants", "allowed_roles", "domain", "manufacturer", "product_family", "model_codes", "software_version_from", "software_version_to", "hardware_revision", "region", "language", "effective_from", "effective_to", "authority_level", "document_revision", "supersedes", "source_file", "source_page", "source_sheet", "source_cell_range", "heading_path", "device_identifiers", "affected_lots", "product", "version", "status", "visibility"}
 }
 
 func (c *Client) post(ctx context.Context, path string, payload any, output any) error {
