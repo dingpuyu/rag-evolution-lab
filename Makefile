@@ -43,7 +43,7 @@ medical-up: stack-up
 
 medical-bootstrap:
 	cd services/document-parser && uv run python ../../scripts/generate_medical_formats.py
-	python3 scripts/medical_bootstrap.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080}
+	python3 scripts/medical_bootstrap.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080} --source-revision $${MEDICAL_SOURCE_REVISION:-1}
 
 medical-smoke:
 	python3 scripts/medical_smoke.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080} --agent $${RAGLAB_AGENT_URL:-http://127.0.0.1:8090}

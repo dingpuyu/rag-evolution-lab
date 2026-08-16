@@ -132,6 +132,12 @@ make medical-bootstrap
 make medical-smoke
 ```
 
+Embedding 模型、维度或语义版本变化时，必须使用新的物理 Collection，并递增源修订以强制重新解析和向量化，禁止把不同模型的向量写入同一索引：
+
+```bash
+MEDICAL_SOURCE_REVISION=2 make medical-bootstrap
+```
+
 默认真实模型配置：
 
 - Embedding：`text-embedding-v4`，1024 维；

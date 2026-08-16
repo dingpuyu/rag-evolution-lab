@@ -80,7 +80,7 @@ def models(product: str) -> list[str]:
     return []
 
 
-def metadata(entry: dict, suffix: str = "") -> dict:
+def metadata(entry: dict, suffix: str = "", source_revision: int = 1) -> dict:
     is_notice = entry["doc_id"].startswith("field-correction")
     version_from = "2.5.0" if is_notice else entry["version"]
     version_to = "2.5.3" if is_notice else entry["version"]
@@ -88,7 +88,7 @@ def metadata(entry: dict, suffix: str = "") -> dict:
         "document_id": entry["doc_id"] + suffix,
         "title": entry["title"] + ("（跨格式测试副本）" if suffix else ""),
         "version": entry["version"],
-        "source_revision": 1,
+        "source_revision": source_revision,
         "domain": "medical-device",
         "manufacturer": "PulseCare",
         "product_family": entry["product"],
@@ -101,7 +101,7 @@ def metadata(entry: dict, suffix: str = "") -> dict:
         "effective_from": str(entry.get("effective_at") or "")[:10],
         "effective_to": str(entry.get("expires_at") or "")[:10],
         "authority_level": "field_correction" if is_notice else ("manufacturer" if entry["quality"] == "authoritative" else "reviewed"),
-        "document_revision": "R1",
+        "document_revision": f"R{source_revision}",
         "supersedes": ["FC-2026-04-DRAFT"] if is_notice else [],
         "device_identifiers": ["MDX-V100P-A"] if is_notice else [],
         "affected_lots": [f"L26A{index:02d}" for index in range(1, 8)] if is_notice else [],
@@ -124,6 +124,7 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--api", default=os.getenv("RAGLAB_API_URL", "http://127.0.0.1:8080"))
     parser.add_argument("--skip-derived", action="store_true")
+    parser.add_argument("--source-revision", type=int, default=int(os.getenv("MEDICAL_SOURCE_REVISION", "1")))
     arguments = parser.parse_args()
     api = arguments.api.rstrip("/")
     tokens = {name: login(api, name) for name in ACCOUNTS}
@@ -132,7 +133,7 @@ def main() -> None:
     for entry in manifest:
         tenant = (entry.get("allowed_tenants") or ["platform"])[0]
         dataset = {"platform": "public-medical-device", "tenant_a": "tenant-a-medical-runbook", "tenant_b": "tenant-b-medical-runbook"}[tenant]
-        result = upload(api, tokens[tenant], dataset, CORPUS / entry["path"], metadata(entry))
+        result = upload(api, tokens[tenant], dataset, CORPUS / entry["path"], metadata(entry, source_revision=arguments.source_revision))
         submitted.append({"document_id": entry["doc_id"], "dataset_id": dataset, "job_id": result.get("job_id"), "status": result.get("status")})
 
     if not arguments.skip_derived and GENERATED.exists():
@@ -144,7 +145,7 @@ def main() -> None:
         }
         for name, entry in by_name.items():
             suffix = "-" + Path(name).suffix.removeprefix(".")
-            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, metadata(entry, suffix))
+            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, metadata(entry, suffix, arguments.source_revision))
             submitted.append({"document_id": entry["doc_id"] + suffix, "dataset_id": "public-medical-device", "job_id": result.get("job_id"), "status": result.get("status")})
     print(json.dumps({"submitted": len(submitted), "documents": submitted}, ensure_ascii=False, indent=2))
 
