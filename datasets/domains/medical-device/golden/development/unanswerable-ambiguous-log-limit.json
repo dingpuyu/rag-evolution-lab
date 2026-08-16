@@ -1,0 +1,18 @@
+{
+  "id": "medical_unanswerable_ambiguous_log_limit",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "unanswerable",
+  "query": "PulseCare 的日志导出包最大是多少？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": null, "version": null},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": ["默认回答 128 MB", "默认回答 256 MB", "默认回答 512 MB"],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "需要补充完整型号和软件版本"
+  },
+  "notes": "当前系统可能直接命中对照表；后续应升级为 needs_clarification。"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "medical_correction_excluded_lot",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "conflict_resolution",
+  "query": "VSM-100 Pro 2.5.2 的批次 L26A08 需要按 FC-2026-04 处理吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.5"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["field-correction-fc-2026-04"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["L26A08 之后的批次不在范围"],
+    "forbidden_facts": ["属于 L26A01 至 L26A07"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "测试边界批次，不能只因型号和版本相似就判定命中。"
+}

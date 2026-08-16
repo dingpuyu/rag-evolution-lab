@@ -1,0 +1,18 @@
+{
+  "id": "medical_semantic_device_identifier",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "标签上的 MDX-V100P-A 对应百系列的哪个具体机型？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare", "version": "2026.1"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["medaxis-device-catalog-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["VSM-100 Pro"],
+    "forbidden_facts": ["VSM-100 标准型", "VSM-200"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "从虚构设备标识反查完整型号。"
+}

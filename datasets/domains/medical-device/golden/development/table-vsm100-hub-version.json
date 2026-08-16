@@ -1,0 +1,18 @@
+{
+  "id": "medical_table_vsm100_hub_version",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "VSM-100 标准型连接 HUB-C4 至少需要哪个版本？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-compatibility-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["2.6.3"],
+    "forbidden_facts": ["2.6.1", "HUB-C4P"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "相似配件代码和版本构成 Hard Negative。"
+}

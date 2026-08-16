@@ -1,0 +1,18 @@
+{
+  "id": "medical_semantic_pro_wifi_menu",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "semantic_paraphrase",
+  "query": "百系列增强款装了无线扩展后，去哪个页面连 Wi-Fi？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-pro-operator-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["维护中心", "连接管理", "无线网络"],
+    "forbidden_facts": ["设备中心 → 网络与时间"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "测试 VSM-100 Pro 的口语化描述。"
+}

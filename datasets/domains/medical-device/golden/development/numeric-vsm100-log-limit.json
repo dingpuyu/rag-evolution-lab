@@ -1,0 +1,18 @@
+{
+  "id": "medical_numeric_vsm100_log_limit",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "VSM-100 2.6 的 pcdiag 单包上限是多少？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-operator-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["256 MB", ".pcdiag"],
+    "forbidden_facts": ["128 MB", "512 MB"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "相邻版本数值不可串用。"
+}

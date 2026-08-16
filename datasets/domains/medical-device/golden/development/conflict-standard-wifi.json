@@ -1,0 +1,18 @@
+{
+  "id": "medical_conflict_standard_wifi",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "conflict_resolution",
+  "query": "VSM-100 标准型装上 WL-M2 就能出现无线网络菜单吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-compatibility-fw2.6", "vsm100-operator-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["VSM-100 不支持 WL-M2", "不显示无线网络菜单"],
+    "forbidden_facts": ["软件 2.6.2 后支持 WL-M2"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "Pro 型号的相似知识是强干扰项。"
+}

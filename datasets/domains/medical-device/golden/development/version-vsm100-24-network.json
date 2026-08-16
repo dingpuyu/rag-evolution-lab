@@ -1,0 +1,18 @@
+{
+  "id": "medical_version_vsm100_24_network",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "version_filter",
+  "query": "VSM-100 软件 2.4 的有线网络入口在哪里？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.4"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-operator-fw2.4"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["系统设置", "通信", "有线网络"],
+    "forbidden_facts": ["维护中心", "连接管理"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "明确查询历史版本时允许召回 deprecated 文档。"
+}

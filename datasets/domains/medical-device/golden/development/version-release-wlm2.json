@@ -1,0 +1,18 @@
+{
+  "id": "medical_version_release_wlm2",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "version_filter",
+  "query": "VSM-100 Pro 从哪个 2.6 维护版本开始支持 WL-M2？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-family", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-family-release-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["2.6.2"],
+    "forbidden_facts": ["VSM-100 标准型支持无线模块"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "发布说明中的型号与维护版本组合。"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "medical_multihop_correction_target_version",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "multi_hop",
+  "query": "FC-2026-04 的测试资产最低应升级到哪个 2.6 维护版本，发布说明里为什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": null, "version": null},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["field-correction-fc-2026-04", "vsm100-family-release-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["2.6.1", "修复诊断包索引不完整"],
+    "forbidden_facts": ["2.6.0 已满足"],
+    "minimum_citations": 2,
+    "expected_refusal_reason": null
+  },
+  "notes": "跨现场通知与发布说明的多跳检索。"
+}

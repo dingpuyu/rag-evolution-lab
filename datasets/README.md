@@ -18,6 +18,13 @@ datasets/
     acmecloud/
       documents/
       manifest.json
+  domains/
+    medical-device/
+      corpus/
+        documents/
+        manifest.json
+      golden/
+        development/
   golden/
     development/
     v4-challenge/
@@ -38,8 +45,21 @@ datasets/
 - Fixture 只保留最小测试数据，不复制完整 Corpus。
 - 修改语料或标注必须更新数据版本。
 
+## 多知识域
+
+默认领域仍为 `acmecloud`，保持原有命令兼容。独立领域把 Corpus 和 Golden Case
+放在同一个领域目录下，避免跨领域标注串用。切换医疗设备合成领域：
+
+```bash
+RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab validate --split development
+RAGLAB_DATASET_DOMAIN=medical-device go run ./cmd/raglab eval --pipeline v5-rerank --split development
+```
+
+`medical-device` 中的品牌、型号、参数和通知均为合成测试数据，不得用于真实医疗设备或临床决策。
+
 ## 当前状态
 
 - Development：20 条固定基线 Case，覆盖 8 个失败类别。
 - V4 Challenge：8 条新措辞和边界 Case，用于验证 Query Routing。
 - 当前共 28 条合成 Golden Query；下一目标为 60 条并增加不参与规则迭代的 Blind Split。
+- Medical Device Development：17 份合成文档、21 条 Golden Query，专门覆盖型号、版本、表格、同码异义、现场更正、澄清与权限问题。

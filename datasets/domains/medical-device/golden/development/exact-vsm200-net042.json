@@ -1,0 +1,18 @@
+{
+  "id": "medical_exact_vsm200_net042",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "VSM-200 3.1 的 SYS-NET-042 是 DHCP 错误吗？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm200", "version": "3.1"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm200-error-codes-fw3.1"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["测试中央站连接证书名称不匹配"],
+    "forbidden_facts": ["有线接口未获得 DHCP 地址"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "同码异义 Hard Negative。"
+}

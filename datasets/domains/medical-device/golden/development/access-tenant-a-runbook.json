@@ -1,0 +1,18 @@
+{
+  "id": "medical_access_tenant_a_runbook",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "access_control",
+  "query": "BJ-ICU-LAB 资产使用哪个同步连接器？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-biomed", "version": "2026.1"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["tenant-a-biomed-runbook-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["biomed-stage-a"],
+    "forbidden_facts": ["biomed-stage-b", "tenant-b-inspection"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "Tenant A 私有资料。"
+}

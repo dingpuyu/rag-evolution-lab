@@ -1,0 +1,18 @@
+{
+  "id": "medical_table_pro_wlm2_version",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "table_numeric",
+  "query": "VSM-100 Pro 使用 WL-M2 的最低软件版本是多少？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-pro-compatibility-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["2.6.2"],
+    "forbidden_facts": ["VSM-100 标准型支持 WL-M2"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证表头与对应数据行不能分离。"
+}

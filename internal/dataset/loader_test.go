@@ -32,3 +32,24 @@ func TestLoadCorpusAndGoldenSplits(t *testing.T) {
 		t.Fatalf("validate V4 challenge: %v", err)
 	}
 }
+
+func TestLoadMedicalDeviceDomain(t *testing.T) {
+	root := filepath.Join("..", "..", "datasets", "domains", "medical-device")
+	documents, err := LoadCorpus(filepath.Join(root, "corpus"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(documents) != 17 {
+		t.Fatalf("expected 17 medical-device documents, got %d", len(documents))
+	}
+	cases, err := LoadGolden(filepath.Join(root, "golden"), "development")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cases) != 21 {
+		t.Fatalf("expected 21 medical-device development cases, got %d", len(cases))
+	}
+	if err := Validate(documents, cases); err != nil {
+		t.Fatalf("validate medical-device domain: %v", err)
+	}
+}

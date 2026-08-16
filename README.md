@@ -136,6 +136,7 @@ Phase 5 已完成首轮工程基线实验：
 - 配置、信任边界和安全验证见 [企业RAG身份与审计](docs/enterprise-rag-security.md)
 - 登录体验、数据集授权和跨租户验证见 [多租户数据集隔离实验](docs/dataset-isolation-lab.md)
 - 受控漏洞演练、修复前后证据和生产预检见 [身份隔离安全演练](docs/security-lab.md)
+- 超复杂文档、版本/型号治理与 Bad Case 闭环见 [复杂文档知识检索体系开发计划](docs/complex-document-rag-development-plan.md)
 
 面向业务体验的企业 Agent 工作台已完成：
 

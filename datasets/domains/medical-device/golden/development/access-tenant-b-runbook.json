@@ -1,0 +1,18 @@
+{
+  "id": "medical_access_tenant_b_runbook",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "access_control",
+  "query": "SH-TRAIN-LAB 的内部通知应该进入哪个队列？",
+  "context": {"tenant_id": "tenant_b", "user_role": "admin", "product": "pulsecare-biomed", "version": "2026.1"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["tenant-b-biomed-runbook-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["tenant-b-inspection"],
+    "forbidden_facts": ["tenant-a-inspection", "biomed-stage-a"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "Tenant B 私有资料。"
+}

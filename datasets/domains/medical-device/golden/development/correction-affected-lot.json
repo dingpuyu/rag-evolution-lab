@@ -1,0 +1,18 @@
+{
+  "id": "medical_correction_affected_lot",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "multi_hop",
+  "query": "DI 为 MDX-V100P-A、软件 2.5.2、批次 L26A04 的 VSM-100 Pro 是否在 FC-2026-04 范围内？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.5"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["field-correction-fc-2026-04"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["属于适用范围", "inspection_required", "2.6.1"],
+    "forbidden_facts": ["VSM-100 标准型也受影响"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "需要同时核对型号、DI、版本和批次。"
+}

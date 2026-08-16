@@ -1,0 +1,18 @@
+{
+  "id": "medical_exact_vsm100_net042",
+  "dataset_version": "0.1.0",
+  "split": "development",
+  "category": "exact_match",
+  "query": "VSM-100 2.6 出现 SYS-NET-042 表示什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-error-codes-fw2.6"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["有线接口未获得 DHCP 地址"],
+    "forbidden_facts": ["证书名称不匹配"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证相同错误码不能串到 VSM-200。"
+}

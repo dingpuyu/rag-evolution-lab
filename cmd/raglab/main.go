@@ -74,6 +74,10 @@ func main() {
 		runEnterpriseEval(root, os.Args[2:])
 		return
 	}
+	corpusRoot, goldenRoot, err := resolveDatasetRoots(root)
+	if err != nil {
+		fatal(err)
+	}
 	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
 	milvusURL := strings.TrimSpace(os.Getenv("RAGLAB_MILVUS_URL"))
 	ollamaModel := strings.TrimSpace(os.Getenv("RAGLAB_OLLAMA_MODEL"))
@@ -85,7 +89,7 @@ func main() {
 			ollamaModel = "qwen3-embedding:4b-local"
 		}
 	}
-	runtime, err := app.BuildWithOptions(context.Background(), filepath.Join(root, "datasets", "corpus", "acmecloud"), app.Options{
+	runtime, err := app.BuildWithOptions(context.Background(), corpusRoot, app.Options{
 		OllamaModel:       ollamaModel,
 		OllamaDimensions:  environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"),
 		OllamaURL:         os.Getenv("RAGLAB_OLLAMA_URL"),
@@ -103,15 +107,15 @@ func main() {
 
 	switch os.Args[1] {
 	case "validate":
-		runValidate(root, runtime, os.Args[2:])
+		runValidate(goldenRoot, runtime, os.Args[2:])
 	case "ingest":
 		fmt.Printf("documents=%d chunks=%d\n", len(runtime.Documents), len(runtime.Chunks))
 	case "query":
 		runQuery(runtime, os.Args[2:])
 	case "eval":
-		runEval(root, runtime, os.Args[2:])
+		runEval(goldenRoot, runtime, os.Args[2:])
 	case "compare":
-		runCompare(root, runtime, os.Args[2:])
+		runCompare(goldenRoot, runtime, os.Args[2:])
 	default:
 		usage()
 		os.Exit(2)
@@ -200,7 +204,11 @@ func runMilvusSeed(args []string) {
 	if err != nil {
 		fatal(err)
 	}
-	documents, err := dataset.LoadCorpus(filepath.Join(root, "datasets", "corpus", "acmecloud"))
+	corpusRoot, _, err := resolveDatasetRoots(root)
+	if err != nil {
+		fatal(err)
+	}
+	documents, err := dataset.LoadCorpus(corpusRoot)
 	if err != nil {
 		fatal(err)
 	}
@@ -732,11 +740,11 @@ func newGenerationGenerator(provider, baseURL, apiKey, ollamaURL, model string, 
 	}
 }
 
-func runValidate(root string, runtime *app.Runtime, args []string) {
+func runValidate(goldenRoot string, runtime *app.Runtime, args []string) {
 	flags := flag.NewFlagSet("validate", flag.ExitOnError)
 	split := flags.String("split", "development", "dataset split")
 	_ = flags.Parse(args)
-	cases, err := dataset.LoadGolden(filepath.Join(root, "datasets", "golden"), *split)
+	cases, err := dataset.LoadGolden(goldenRoot, *split)
 	if err != nil {
 		fatal(err)
 	}
@@ -775,13 +783,13 @@ func runQuery(runtime *app.Runtime, args []string) {
 	writeJSON(response)
 }
 
-func runEval(root string, runtime *app.Runtime, args []string) {
+func runEval(goldenRoot string, runtime *app.Runtime, args []string) {
 	flags := flag.NewFlagSet("eval", flag.ExitOnError)
 	pipelineName := flags.String("pipeline", "v0-keyword", "pipeline version")
 	split := flags.String("split", "development", "dataset split")
 	jsonOutput := flags.Bool("json", false, "print full JSON report")
 	_ = flags.Parse(args)
-	report := evaluate(root, runtime, *pipelineName, *split)
+	report := evaluate(goldenRoot, runtime, *pipelineName, *split)
 	if *jsonOutput {
 		writeJSON(report)
 		return
@@ -789,7 +797,7 @@ func runEval(root string, runtime *app.Runtime, args []string) {
 	printReport(report)
 }
 
-func runCompare(root string, runtime *app.Runtime, args []string) {
+func runCompare(goldenRoot string, runtime *app.Runtime, args []string) {
 	flags := flag.NewFlagSet("compare", flag.ExitOnError)
 	baseline := flags.String("baseline", "v0-keyword", "baseline pipeline")
 	candidate := flags.String("candidate", "v1-vector", "candidate pipeline")
@@ -803,8 +811,8 @@ func runCompare(root string, runtime *app.Runtime, args []string) {
 	minAnswerability := flags.Float64("min-answerability", 0, "minimum candidate answerability accuracy; zero disables the threshold")
 	maxLatencyP95MS := flags.Float64("max-p95-ms", 0, "maximum candidate P95 latency in milliseconds; zero disables the threshold")
 	_ = flags.Parse(args)
-	baseReport := evaluate(root, runtime, *baseline, *split)
-	candidateReport := evaluate(root, runtime, *candidate, *split)
+	baseReport := evaluate(goldenRoot, runtime, *baseline, *split)
+	candidateReport := evaluate(goldenRoot, runtime, *candidate, *split)
 	policy := evaluation.GatePolicy{
 		FailOnRegression: *failOnRegression,
 		MinHitRate:       *minHitRate,
@@ -1034,12 +1042,12 @@ func runEnterpriseEval(root string, args []string) {
 	}
 }
 
-func evaluate(root string, runtime *app.Runtime, pipelineName, split string) evaluation.Report {
+func evaluate(goldenRoot string, runtime *app.Runtime, pipelineName, split string) evaluation.Report {
 	target, err := runtime.Pipeline(pipelineName)
 	if err != nil {
 		fatal(err)
 	}
-	cases, err := dataset.LoadGolden(filepath.Join(root, "datasets", "golden"), split)
+	cases, err := dataset.LoadGolden(goldenRoot, split)
 	if err != nil {
 		fatal(err)
 	}
@@ -1076,6 +1084,33 @@ func sortedCountKeys(values map[string]int) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+// resolveDatasetRoots keeps the original AcmeCloud fixture as the default,
+// while allowing independent knowledge domains to carry their own corpus and
+// Golden Cases. Keeping the two roots together prevents a medical corpus from
+// accidentally being evaluated against another domain's expected documents.
+func resolveDatasetRoots(projectRoot string) (string, string, error) {
+	domainName := strings.TrimSpace(os.Getenv("RAGLAB_DATASET_DOMAIN"))
+	if domainName == "" || domainName == "acmecloud" {
+		return filepath.Join(projectRoot, "datasets", "corpus", "acmecloud"),
+			filepath.Join(projectRoot, "datasets", "golden"), nil
+	}
+	for _, value := range domainName {
+		if (value >= 'a' && value <= 'z') || (value >= '0' && value <= '9') || value == '-' || value == '_' {
+			continue
+		}
+		return "", "", fmt.Errorf("invalid RAGLAB_DATASET_DOMAIN %q", domainName)
+	}
+	domainRoot := filepath.Join(projectRoot, "datasets", "domains", domainName)
+	corpusRoot := filepath.Join(domainRoot, "corpus")
+	goldenRoot := filepath.Join(domainRoot, "golden")
+	for _, required := range []string{filepath.Join(corpusRoot, "manifest.json"), filepath.Join(goldenRoot, "development")} {
+		if _, err := os.Stat(required); err != nil {
+			return "", "", fmt.Errorf("dataset domain %q is incomplete: %w", domainName, err)
+		}
+	}
+	return corpusRoot, goldenRoot, nil
 }
 
 func findProjectRoot() (string, error) {
