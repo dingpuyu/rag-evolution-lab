@@ -29,6 +29,8 @@ make medical-smoke
 
 复杂 PDF、DOCX、XLSX 不再只转成纯文本：Document IR v2 会把页码、标题路径、工作表和单元格范围贯穿到 Chunk、Milvus 引用与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
 
+评测失败也不再停留在一行红色结果：管理员可以诊断根因、修订正确证据、执行真实检索单题复测，并把通过案例晋升为下一次发布门禁，完整设计与真实 XLSX 案例见 [医疗 RAG Bad Case 人工修复闭环](docs/medical-bad-case-loop.md)。
+
 ## 项目目标
 
 - 系统探索 RAG 的核心原理、常见问题和工程实践。

@@ -30,7 +30,7 @@
   │                 │    ├→ Exact identifier + BM25 + Dense + RRF
   │                 │    └→ qwen3-rerank
   │                 └→ DeepSeek grounded answer
-  └─ Quality → 按应用选择 Golden Cases + Agent cases → PostgreSQL → Bad Case review
+  └─ Quality → 静态 Golden + human regression → PostgreSQL → 诊断/单题复测/回归晋升
 ```
 
 职责边界：
@@ -82,6 +82,8 @@
 ```
 
 页面会显示本次解析预览。页码、标题路径、工作表和单元格范围继续进入 Chunk、Milvus Hit 和最终 Citation。DOCX 按 XML 中的真实段落/表格顺序解析；XLSX 形成带表头语义的行级 Block；PDF 文本和表格按页面坐标重排。扫描 PDF 会标记 `ocr_required` 并阻止发布；OCR 不在本阶段范围。完整设计与 Bad Case 见 [Document IR v2](medical-document-ir-v2.md)。
+
+质量页还提供跨运行的 Bad Case 工作台。人工修订正确文档、设备上下文或来源定位后，旧验证会自动失效；单题复测通过才能晋升 `human_regression`，下一次完整评测自动执行。真实 XLSX 修复与面试讲法见 [Bad Case 人工修复闭环](medical-bad-case-loop.md)。
 
 索引任务具备幂等键、队列、Worker Lease、Heartbeat、失败原因、最多三次尝试、人工重试、取消和写后 Strong Query 验证。原件解析目前在上传请求内完成，Embedding 与索引异步执行；进一步处理超大文件时，可把 Parser 阶段也下沉到同一 Job 状态机。
 

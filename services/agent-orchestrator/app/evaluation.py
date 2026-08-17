@@ -87,6 +87,21 @@ MEDICAL_EQUIVALENT_DOCUMENTS = (
     {"vsm100-family-release-fw2.6", "vsm100-family-release-fw2.6-html"},
 )
 
+BAD_CASE_ROOT_CAUSES = {
+    "wrong_model",
+    "wrong_version",
+    "missing_exact_identifier",
+    "chunk_boundary",
+    "source_location",
+    "rerank_order",
+    "permission_filter",
+    "insufficient_corpus",
+    "agent_decision",
+    "answer_grounding",
+    "other",
+}
+BAD_CASE_STATUSES = {"open", "diagnosed", "verified", "regression"}
+
 
 def is_customer_app(app_id: str) -> bool:
     return "medical-device-customer-agent" in app_id
@@ -146,6 +161,13 @@ def golden_cases_for(app_id: str, tenant_id: str) -> list[dict[str, Any]]:
 
 def golden_device_context(case: dict[str, Any]) -> dict[str, str]:
     context = case.get("context", {})
+    if context.get("model_code") or context.get("software_version") or context.get("lot_or_batch"):
+        return {
+            "model_code": str(context.get("model_code") or ""),
+            "software_version": str(context.get("software_version") or ""),
+            "lot_or_batch": str(context.get("lot_or_batch") or ""),
+            "region": str(context.get("region") or "CN"),
+        }
     product = str(context.get("product") or "").lower()
     model_code = {
         "pulsecare-vsm100": "VSM-100",
@@ -168,7 +190,7 @@ class EvaluationRun:
     app_id: str
     environment_id: str
     status: str = "queued"
-    suite_version: str = "medical-rag-agent-v3"
+    suite_version: str = "medical-rag-agent-v4"
     total_cases: int = len(MEDICAL_AGENT_CASES)
     passed_cases: int = 0
     failed_cases: int = 0
@@ -186,6 +208,8 @@ class EvaluationStore:
         self.runs: dict[str, dict[str, Any]] = {}
         self.cases: dict[str, list[dict[str, Any]]] = {}
         self.events: dict[str, list[dict[str, Any]]] = {}
+        self.bad_cases: dict[str, dict[str, Any]] = {}
+        self.bad_case_attempts: dict[str, list[dict[str, Any]]] = {}
 
     async def _pool(self) -> asyncpg.Pool | None:
         if not self.database_url:
@@ -201,8 +225,9 @@ class EvaluationStore:
 
     async def create(self, tenant_id: str, created_by: str, app_id: str, environment_id: str) -> dict[str, Any]:
         run = EvaluationRun(run_id="medeval_" + uuid.uuid4().hex, tenant_id=tenant_id, created_by=created_by, app_id=app_id, environment_id=environment_id)
-        run.suite_version = "medical-sales-customer-agent-v3" if is_customer_app(app_id) else "medical-rag-agent-v3"
-        run.total_cases = len(agent_cases_for(app_id)) + len(golden_cases_for(app_id, tenant_id))
+        run.suite_version = "medical-sales-customer-agent-v4" if is_customer_app(app_id) else "medical-rag-agent-v4"
+        promoted_cases = await self.promoted_golden_cases(tenant_id, app_id)
+        run.total_cases = len(agent_cases_for(app_id)) + len(golden_cases_for(app_id, tenant_id)) + len(promoted_cases)
         payload = vars(run)
         pool = await self._pool()
         if pool is None:
@@ -360,6 +385,247 @@ class EvaluationStore:
         await self.event(run_id, "case_reviewed", {"case_id": case_id, "review_status": review_status, "root_cause": root_cause})
         return item
 
+    async def create_bad_case(
+        self,
+        run: dict[str, Any],
+        case: dict[str, Any],
+        created_by: str,
+        root_cause: str,
+        resolution_note: str,
+    ) -> dict[str, Any]:
+        """Snapshot one evaluation failure into the durable human-review queue."""
+        details = case.get("details") or {}
+        location_checks = details.get("source_location_checks") or []
+        expected_locations = [check.get("expected") for check in location_checks if check.get("expected")]
+        now = datetime.now(UTC).isoformat()
+        item = {
+            "bad_case_id": "badcase_" + uuid.uuid4().hex,
+            "tenant_id": run["tenant_id"],
+            "app_id": run["app_id"],
+            "environment_id": run["environment_id"],
+            "source_run_id": run["run_id"],
+            "source_case_id": case["case_id"],
+            "layer": details.get("layer") or ("rag" if str(case["case_id"]).startswith("rag:") else "agent"),
+            "query": case["query"],
+            "expected_decision": case.get("expected_decision", ""),
+            "actual_decision": case.get("actual_decision", ""),
+            "expected_document_ids": details.get("relevant_document_ids") or [],
+            "actual_document_ids": details.get("retrieved_document_ids") or [],
+            "expected_source_locations": expected_locations,
+            "device_context": details.get("device_context") or {},
+            "root_cause": root_cause,
+            "resolution_note": resolution_note,
+            "status": "open",
+            "verification_count": 0,
+            "last_verification": {},
+            "verified_at": None,
+            "promoted_at": None,
+            "created_by": created_by,
+            "updated_by": created_by,
+            "created_at": now,
+            "updated_at": now,
+        }
+        pool = await self._pool()
+        if pool is None:
+            for existing in self.bad_cases.values():
+                if existing["source_run_id"] == run["run_id"] and existing["source_case_id"] == case["case_id"]:
+                    return dict(existing)
+            self.bad_cases[item["bad_case_id"]] = item
+            self.bad_case_attempts[item["bad_case_id"]] = []
+        else:
+            row = await pool.fetchrow(
+                """INSERT INTO medical_bad_cases (
+                    bad_case_id,tenant_id,app_id,environment_id,source_run_id,source_case_id,layer,query,
+                    expected_decision,actual_decision,expected_document_ids,actual_document_ids,
+                    expected_source_locations,device_context,root_cause,resolution_note,status,created_by,updated_by
+                ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'open',$17,$17)
+                ON CONFLICT(source_run_id,source_case_id) DO UPDATE SET updated_at=medical_bad_cases.updated_at
+                RETURNING *""",
+                item["bad_case_id"], item["tenant_id"], item["app_id"], item["environment_id"],
+                item["source_run_id"], item["source_case_id"], item["layer"], item["query"],
+                item["expected_decision"], item["actual_decision"], json.dumps(item["expected_document_ids"]),
+                json.dumps(item["actual_document_ids"]), json.dumps(item["expected_source_locations"]),
+                json.dumps(item["device_context"]), root_cause, resolution_note, created_by,
+            )
+            item = self._decode_bad_case(dict(row))
+        await self.review_case(run["run_id"], case["case_id"], "bad_case", root_cause, resolution_note)
+        await self.event(run["run_id"], "bad_case_created", {"bad_case_id": item["bad_case_id"], "case_id": case["case_id"]})
+        return dict(item)
+
+    async def list_bad_cases(self, tenant_id: str, app_id: str = "", status: str = "") -> list[dict[str, Any]]:
+        pool = await self._pool()
+        if pool is None:
+            result = [
+                dict(item) for item in self.bad_cases.values()
+                if item["tenant_id"] == tenant_id
+                and (not app_id or item["app_id"] == app_id)
+                and (not status or item["status"] == status)
+            ]
+            return sorted(result, key=lambda item: item["updated_at"], reverse=True)
+        rows = await pool.fetch(
+            """SELECT * FROM medical_bad_cases
+            WHERE tenant_id=$1 AND ($2='' OR app_id=$2) AND ($3='' OR status=$3)
+            ORDER BY updated_at DESC""",
+            tenant_id, app_id, status,
+        )
+        return [self._decode_bad_case(dict(row)) for row in rows]
+
+    async def get_bad_case(self, bad_case_id: str, tenant_id: str, allow_any: bool = False) -> dict[str, Any]:
+        pool = await self._pool()
+        if pool is None:
+            item = self.bad_cases.get(bad_case_id)
+            if item is None or (item["tenant_id"] != tenant_id and not allow_any):
+                raise KeyError(bad_case_id)
+            return dict(item)
+        row = await pool.fetchrow("SELECT * FROM medical_bad_cases WHERE bad_case_id=$1", bad_case_id)
+        if row is None or (row["tenant_id"] != tenant_id and not allow_any):
+            raise KeyError(bad_case_id)
+        return self._decode_bad_case(dict(row))
+
+    async def update_bad_case(
+        self,
+        bad_case_id: str,
+        tenant_id: str,
+        updated_by: str,
+        root_cause: str,
+        resolution_note: str,
+        expected_document_ids: list[str],
+        expected_source_locations: list[dict[str, Any]],
+        device_context: dict[str, str],
+    ) -> dict[str, Any]:
+        current = await self.get_bad_case(bad_case_id, tenant_id)
+        status = "diagnosed"
+        now = datetime.now(UTC).isoformat()
+        updates = {
+            "root_cause": root_cause,
+            "resolution_note": resolution_note,
+            "expected_document_ids": expected_document_ids,
+            "expected_source_locations": expected_source_locations,
+            "device_context": device_context,
+            "status": status,
+            "last_verification": {},
+            "verified_at": None,
+            "promoted_at": None,
+            "updated_by": updated_by,
+            "updated_at": now,
+        }
+        pool = await self._pool()
+        if pool is None:
+            current.update(updates)
+            self.bad_cases[bad_case_id] = current
+            return dict(current)
+        row = await pool.fetchrow(
+            """UPDATE medical_bad_cases SET root_cause=$3,resolution_note=$4,expected_document_ids=$5,
+            expected_source_locations=$6,device_context=$7,status='diagnosed',last_verification='{}'::jsonb,
+            verified_at=NULL,promoted_at=NULL,updated_by=$8,updated_at=now()
+            WHERE bad_case_id=$1 AND tenant_id=$2 RETURNING *""",
+            bad_case_id, tenant_id, root_cause, resolution_note, json.dumps(expected_document_ids),
+            json.dumps(expected_source_locations), json.dumps(device_context), updated_by,
+        )
+        if row is None:
+            raise KeyError(bad_case_id)
+        return self._decode_bad_case(dict(row))
+
+    async def record_bad_case_verification(self, bad_case_id: str, result: dict[str, Any], verified_by: str) -> dict[str, Any]:
+        current = await self.get_bad_case(bad_case_id, "", allow_any=True)
+        passed = bool(result.get("passed"))
+        now = datetime.now(UTC).isoformat()
+        status = "verified" if passed else "diagnosed"
+        pool = await self._pool()
+        if pool is None:
+            attempt = {
+                "attempt": int(current.get("verification_count", 0)) + 1,
+                "passed": passed,
+                "result": result,
+                "verified_by": verified_by,
+                "verified_at": now,
+            }
+            self.bad_case_attempts.setdefault(bad_case_id, []).append(attempt)
+            current.update(
+                verification_count=attempt["attempt"], last_verification=result, status=status,
+                verified_at=now if passed else None, promoted_at=None, updated_by=verified_by, updated_at=now,
+            )
+            self.bad_cases[bad_case_id] = current
+            return dict(current)
+        async with pool.acquire() as connection:
+            async with connection.transaction():
+                locked = await connection.fetchrow(
+                    "SELECT verification_count FROM medical_bad_cases WHERE bad_case_id=$1 FOR UPDATE",
+                    bad_case_id,
+                )
+                if locked is None:
+                    raise KeyError(bad_case_id)
+                attempt_number = int(locked["verification_count"]) + 1
+                await connection.execute(
+                    """INSERT INTO medical_bad_case_attempts(bad_case_id,attempt,passed,result,verified_by)
+                    VALUES($1,$2,$3,$4,$5)""",
+                    bad_case_id, attempt_number, passed, json.dumps(result), verified_by,
+                )
+                row = await connection.fetchrow(
+                    """UPDATE medical_bad_cases SET verification_count=$2,last_verification=$3,status=$4,
+                    verified_at=CASE WHEN $5 THEN now() ELSE NULL END,promoted_at=NULL,updated_by=$6,updated_at=now()
+                    WHERE bad_case_id=$1 RETURNING *""",
+                    bad_case_id, attempt_number, json.dumps(result), status, passed, verified_by,
+                )
+        return self._decode_bad_case(dict(row))
+
+    async def promote_bad_case(self, bad_case_id: str, tenant_id: str, promoted_by: str) -> dict[str, Any]:
+        current = await self.get_bad_case(bad_case_id, tenant_id)
+        if current["layer"] != "rag":
+            raise ValueError("only retrieval bad cases can be promoted in this phase")
+        if current["status"] != "verified" or not current.get("last_verification", {}).get("passed"):
+            raise ValueError("bad case must pass targeted verification before promotion")
+        now = datetime.now(UTC).isoformat()
+        pool = await self._pool()
+        if pool is None:
+            current.update(status="regression", promoted_at=now, updated_by=promoted_by, updated_at=now)
+            self.bad_cases[bad_case_id] = current
+            return dict(current)
+        row = await pool.fetchrow(
+            """UPDATE medical_bad_cases SET status='regression',promoted_at=now(),updated_by=$3,updated_at=now()
+            WHERE bad_case_id=$1 AND tenant_id=$2 RETURNING *""",
+            bad_case_id, tenant_id, promoted_by,
+        )
+        if row is None:
+            raise KeyError(bad_case_id)
+        return self._decode_bad_case(dict(row))
+
+    async def promoted_golden_cases(self, tenant_id: str, app_id: str) -> list[dict[str, Any]]:
+        items = await self.list_bad_cases(tenant_id, app_id, "regression")
+        return [bad_case_to_golden(item) for item in items if item["layer"] == "rag"]
+
+    async def list_bad_case_attempts(self, bad_case_id: str, tenant_id: str) -> list[dict[str, Any]]:
+        await self.get_bad_case(bad_case_id, tenant_id)
+        pool = await self._pool()
+        if pool is None:
+            return list(self.bad_case_attempts.get(bad_case_id, []))
+        result: list[dict[str, Any]] = []
+        for row in await pool.fetch(
+            """SELECT attempt,passed,result,verified_by,verified_at FROM medical_bad_case_attempts
+            WHERE bad_case_id=$1 ORDER BY attempt""",
+            bad_case_id,
+        ):
+            item = dict(row)
+            if isinstance(item.get("result"), str):
+                item["result"] = json.loads(item["result"])
+            if item.get("verified_at"):
+                item["verified_at"] = item["verified_at"].isoformat()
+            result.append(item)
+        return result
+
+    @staticmethod
+    def _decode_bad_case(item: dict[str, Any]) -> dict[str, Any]:
+        for name in (
+            "expected_document_ids", "actual_document_ids", "expected_source_locations",
+            "device_context", "last_verification",
+        ):
+            if isinstance(item.get(name), str):
+                item[name] = json.loads(item[name])
+        for name in ("verified_at", "promoted_at", "created_at", "updated_at"):
+            if item.get(name) and hasattr(item[name], "isoformat"):
+                item[name] = item[name].isoformat()
+        return item
+
 
 def evaluate_case(case: dict[str, Any], response: AgentResponse, latency_ms: float) -> dict[str, Any]:
     result = response.result
@@ -438,6 +704,7 @@ def evaluate_retrieval_case(case: dict[str, Any], payload: dict[str, Any], laten
         "hit_at_5": hit5, "reciprocal_rank": reciprocal_rank, "ndcg": ndcg,
         "bindings": payload.get("bindings", []), "scored": answerable,
         "source_location_passed": location_passed, "source_location_checks": location_checks,
+        "device_context": golden_device_context(case),
     }
     item = {
         "case_id": "rag:" + case["id"], "query": case["query"],
@@ -461,6 +728,45 @@ def _matches_source_location(hit: dict[str, Any], expected: dict[str, Any]) -> b
     return True
 
 
+def bad_case_to_golden(item: dict[str, Any]) -> dict[str, Any]:
+    """Convert a human-reviewed case to the same contract as repository Golden Cases."""
+    return {
+        "id": "human_" + item["bad_case_id"],
+        "query": item["query"],
+        "split": "human_regression",
+        "category": item.get("root_cause") or "human_bad_case",
+        "context": item.get("device_context") or {},
+        "expected": {
+            "answerable": item.get("expected_decision") == "hit",
+            "relevant_doc_ids": item.get("expected_document_ids") or [],
+            "source_locations": item.get("expected_source_locations") or [],
+        },
+        "bad_case_id": item["bad_case_id"],
+    }
+
+
+async def verify_bad_case(item: dict[str, Any], runtime: Any, authorization: str) -> dict[str, Any]:
+    if item["layer"] != "rag":
+        raise ValueError("targeted verification currently supports retrieval cases only")
+    case = bad_case_to_golden(item)
+    started = time.perf_counter()
+    payload = await runtime.gateway.search(
+        item["app_id"], item["environment_id"], item["query"], authorization,
+        device_context=item.get("device_context") or {},
+    )
+    result, metrics = evaluate_retrieval_case(case, payload, (time.perf_counter() - started) * 1000)
+    return {
+        "passed": result["passed"],
+        "actual_decision": result["actual_decision"],
+        "reason_code": result["reason_code"],
+        "trace_id": result["trace_id"],
+        "latency_ms": result["latency_ms"],
+        "retrieved_document_ids": result["details"].get("retrieved_document_ids", []),
+        "source_location_passed": result["details"].get("source_location_passed", True),
+        "metrics": metrics,
+    }
+
+
 async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, authorization: str) -> None:
     run_id = run["run_id"]
     try:
@@ -472,6 +778,7 @@ async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, a
         customer_run = is_customer_app(run["app_id"])
         agent_cases = agent_cases_for(run["app_id"])
         golden_cases = golden_cases_for(run["app_id"], run["tenant_id"])
+        golden_cases.extend(await store.promoted_golden_cases(run["tenant_id"], run["app_id"]))
         for index, case in enumerate(golden_cases, start=1):
             case_id = "rag:" + case["id"]
             await store.event(run_id, "case_started", {"case_id": case_id, "sequence": index, "layer": "rag"})
@@ -607,4 +914,31 @@ CREATE TABLE IF NOT EXISTS medical_evaluation_events (
     id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, run_id text NOT NULL REFERENCES medical_evaluation_runs(run_id) ON DELETE CASCADE,
     event_type text NOT NULL, payload jsonb NOT NULL DEFAULT '{}'::jsonb, occurred_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS medical_bad_cases (
+    bad_case_id text PRIMARY KEY, tenant_id text NOT NULL, app_id text NOT NULL, environment_id text NOT NULL,
+    source_run_id text NOT NULL,
+    source_case_id text NOT NULL, layer text NOT NULL, query text NOT NULL,
+    expected_decision text NOT NULL, actual_decision text NOT NULL,
+    expected_document_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+    actual_document_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+    expected_source_locations jsonb NOT NULL DEFAULT '[]'::jsonb,
+    device_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+    root_cause text NOT NULL DEFAULT '', resolution_note text NOT NULL DEFAULT '',
+    status text NOT NULL DEFAULT 'open', verification_count integer NOT NULL DEFAULT 0,
+    last_verification jsonb NOT NULL DEFAULT '{}'::jsonb,
+    verified_at timestamptz, promoted_at timestamptz,
+    created_by text NOT NULL, updated_by text NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(source_run_id,source_case_id)
+);
+CREATE INDEX IF NOT EXISTS medical_bad_cases_tenant_status_idx ON medical_bad_cases(tenant_id,app_id,status,updated_at DESC);
+CREATE TABLE IF NOT EXISTS medical_bad_case_attempts (
+    id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    bad_case_id text NOT NULL REFERENCES medical_bad_cases(bad_case_id) ON DELETE CASCADE,
+    attempt integer NOT NULL, passed boolean NOT NULL, result jsonb NOT NULL DEFAULT '{}'::jsonb,
+    verified_by text NOT NULL, verified_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(bad_case_id,attempt)
+);
+-- A learned regression asset must outlive operational Evaluation Run cleanup.
+ALTER TABLE medical_bad_cases DROP CONSTRAINT IF EXISTS medical_bad_cases_source_run_id_fkey;
 """

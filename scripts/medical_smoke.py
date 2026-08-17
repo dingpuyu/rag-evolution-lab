@@ -96,13 +96,20 @@ def main() -> None:
     active_bindings = {binding["dataset_id"] for binding in body.get("bindings", []) if binding.get("status") == "active"}
     assert active_bindings == {"public-medical-device-sales"}, body
 
+    status, body = call("GET", f"{agent}/api/v1/evaluations/medical-device/bad-cases?app_id=tenant_a-medical-device-agent", alice)
+    assert status == 200 and isinstance(body.get("cases"), list), (status, body)
+    status, body = call("GET", f"{agent}/api/v1/evaluations/medical-device/bad-cases?app_id=tenant_a-medical-device-agent", bob)
+    assert status == 403, (status, body)
+    status, body = call("GET", f"{agent}/api/v1/evaluations/medical-device/bad-cases", customer)
+    assert status == 403, (status, body)
+
     answer(agent, customer, "tenant_a", "我对这些产品一窍不通，应该从哪里开始？", "answer", customer=True)
     result = answer(agent, customer, "tenant_a", "你们目前有哪些医疗设备产品线？", "answer", customer=True)
     assert result["result"]["citations"] and all(item["dataset_id"] == "public-medical-device-sales" for item in result["result"]["citations"]), result
     answer(agent, customer, "tenant_a", "设备网络连不上，我应该怎么排障？", "clarify", customer=True)
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
 
-    print(json.dumps({"status": "passed", "checks": 18, "tenants": ["tenant_a", "tenant_b"], "customer_public_only": True}, ensure_ascii=False))
+    print(json.dumps({"status": "passed", "checks": 21, "tenants": ["tenant_a", "tenant_b"], "customer_public_only": True, "bad_case_isolation": True}, ensure_ascii=False))
 
 
 if __name__ == "__main__":

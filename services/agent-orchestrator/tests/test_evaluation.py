@@ -1,4 +1,4 @@
-from app.evaluation import EvaluationStore, agent_cases_for, evaluate_case, evaluate_retrieval_case, golden_cases_for, golden_device_context, load_medical_golden, load_medical_sales_golden
+from app.evaluation import EvaluationStore, agent_cases_for, bad_case_to_golden, evaluate_case, evaluate_retrieval_case, golden_cases_for, golden_device_context, load_medical_golden, load_medical_sales_golden
 from app.models import AgentResponse, AgentResult, DeviceContext, SearchHit
 
 
@@ -35,6 +35,77 @@ async def test_latest_evaluation_is_tenant_and_environment_scoped():
         pass
     else:
         raise AssertionError("latest evaluation must not cross tenant boundaries")
+
+
+async def test_bad_case_lifecycle_requires_verification_before_regression_promotion():
+    store = EvaluationStore()
+    run = await store.create("tenant_a", "alice", "tenant_a-medical-device-agent", "tenant_a-medical-device-agent-dev")
+    await store.add_case(run["run_id"], {
+        "case_id": "rag:wrong-rank", "query": "VSM-100 Pro WLM-2 最低固件",
+        "expected_decision": "hit", "actual_decision": "miss", "passed": False,
+        "details": {
+            "layer": "rag", "relevant_document_ids": ["compatibility-xlsx"],
+            "retrieved_document_ids": ["noise"],
+            "source_location_checks": [{"expected": {"document_id": "compatibility-xlsx", "source_sheet": "兼容矩阵"}}],
+            "device_context": {"model_code": "VSM-100 Pro", "software_version": "2.6", "region": "CN"},
+        },
+    })
+    case = (await store.list_cases(run["run_id"]))[0]
+    bad_case = await store.create_bad_case(run, case, "alice", "rerank_order", "确认目标行应排第一")
+    assert bad_case["status"] == "open"
+    assert bad_case["expected_document_ids"] == ["compatibility-xlsx"]
+    assert len(await store.list_bad_cases("tenant_a")) == 1
+    assert await store.list_bad_cases("tenant_b") == []
+
+    try:
+        await store.promote_bad_case(bad_case["bad_case_id"], "tenant_a", "alice")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("an unverified bad case must not enter the regression suite")
+
+    diagnosed = await store.update_bad_case(
+        bad_case["bad_case_id"], "tenant_a", "alice", "rerank_order", "修复 XLSX 型号元数据",
+        ["compatibility-xlsx"], bad_case["expected_source_locations"], bad_case["device_context"],
+    )
+    assert diagnosed["status"] == "diagnosed"
+    verified = await store.record_bad_case_verification(
+        bad_case["bad_case_id"], {"passed": True, "trace_id": "trace-fixed", "metrics": {"mrr": 1.0}}, "alice",
+    )
+    assert verified["status"] == "verified"
+    attempts = await store.list_bad_case_attempts(bad_case["bad_case_id"], "tenant_a")
+    assert attempts[0]["result"]["trace_id"] == "trace-fixed"
+    try:
+        await store.list_bad_case_attempts(bad_case["bad_case_id"], "tenant_b")
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("verification attempts must remain tenant scoped")
+    promoted = await store.promote_bad_case(bad_case["bad_case_id"], "tenant_a", "alice")
+    assert promoted["status"] == "regression"
+    golden = bad_case_to_golden(promoted)
+    assert golden["split"] == "human_regression"
+    assert golden["expected"]["source_locations"][0]["source_sheet"] == "兼容矩阵"
+    assert len(await store.promoted_golden_cases("tenant_a", run["app_id"])) == 1
+
+    next_run = await store.create("tenant_a", "alice", run["app_id"], run["environment_id"])
+    static_total = len(agent_cases_for(run["app_id"])) + len(golden_cases_for(run["app_id"], "tenant_a"))
+    assert next_run["total_cases"] == static_total + 1
+
+
+async def test_editing_verified_bad_case_invalidates_verification_and_promotion():
+    store = EvaluationStore()
+    run = await store.create("tenant_a", "alice", "tenant_a-medical-device-agent", "dev")
+    await store.add_case(run["run_id"], {
+        "case_id": "rag:one", "query": "q", "expected_decision": "hit", "actual_decision": "miss",
+        "passed": False, "details": {"layer": "rag", "relevant_document_ids": ["right"]},
+    })
+    item = await store.create_bad_case(run, (await store.list_cases(run["run_id"]))[0], "alice", "other", "")
+    await store.record_bad_case_verification(item["bad_case_id"], {"passed": True}, "alice")
+    edited = await store.update_bad_case(item["bad_case_id"], "tenant_a", "alice", "wrong_model", "changed", ["new-right"], [], {})
+    assert edited["status"] == "diagnosed"
+    assert edited["last_verification"] == {}
+    assert edited["promoted_at"] is None
 
 
 def test_evaluate_case_checks_decision_reason_and_citations():

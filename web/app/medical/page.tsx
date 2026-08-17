@@ -22,6 +22,7 @@ type EvalCase = { id: string; query: string; context?: Partial<DeviceContext>; e
 type EvalCaseResult = { case_id: string; query: string; expected_decision: string; actual_decision: string; passed: boolean; reason_code: string; error?: string; trace_id?: string; latency_ms?: number; citations?: Array<{ document_id?: string; dataset_id?: string; title?: string; content?: string; source_file?: string; source_page?: number; source_sheet?: string; source_cell_range?: string; heading_path?: string[] }>; details?: { layer?: string; category?: string; split?: string; retrieved_document_ids?: string[]; relevant_document_ids?: string[]; hit_at_5?: number; reciprocal_rank?: number; ndcg?: number; source_location_passed?: boolean; source_location_checks?: Array<{ matched?: boolean }> }; review_status?: string; root_cause?: string; human_note?: string };
 type EvalMetrics = { overall_pass_rate?: number; decision_accuracy?: number; clinical_refusal_recall?: number; applicability_accuracy?: number; rag_golden_total?: number; rag_cases_executed?: number; hit_at_5?: number; mrr?: number; ndcg?: number; correct_model_at_5?: number; correct_version_at_5?: number; wrong_model_rate?: number; source_location_accuracy?: number; permission_leaks?: number; p50_latency_ms?: number; gate_passed?: boolean; gate_failures?: string[] };
 type EvalRun = { run_id: string; status: string; total_cases: number; passed_cases: number; failed_cases: number; metrics?: EvalMetrics };
+type BadCase = { bad_case_id: string; app_id: string; environment_id: string; source_run_id: string; source_case_id: string; layer: string; query: string; expected_decision: string; actual_decision: string; expected_document_ids: string[]; actual_document_ids: string[]; expected_source_locations: Array<Record<string, unknown>>; device_context: Partial<DeviceContext>; root_cause: string; resolution_note: string; status: "open" | "diagnosed" | "verified" | "regression"; verification_count: number; last_verification?: { passed?: boolean; trace_id?: string; retrieved_document_ids?: string[]; source_location_passed?: boolean; metrics?: { hit5?: number; mrr?: number; ndcg?: number } }; verified_at?: string; promoted_at?: string; updated_at: string };
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://127.0.0.1:8080";
 const AGENT_BASE = process.env.NEXT_PUBLIC_AGENT_API_BASE ?? "http://127.0.0.1:8090";
@@ -58,6 +59,13 @@ const CORE_EVALS: EvalCase[] = [
   { id: "notice-excluded-model", query: "FC-2026-04 是否适用？", context: { model_code: "VSM-100", software_version: "2.5.2", lot_or_batch: "L26A03" }, expected: "answer" },
   { id: "notice-excluded-lot", query: "FC-2026-04 是否适用？", context: { model_code: "VSM-100 Pro", software_version: "2.5.2", lot_or_batch: "L26A09" }, expected: "answer" },
   { id: "grounded-error-code", query: "VSM-100 软件 2.6 的 SYS-NET-042 是什么？", expected: "answer" },
+];
+const BAD_CASE_CAUSES = [
+  ["wrong_model", "召回了错误型号"], ["wrong_version", "版本范围错误"],
+  ["missing_exact_identifier", "精确标识符丢失"], ["chunk_boundary", "分块边界破坏语义"],
+  ["source_location", "引用位置不正确"], ["rerank_order", "重排顺序不合理"],
+  ["permission_filter", "权限过滤异常"], ["insufficient_corpus", "语料缺失"],
+  ["agent_decision", "Agent 决策错误"], ["answer_grounding", "回答未忠于证据"], ["other", "其他"],
 ];
 
 function key(prefix: string) { return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`; }
@@ -98,6 +106,8 @@ export default function MedicalWorkspace() {
   const [evalBusy, setEvalBusy] = useState(false);
   const [evalRun, setEvalRun] = useState<EvalRun | null>(null);
   const [evalResults, setEvalResults] = useState<EvalCaseResult[]>([]);
+  const [badCases, setBadCases] = useState<BadCase[]>([]);
+  const [badCaseBusy, setBadCaseBusy] = useState("");
   const conversationRef = useRef<HTMLDivElement>(null);
 
   const medicalDatasets = useMemo(
@@ -310,16 +320,62 @@ export default function MedicalWorkspace() {
         applyEvaluationResults(cases);
       }
     } catch (error) { setNotice(error instanceof Error ? error.message : "评测运行失败"); }
-    finally { setEvalBusy(false); }
+    finally { setEvalBusy(false); void loadBadCases().catch((error) => setNotice(error instanceof Error ? error.message : "Bad Case 队列加载失败")); }
+  }
+  async function loadBadCases() {
+    if (!session || !appID || !isAdmin) return;
+    const response = await request(AGENT_BASE, `/api/v1/evaluations/medical-device/bad-cases?app_id=${encodeURIComponent(appID)}`);
+    setBadCases(((await response.json()) as { cases: BadCase[] }).cases ?? []);
   }
   async function markBadCase(item: EvalCaseResult) {
     if (!evalRun) return;
+    const rootCause = item.details?.source_location_passed === false ? "source_location" : item.details?.layer === "rag" ? "rerank_order" : "agent_decision";
+    setBadCaseBusy(item.case_id);
     try {
-      await request(AGENT_BASE, `/api/v1/evaluations/runs/${encodeURIComponent(evalRun.run_id)}/cases/${encodeURIComponent(item.case_id)}`, {
-        method: "PATCH", body: JSON.stringify({ review_status: "bad_case", root_cause: item.details?.layer === "rag" ? "retrieval_mismatch" : "agent_decision_mismatch", human_note: "网页人工确认，进入 Bad Case 修复队列" }),
+      await request(AGENT_BASE, `/api/v1/evaluations/runs/${encodeURIComponent(evalRun.run_id)}/cases/${encodeURIComponent(item.case_id)}/bad-case`, {
+        method: "POST", body: JSON.stringify({ root_cause: rootCause, resolution_note: "网页人工确认，等待根因诊断和正确证据标注" }),
       });
-      setEvalResults((items) => items.map((candidate) => candidate.case_id === item.case_id ? { ...candidate, review_status: "bad_case", root_cause: item.details?.layer === "rag" ? "retrieval_mismatch" : "agent_decision_mismatch" } : candidate));
+      setEvalResults((items) => items.map((candidate) => candidate.case_id === item.case_id ? { ...candidate, review_status: "bad_case", root_cause: rootCause } : candidate));
+      await loadBadCases();
     } catch (error) { setNotice(error instanceof Error ? error.message : "Bad Case 标记失败"); }
+    finally { setBadCaseBusy(""); }
+  }
+  function editBadCase(id: string, patch: Partial<BadCase>) {
+    setBadCases((items) => items.map((item) => item.bad_case_id === id ? { ...item, ...patch } : item));
+  }
+  async function saveBadCase(item: BadCase) {
+    setBadCaseBusy(item.bad_case_id);
+    try {
+      const response = await request(AGENT_BASE, `/api/v1/evaluations/medical-device/bad-cases/${encodeURIComponent(item.bad_case_id)}`, {
+        method: "PATCH", body: JSON.stringify({
+          root_cause: item.root_cause, resolution_note: item.resolution_note,
+          expected_document_ids: item.expected_document_ids,
+          expected_source_locations: item.expected_source_locations,
+          device_context: item.device_context,
+        }),
+      });
+      editBadCase(item.bad_case_id, await response.json() as BadCase);
+      setNotice("诊断已保存；修改预期证据后必须重新进行单题验证。");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "Bad Case 保存失败"); }
+    finally { setBadCaseBusy(""); }
+  }
+  async function verifyBadCase(item: BadCase) {
+    setBadCaseBusy(item.bad_case_id);
+    try {
+      const response = await request(AGENT_BASE, `/api/v1/evaluations/medical-device/bad-cases/${encodeURIComponent(item.bad_case_id)}/verify`, { method: "POST", body: "{}" });
+      const verified = await response.json() as BadCase; editBadCase(item.bad_case_id, verified);
+      setNotice(verified.status === "verified" ? "单题验证通过，可以晋升回归集。" : "单题仍未通过，请继续修复检索链路或标注。 ");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "单题验证失败"); }
+    finally { setBadCaseBusy(""); }
+  }
+  async function promoteBadCase(item: BadCase) {
+    setBadCaseBusy(item.bad_case_id);
+    try {
+      const response = await request(AGENT_BASE, `/api/v1/evaluations/medical-device/bad-cases/${encodeURIComponent(item.bad_case_id)}/promote`, { method: "POST", body: "{}" });
+      editBadCase(item.bad_case_id, await response.json() as BadCase);
+      setNotice("已晋升为人工回归用例；下一次完整评测会自动执行。 ");
+    } catch (error) { setNotice(error instanceof Error ? error.message : "晋升回归集失败"); }
+    finally { setBadCaseBusy(""); }
   }
   function logout() { localStorage.removeItem(SESSION_KEY); setSession(null); setMessages([]); }
 
@@ -348,10 +404,11 @@ export default function MedicalWorkspace() {
   useEffect(() => {
     if (tab === "evaluation" && appID && environmentID && session) {
       queueMicrotask(() => void loadLatestEvaluation().catch((error) => setNotice(error instanceof Error ? error.message : "最近评测加载失败")));
+      if (isAdmin) queueMicrotask(() => void loadBadCases().catch((error) => setNotice(error instanceof Error ? error.message : "Bad Case 队列加载失败")));
     }
     // The latest run is scoped by the active app/environment and tenant session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, appID, environmentID, session]);
+  }, [tab, appID, environmentID, session, isAdmin]);
   useEffect(() => {
     const node = conversationRef.current;
     if (!node) return;
@@ -401,6 +458,7 @@ export default function MedicalWorkspace() {
     {tab === "evaluation" && <div className="medical-content"><div className="medical-page-title"><div><p className="medical-kicker">QUALITY GATE / BAD CASE LOOP</p><h1>医疗回归评测</h1><p>在线执行当前租户可用的 Golden Cases 与 Agent 决策用例，结果持久化并作为发布门禁。</p></div><button onClick={() => void runEvaluation()} disabled={evalBusy}>{evalBusy ? `运行中 ${runCompleted}/${evalRun?.total_cases ?? 46}` : "运行完整回归"}</button></div><div className="medical-metric-row"><div><span>完整用例</span><b>{evalRun ? `${runCompleted}/${evalRun.total_cases}` : "—"}</b></div><div><span>Agent 决策准确率</span><b>{evalRun?.metrics?.decision_accuracy == null ? (completed ? `${Math.round(passed / completed * 100)}%` : "—") : `${Math.round(evalRun.metrics.decision_accuracy * 100)}%`}</b></div><div><span>临床拒答召回</span><b>{evalRun?.metrics?.clinical_refusal_recall == null ? "待运行" : `${Math.round(evalRun.metrics.clinical_refusal_recall * 100)}%`}</b></div><div><span>租户泄漏</span><b>{evalRun?.metrics?.permission_leaks ?? "—"}</b></div></div><section className="medical-eval-table"><div className="head"><span>Case</span><span>问题</span><span>期望 / 实际</span><span>原因</span></div>{evalCases.map((item) => <div className="row" key={item.id}><code>{item.id}</code><span>{item.query}</span><span><i className={item.result ? item.result === item.expected ? "pass" : "fail" : "pending"}>{item.expected}</i>{item.result && <> / <i className={item.result === item.expected ? "pass" : "fail"}>{item.result}</i></>}</span><small>{item.reason || "等待运行"}</small></div>)}</section><div className="medical-eval-note"><b>发布硬门禁</b><p>权限泄漏、错误租户引用、临床拒答、确定性通知判断属于硬门禁；LLM Judge 只辅助评价表达，不覆盖安全与版本正确性。</p></div></div>}
     {tab === "evaluation" && evalRun && <div className="medical-content medical-run-summary"><code>{evalRun.run_id}</code><span>{evalRun.status} · {evalRun.passed_cases}/{evalRun.total_cases} passed</span><span>decision {evalRun.metrics?.decision_accuracy == null ? "—" : `${Math.round(evalRun.metrics.decision_accuracy * 100)}%`} · p50 {Math.round(evalRun.metrics?.p50_latency_ms ?? 0)} ms</span>{evalRun.metrics?.gate_passed != null && <span>{evalRun.metrics.gate_passed ? "质量门禁通过" : `质量门禁未通过：${(evalRun.metrics.gate_failures ?? []).join("、")}`}</span>}</div>}
     {tab === "evaluation" && <EvaluationDetails run={evalRun} results={evalResults} onBadCase={markBadCase} />}
+    {tab === "evaluation" && <BadCaseWorkbench cases={badCases} busy={badCaseBusy} edit={editBadCase} save={saveBadCase} verify={verifyBadCase} promote={promoteBadCase} />}
     {tab === "knowledge" && isAdmin && audience === "professional" && <div className="medical-content medical-status-section"><UploadStatus records={uploads} /></div>}
     {tab === "knowledge" && parsePreview.length > 0 && <ParsePreview blocks={parsePreview} />}
   </main>;
@@ -437,6 +495,26 @@ function EvaluationDetails({ run, results, onBadCase }: { run: EvalRun | null; r
       {!item.passed && <button className={item.review_status === "bad_case" ? "reviewed" : ""} onClick={() => onBadCase(item)}>{item.review_status === "bad_case" ? `已进入 Bad Case · ${item.root_cause}` : "人工确认并标记 Bad Case"}</button>}
       </div>
     </details>)}</section>}
+  </div>;
+}
+
+function BadCaseWorkbench({ cases, busy, edit, save, verify, promote }: { cases: BadCase[]; busy: string; edit: (id: string, patch: Partial<BadCase>) => void; save: (item: BadCase) => void; verify: (item: BadCase) => void; promote: (item: BadCase) => void }) {
+  const counts = cases.reduce((result, item) => ({ ...result, [item.status]: (result[item.status] ?? 0) + 1 }), {} as Record<string, number>);
+  return <div className="medical-content medical-badcase-workbench">
+    <div className="medical-page-title"><div><p className="medical-kicker">HUMAN-IN-THE-LOOP QUALITY LOOP</p><h2>Bad Case 修复工作台</h2><p>标注根因与正确证据，使用当前检索链路进行低成本单题复测；只有复测通过的检索题才能晋升回归集。</p></div><span>{cases.length} cases · {counts.regression ?? 0} regression</span></div>
+    <div className="medical-badcase-flow"><span>发现问题</span><b>→</b><span>人工诊断</span><b>→</b><span>单题复测</span><b>→</b><span>晋升回归</span><b>→</b><span>参与发布门禁</span></div>
+    {cases.length === 0 ? <div className="medical-empty">当前应用还没有人工确认的 Bad Case。评测失败后可在上方逐题收录。</div> : <section className="medical-badcase-list">{cases.map((item) => <article key={item.bad_case_id}>
+      <header><div><code>{item.source_case_id}</code><strong>{item.query}</strong><small>{item.source_run_id}</small></div><i className={item.status}>{item.status}</i></header>
+      <div className="medical-badcase-grid">
+        <label>根因分类<select value={item.root_cause || "other"} onChange={(event) => edit(item.bad_case_id, { root_cause: event.target.value })}>{BAD_CASE_CAUSES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+        <label>正确文档 ID（逗号分隔）<input value={item.expected_document_ids.join(", ")} onChange={(event) => edit(item.bad_case_id, { expected_document_ids: event.target.value.split(/[,，]/).map((value) => value.trim()).filter(Boolean) })} /></label>
+        <label>设备型号<input value={item.device_context?.model_code ?? ""} onChange={(event) => edit(item.bad_case_id, { device_context: { ...item.device_context, model_code: event.target.value } })} /></label>
+        <label>软件版本<input value={item.device_context?.software_version ?? ""} onChange={(event) => edit(item.bad_case_id, { device_context: { ...item.device_context, software_version: event.target.value } })} /></label>
+        <label className="wide">修复说明<textarea rows={2} value={item.resolution_note} onChange={(event) => edit(item.bad_case_id, { resolution_note: event.target.value })} placeholder="记录检索失败原因、修改内容和为什么这样修复…" /></label>
+      </div>
+      <dl><dt>原始结果</dt><dd>{item.expected_decision} → {item.actual_decision} · {item.actual_document_ids.join("、") || "无召回"}</dd><dt>来源定位约束</dt><dd>{item.expected_source_locations.length ? JSON.stringify(item.expected_source_locations) : "无"}</dd><dt>最近验证</dt><dd>{item.verification_count ? `${item.last_verification?.passed ? "通过" : "未通过"} · ${item.last_verification?.retrieved_document_ids?.join("、") || "无召回"} · ${item.last_verification?.trace_id || "无 Trace"}` : "尚未执行"}</dd></dl>
+      <footer><button className="secondary" disabled={busy === item.bad_case_id} onClick={() => save(item)}>保存诊断</button>{item.layer === "rag" && item.status !== "regression" && <button disabled={busy === item.bad_case_id} onClick={() => verify(item)}>单题复测</button>}{item.status === "verified" && <button disabled={busy === item.bad_case_id} onClick={() => promote(item)}>晋升回归集</button>}{item.status === "regression" && <b>下一次完整评测自动执行</b>}</footer>
+    </article>)}</section>}
   </div>;
 }
 

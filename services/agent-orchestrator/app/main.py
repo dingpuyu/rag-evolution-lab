@@ -7,10 +7,10 @@ import uuid
 from fastapi import FastAPI, Header, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .config import get_settings
-from .evaluation import EvaluationStore, run_suite
+from .evaluation import BAD_CASE_ROOT_CAUSES, BAD_CASE_STATUSES, EvaluationStore, run_suite, verify_bad_case
 from .gateway import KnowledgeGatewayClient
 from .graph import AgentRuntime, build_runtime
 from .llm import build_llm
@@ -35,6 +35,19 @@ class MedicalCaseReviewRequest(BaseModel):
     review_status: str = "bad_case"
     root_cause: str = "retrieval_or_decision_mismatch"
     human_note: str = ""
+
+
+class MedicalBadCaseCreateRequest(BaseModel):
+    root_cause: str = "other"
+    resolution_note: str = ""
+
+
+class MedicalBadCaseUpdateRequest(BaseModel):
+    root_cause: str = "other"
+    resolution_note: str = ""
+    expected_document_ids: list[str] = Field(default_factory=list)
+    expected_source_locations: list[dict] = Field(default_factory=list)
+    device_context: dict[str, str] = Field(default_factory=dict)
 
 app = FastAPI(title="RagLab LangGraph Agent", version="0.1.0")
 app.add_middleware(
@@ -139,6 +152,113 @@ async def review_medical_evaluation_case(
         )
     except KeyError as exc:
         raise HTTPException(status_code=404, detail="evaluation case not found") from exc
+
+
+@app.post("/api/v1/evaluations/runs/{run_id}/cases/{case_id}/bad-case")
+async def create_medical_bad_case(
+    request: MedicalBadCaseCreateRequest,
+    run_id: str,
+    case_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    try:
+        run = await evaluation_store.get(run_id, identity.tenant_id, allow_any="platform_admin" in identity.roles)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="evaluation run not found") from exc
+    cases = await evaluation_store.list_cases(run_id)
+    case = next((item for item in cases if item["case_id"] == case_id), None)
+    if case is None:
+        raise HTTPException(status_code=404, detail="evaluation case not found")
+    root_cause = request.root_cause.strip() or "other"
+    if root_cause not in BAD_CASE_ROOT_CAUSES:
+        raise HTTPException(status_code=400, detail="unsupported root_cause")
+    return await evaluation_store.create_bad_case(
+        run, case, identity.subject, root_cause, request.resolution_note.strip()[:4000],
+    )
+
+
+@app.get("/api/v1/evaluations/medical-device/bad-cases")
+async def list_medical_bad_cases(
+    app_id: str = "",
+    status: str = "",
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    if status and status not in BAD_CASE_STATUSES:
+        raise HTTPException(status_code=400, detail="unsupported bad case status")
+    allowed_apps = {
+        f"{identity.tenant_id}-medical-device-agent",
+        f"{identity.tenant_id}-medical-device-customer-agent",
+    }
+    if app_id and "platform_admin" not in identity.roles and app_id not in allowed_apps:
+        raise HTTPException(status_code=403, detail="bad case app must belong to the authenticated tenant")
+    cases = await evaluation_store.list_bad_cases(identity.tenant_id, app_id.strip(), status.strip())
+    return {"cases": cases, "total": len(cases)}
+
+
+@app.patch("/api/v1/evaluations/medical-device/bad-cases/{bad_case_id}")
+async def update_medical_bad_case(
+    request: MedicalBadCaseUpdateRequest,
+    bad_case_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    root_cause = request.root_cause.strip() or "other"
+    if root_cause not in BAD_CASE_ROOT_CAUSES:
+        raise HTTPException(status_code=400, detail="unsupported root_cause")
+    document_ids = list(dict.fromkeys(value.strip() for value in request.expected_document_ids if value.strip()))[:20]
+    try:
+        return await evaluation_store.update_bad_case(
+            bad_case_id, identity.tenant_id, identity.subject, root_cause,
+            request.resolution_note.strip()[:4000], document_ids,
+            request.expected_source_locations[:20], request.device_context,
+        )
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="bad case not found") from exc
+
+
+@app.post("/api/v1/evaluations/medical-device/bad-cases/{bad_case_id}/verify")
+async def verify_medical_bad_case(
+    bad_case_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    try:
+        item = await evaluation_store.get_bad_case(bad_case_id, identity.tenant_id)
+        result = await verify_bad_case(item, runtime, authorization or "")
+        return await evaluation_store.record_bad_case_verification(bad_case_id, result, identity.subject)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="bad case not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.post("/api/v1/evaluations/medical-device/bad-cases/{bad_case_id}/promote")
+async def promote_medical_bad_case(
+    bad_case_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    try:
+        return await evaluation_store.promote_bad_case(bad_case_id, identity.tenant_id, identity.subject)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="bad case not found") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@app.get("/api/v1/evaluations/medical-device/bad-cases/{bad_case_id}/attempts")
+async def list_medical_bad_case_attempts(
+    bad_case_id: str,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    try:
+        attempts = await evaluation_store.list_bad_case_attempts(bad_case_id, identity.tenant_id)
+        return {"bad_case_id": bad_case_id, "attempts": attempts}
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="bad case not found") from exc
 
 
 @app.post("/api/v1/apps/{app_id}/agent/answer", response_model=AgentResponse)
