@@ -5,10 +5,13 @@ package knowledgegateway
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"regexp"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
@@ -589,7 +592,18 @@ func (service *Service) rewriterName() string {
 	return "query-rewriter"
 }
 
-func newTraceID() string { return fmt.Sprintf("gw_trace_%d", time.Now().UTC().UnixNano()) }
+var traceFallbackCounter atomic.Uint64
+
+func newTraceID() string {
+	// Wall-clock nanoseconds are not unique under concurrent fan-out. Use a
+	// random 128-bit identifier so parallel retrieval branches cannot overwrite
+	// each other's persisted Query Trace.
+	var value [16]byte
+	if _, err := rand.Read(value[:]); err == nil {
+		return "gw_trace_" + hex.EncodeToString(value[:])
+	}
+	return fmt.Sprintf("gw_trace_%d_%d", time.Now().UTC().UnixNano(), traceFallbackCounter.Add(1))
+}
 
 func candidateCount(traces []BindingTrace) int {
 	total := 0

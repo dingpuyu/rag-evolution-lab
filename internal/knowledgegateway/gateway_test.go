@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,28 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 )
+
+func TestTraceIDsAreUniqueUnderConcurrentFanOut(t *testing.T) {
+	const count = 1000
+	ids := make(chan string, count)
+	var group sync.WaitGroup
+	for range count {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			ids <- newTraceID()
+		}()
+	}
+	group.Wait()
+	close(ids)
+	seen := make(map[string]struct{}, count)
+	for id := range ids {
+		if _, exists := seen[id]; exists {
+			t.Fatalf("duplicate trace id: %s", id)
+		}
+		seen[id] = struct{}{}
+	}
+}
 
 type fakeApps struct {
 	bindings []datasetaccess.KnowledgeBinding

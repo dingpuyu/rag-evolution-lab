@@ -114,6 +114,8 @@
 → 有据回答 / 澄清 / 拒答
 ```
 
+当一个问题同时出现多个明确型号时，Agent 不再把整句交给一次 Top-K 检索。它先保留全部显式型号，再按型号并行调用同一个受权 Knowledge Gateway，最后按实体交错合并并去重证据。每个子检索仍经过服务端 Dataset/Tenant/Role 过滤；这既避免高相似型号占满候选集，也保证某个型号不会“被另一个型号的资料代表”。Gateway Trace 使用随机 128-bit ID，能够正确区分同一 Agent Run 中的并发子检索。
+
 Milvus Collection 使用 BM25 Function 自动从 `content` 生成 `SparseFloatVector`，并分别建立 HNSW/COSINE 与 SPARSE_INVERTED_INDEX/BM25。Hybrid Search 的两条子查询都携带同一个服务端 ACL Filter，避免“向量分支安全、全文分支泄漏”的常见错误。
 
 `dataset_id` 是必备字段。新 Schema 发布到新物理 Collection，readiness gate 检查字段、1024 维 Embedding、行数和索引 Finished 后再切换 Alias/环境发布指针；不原地修改旧索引。
@@ -216,5 +218,6 @@ Bootstrap 会先校验 `sources.lock.json`；官方摘要、URL 或内容指纹�
 3. 只在 Prompt 中写权限不安全，所以授权在 PostgreSQL 控制面完成，Filter 在 ANN 前由服务端生成，两条混合召回分支使用同一 Filter。
 4. LLM 不适合做通知范围比较，所以把版本和批次适用性做成确定性工具，模型只解释结果。
 5. 不追求第一次就完美，用 43 条固定 RAG 回归、在线 Trace 和人工 Bad Case 建立持续优化闭环。
+6. 最初的答案关键词评测把双型号问题误判为通过；增加“必需文档集合、最少独立文档数、允许数据集”证据门禁后，才发现 `BeneVision N1` 证据缺失。多实体 fan-out 修复后，同一冻结数据集从 87.5% 提升到 100%，且无新增退化。详见 [多实体证据覆盖优化](multi-entity-evidence-optimization.md)。
 
 当前明确限制：公开产品语料不是完整说明书，也不能证明当前库存、报价、配置或注册有效性；NMPA API 自动同步、OCR、真实 CRM/ERP/售后工单和云部署不在本阶段。专业运维侧资料仍为虚构数据。

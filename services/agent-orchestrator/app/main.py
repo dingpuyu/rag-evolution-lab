@@ -111,7 +111,7 @@ async def medical_evaluation_contract(
         "flow": [
             {"id": "scope", "name": "范围与风险识别", "owner": "deterministic", "quality": ["decision_accuracy", "clinical_refusal_recall"], "interventions": ["intent_rules", "safety_policy"]},
             {"id": "context", "name": "设备上下文解析", "owner": "deterministic", "quality": ["model_resolution", "clarification_recall"], "interventions": ["entity_rules", "metadata"]},
-            {"id": "retrieve", "name": "授权知识检索", "owner": "knowledge_gateway", "quality": ["hit_at_5", "mrr", "permission_leaks"], "interventions": ["query_rewrite", "hybrid_weights", "rerank"]},
+            {"id": "retrieve", "name": "授权知识检索", "owner": "knowledge_gateway", "quality": ["hit_at_5", "mrr", "evidence_coverage", "permission_leaks"], "interventions": ["entity_fanout", "per_entity_quota", "query_rewrite", "hybrid_weights", "rerank"]},
             {"id": "verify", "name": "证据适用性校验", "owner": "deterministic", "quality": ["correct_model", "correct_version", "source_location"], "interventions": ["verification_policy", "corpus_metadata"]},
             {"id": "answer", "name": "有据回答生成", "owner": "llm", "quality": ["grounding", "fact_coverage", "response_style"], "interventions": ["prompt_overlay"], "editable": True},
             {"id": "finalize", "name": "引用与 Trace", "owner": "runtime", "quality": ["citation_accuracy", "trace_completeness", "latency"], "interventions": ["observability", "timeout_budget"]},

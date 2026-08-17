@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -12,6 +13,7 @@ from .gateway import GatewayError, KnowledgeGatewayClient
 from .llm import Answerer, Planner, RuleAnswerer, RulePlanner, citations_from_hits
 from .medical import (
     assess_field_correction,
+    mentioned_sales_models,
     resolve_customer_query,
     resolve_medical_query,
     sanitize_customer_retrieval_query,
@@ -275,21 +277,61 @@ class AgentRuntime:
             # the deterministic tool after evidence identity/authority checks.
             gateway_context["model_code"] = ""
             gateway_context["software_version"] = ""
+        comparison_models = mentioned_sales_models(str(state["query"])) if state.get("medical_intent") == "product_discovery" else []
         try:
-            payload = await self.gateway.search(
-                context.app_id,
-                context.environment_id,
-                retrieval_query,
-                context.authorization,
-                device_context=gateway_context,
-            )
-            hits = [hit.model_dump() for hit in self.gateway.hits(payload)]
-            trace_id = str(payload.get("trace_id", ""))
-            observation = {"tool": "knowledge_search", "status": "ok", "summary": f"授权检索命中 {len(hits)} 条医疗设备证据"}
+            if len(comparison_models) >= 2:
+                # A single metadata filter cannot represent a cross-model
+                # comparison. Fan out one authorized retrieval per explicit
+                # model, then merge deterministically so one popular model
+                # cannot occupy every evidence slot.
+                payloads = await asyncio.gather(*[
+                    self.gateway.search(
+                        context.app_id,
+                        context.environment_id,
+                        retrieval_query,
+                        context.authorization,
+                        device_context={**gateway_context, "model_code": model},
+                    )
+                    for model in comparison_models[:4]
+                ])
+                trace_ids = [str(payload.get("trace_id", "")) for payload in payloads if payload.get("trace_id")]
+                per_model_hits = [[hit.model_dump() for hit in self.gateway.hits(payload)] for payload in payloads]
+                hits = []
+                seen: set[str] = set()
+                for rank in range(max((len(items) for items in per_model_hits), default=0)):
+                    for items in per_model_hits:
+                        if rank >= len(items):
+                            continue
+                        hit = items[rank]
+                        identity = str(hit.get("chunk_id") or f"{hit.get('document_id', '')}:{hit.get('content', '')}")
+                        if identity in seen:
+                            continue
+                        seen.add(identity)
+                        hits.append(hit)
+                trace_id = trace_ids[0] if trace_ids else ""
+                observation = {
+                    "tool": "knowledge_search", "status": "ok",
+                    "summary": f"按 {len(comparison_models[:4])} 个明确型号隔离召回并合并 {len(hits)} 条证据",
+                    "trace_ids": trace_ids,
+                    "model_codes": comparison_models[:4],
+                }
+            else:
+                payload = await self.gateway.search(
+                    context.app_id,
+                    context.environment_id,
+                    retrieval_query,
+                    context.authorization,
+                    device_context=gateway_context,
+                )
+                hits = [hit.model_dump() for hit in self.gateway.hits(payload)]
+                trace_id = str(payload.get("trace_id", ""))
+                observation = {"tool": "knowledge_search", "status": "ok", "summary": f"授权检索命中 {len(hits)} 条医疗设备证据"}
         except GatewayError as exc:
             hits, trace_id = [], ""
             observation = {"tool": "knowledge_search", "status": "error", "summary": str(exc)}
         action_arguments = {**gateway_context, "retrieval_query": retrieval_query}
+        if len(comparison_models) >= 2:
+            action_arguments["comparison_models"] = comparison_models[:4]
         step = AgentStep(step=1, action={"type": "knowledge_search", "arguments": action_arguments}, observation=observation).model_dump(exclude_none=True)
         return {"evidence": hits, "trace_id": trace_id, "gateway_error": "" if observation["status"] == "ok" else observation["summary"], "steps": [step], "observations": [observation]}
 

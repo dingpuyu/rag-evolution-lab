@@ -33,6 +33,12 @@ class MedicalResolution:
     candidates: list[str]
 
 
+def mentioned_sales_models(query: str) -> list[str]:
+    """Return every explicitly mentioned sales model in stable catalog order."""
+    normalized = query.casefold()
+    return [model for model, aliases in SALES_MODEL_ALIASES if any(alias in normalized for alias in aliases)]
+
+
 def sanitize_customer_retrieval_query(query: str) -> str:
     """Remove control-language from search without changing model identifiers.
 
@@ -108,17 +114,14 @@ def resolve_customer_query(query: str, supplied: DeviceContext | None = None) ->
     fail-closed until the customer can identify the complete model.
     """
     supplied = supplied or DeviceContext()
-    if not supplied.model_code.strip():
-        normalized = query.casefold()
-        for model, aliases in SALES_MODEL_ALIASES:
-            if any(alias in normalized for alias in aliases):
-                supplied = DeviceContext(
-                    model_code=model,
-                    software_version=supplied.software_version,
-                    lot_or_batch=supplied.lot_or_batch,
-                    region=supplied.region,
-                )
-                break
+    mentioned_models = mentioned_sales_models(query)
+    if not supplied.model_code.strip() and mentioned_models:
+        supplied = DeviceContext(
+            model_code=mentioned_models[0],
+            software_version=supplied.software_version,
+            lot_or_batch=supplied.lot_or_batch,
+            region=supplied.region,
+        )
     base = resolve_medical_query(query, supplied)
     if base.intent in {"refuse", "field_correction"}:
         return base
@@ -129,11 +132,11 @@ def resolve_customer_query(query: str, supplied: DeviceContext | None = None) ->
         return MedicalResolution("customer_onboarding", "customer_guided_onboarding", base.context, ["产品线概览", "认识型号", "开始排障"])
 
     product_terms = ("产品线", "有哪些产品", "有哪些型号", "产品介绍", "型号介绍", "特点", "特色", "区别", "对比", "哪款", "哪个好", "适合")
-    if any(term in lower for term in product_terms):
+    if len(mentioned_models) >= 2 or any(term in lower for term in product_terms):
         context = base.context
-        if any(term in lower for term in ("产品线", "有哪些产品", "有哪些型号", "区别", "对比", "哪款", "哪个好")):
+        if len(mentioned_models) >= 2 or any(term in lower for term in ("产品线", "有哪些产品", "有哪些型号", "区别", "对比", "哪款", "哪个好")):
             context = DeviceContext(region=base.context.region)
-        return MedicalResolution("product_discovery", "customer_product_discovery", context, SALES_MODEL_CANDIDATES)
+        return MedicalResolution("product_discovery", "customer_product_discovery", context, mentioned_models or SALES_MODEL_CANDIDATES)
 
     getting_started_terms = ("型号在哪里", "哪里看型号", "版本在哪里", "哪里看版本", "怎么提问", "如何提问", "第一次使用", "入门")
     if any(term in lower for term in getting_started_terms):
