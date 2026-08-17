@@ -31,6 +31,8 @@ make medical-smoke
 
 评测失败也不再停留在一行红色结果：管理员可以诊断根因、修订正确证据、执行真实检索单题复测，并把通过案例晋升为下一次发布门禁，完整设计与真实 XLSX 案例见 [医疗 RAG Bad Case 人工修复闭环](docs/medical-bad-case-loop.md)。
 
+完整 Agent 评测、业务链路分析、脱敏生产回放、Prompt Baseline/Candidate 实验和 Pi Bad Case 诊断已拆分到同级独立项目 `agent-evaluation`。本仓库只提供受鉴权的评测契约、隔离 Prompt Preview、Bad Case 和 Query Trace，避免评测故障进入在线 RAG 数据面。
+
 ## 项目目标
 
 - 系统探索 RAG 的核心原理、常见问题和工程实践。

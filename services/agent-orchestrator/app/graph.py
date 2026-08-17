@@ -28,6 +28,7 @@ class RequestContext:
     app_id: str
     environment_id: str
     device_context: DeviceContext
+    prompt_overlay: str = ""
 
 
 class AgentRuntime:
@@ -335,7 +336,11 @@ class AgentRuntime:
             return {"response": result.model_dump()}
         customer = bool(state.get("is_customer"))
         answerer = self.medical_customer_answerer if customer else self.medical_answerer
-        answer = await answerer.answer(str(state["query"]), evidence)
+        prompt_overlay = self._context(state).prompt_overlay
+        if prompt_overlay and hasattr(answerer, "answer_with_prompt"):
+            answer = await answerer.answer_with_prompt(str(state["query"]), evidence, prompt_overlay)  # type: ignore[attr-defined]
+        else:
+            answer = await answerer.answer(str(state["query"]), evidence)
         result = AgentResult(
             status="completed", decision="answer", reason_code="grounded_customer_answer" if customer else "grounded_medical_answer", answer=answer,
             answer_source="rag", resolved_context=resolved, citations=citations, steps=steps,
@@ -462,9 +467,16 @@ class AgentRuntime:
         thread_id: str | None = None,
         confirmation: bool | None = None,
         device_context: DeviceContext | None = None,
+        prompt_overlay: str = "",
     ) -> AgentResponse:
         thread_id = thread_id or f"thread-{uuid.uuid4().hex}"
-        self.contexts[thread_id] = RequestContext(authorization=authorization, app_id=app_id, environment_id=environment_id, device_context=device_context or DeviceContext())
+        self.contexts[thread_id] = RequestContext(
+            authorization=authorization,
+            app_id=app_id,
+            environment_id=environment_id,
+            device_context=device_context or DeviceContext(),
+            prompt_overlay=prompt_overlay[:5000],
+        )
         config = {"configurable": {"thread_id": thread_id}}
         if confirmation is True:
             from langgraph.types import Command

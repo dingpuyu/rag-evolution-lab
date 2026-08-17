@@ -13,8 +13,8 @@ from .config import get_settings
 from .evaluation import BAD_CASE_ROOT_CAUSES, BAD_CASE_STATUSES, EvaluationStore, run_suite, verify_bad_case
 from .gateway import KnowledgeGatewayClient
 from .graph import AgentRuntime, build_runtime
-from .llm import build_llm
-from .models import AgentRequest, AgentResponse
+from .llm import DeepSeekMedicalAnswerer, DeepSeekMedicalCustomerAnswerer, build_llm
+from .models import AgentRequest, AgentResponse, DeviceContext
 
 settings = get_settings()
 gateway = KnowledgeGatewayClient(settings.raglab_api_url)
@@ -49,6 +49,14 @@ class MedicalBadCaseUpdateRequest(BaseModel):
     expected_source_locations: list[dict] = Field(default_factory=list)
     device_context: dict[str, str] = Field(default_factory=dict)
 
+
+class MedicalPromptPreviewRequest(BaseModel):
+    app_id: str = ""
+    environment_id: str = ""
+    query: str = Field(min_length=1, max_length=4000)
+    device_context: DeviceContext = Field(default_factory=DeviceContext)
+    prompt_overlay: str = Field(default="", max_length=5000)
+
 app = FastAPI(title="RagLab LangGraph Agent", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
@@ -71,9 +79,81 @@ async def evaluation_identity(authorization: str | None):
     return identity
 
 
+def allowed_medical_apps(tenant_id: str) -> set[str]:
+    return {
+        f"{tenant_id}-medical-device-agent",
+        f"{tenant_id}-medical-device-customer-agent",
+    }
+
+
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
     return {"status": "ok", "runtime": "langgraph", "model": settings.deepseek_model if settings.model_api_key else "rule-fallback"}
+
+
+@app.get("/api/v1/evaluations/medical-device/contract")
+async def medical_evaluation_contract(
+    app_id: str = "",
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Describe the business graph and safe evaluation intervention points."""
+    identity = await evaluation_identity(authorization)
+    selected_app = app_id.strip() or f"{identity.tenant_id}-medical-device-customer-agent"
+    if "platform_admin" not in identity.roles and selected_app not in allowed_medical_apps(identity.tenant_id):
+        raise HTTPException(status_code=403, detail="evaluation app must belong to the authenticated tenant")
+    customer = "medical-device-customer-agent" in selected_app
+    prompt = DeepSeekMedicalCustomerAnswerer.system_prompt if customer else DeepSeekMedicalAnswerer.system_prompt
+    return {
+        "target_id": "rag-evolution-lab",
+        "app_id": selected_app,
+        "target_type": "langgraph_agent",
+        "business_goal": "帮助医疗设备客户从产品认知进入有证据的售前咨询与安全售后分诊" if customer else "帮助医学工程师完成有权限、有型号版本约束的设备知识查询",
+        "flow": [
+            {"id": "scope", "name": "范围与风险识别", "owner": "deterministic", "quality": ["decision_accuracy", "clinical_refusal_recall"], "interventions": ["intent_rules", "safety_policy"]},
+            {"id": "context", "name": "设备上下文解析", "owner": "deterministic", "quality": ["model_resolution", "clarification_recall"], "interventions": ["entity_rules", "metadata"]},
+            {"id": "retrieve", "name": "授权知识检索", "owner": "knowledge_gateway", "quality": ["hit_at_5", "mrr", "permission_leaks"], "interventions": ["query_rewrite", "hybrid_weights", "rerank"]},
+            {"id": "verify", "name": "证据适用性校验", "owner": "deterministic", "quality": ["correct_model", "correct_version", "source_location"], "interventions": ["verification_policy", "corpus_metadata"]},
+            {"id": "answer", "name": "有据回答生成", "owner": "llm", "quality": ["grounding", "fact_coverage", "response_style"], "interventions": ["prompt_overlay"], "editable": True},
+            {"id": "finalize", "name": "引用与 Trace", "owner": "runtime", "quality": ["citation_accuracy", "trace_completeness", "latency"], "interventions": ["observability", "timeout_budget"]},
+        ],
+        "prompt_slot": {
+            "id": "answer_generation_overlay",
+            "base_prompt": prompt,
+            "editable_scope": "answer_generation_only",
+            "max_length": 5000,
+            "production_mutation": False,
+        },
+        "hard_controls": ["tenant_and_dataset_filter", "clinical_boundary", "evidence_verification", "bounded_graph", "trace_audit"],
+        "dataset_contract": {"expected_format": "agent-evaluation.dataset.v1", "contains_patient_data": False, "recommended_split": ["development", "regression"]},
+    }
+
+
+@app.post("/api/v1/evaluations/medical-device/prompt-preview")
+async def medical_prompt_preview(
+    request: MedicalPromptPreviewRequest,
+    authorization: str | None = Header(default=None),
+) -> dict:
+    """Run one non-persistent prompt candidate against the real business graph."""
+    identity = await evaluation_identity(authorization)
+    app_id = request.app_id.strip() or f"{identity.tenant_id}-medical-device-customer-agent"
+    if "platform_admin" not in identity.roles and app_id not in allowed_medical_apps(identity.tenant_id):
+        raise HTTPException(status_code=403, detail="evaluation app must belong to the authenticated tenant")
+    environment_id = request.environment_id.strip() or f"{app_id}-dev"
+    response = await runtime.run(
+        app_id=app_id,
+        environment_id=environment_id,
+        query=request.query,
+        authorization=authorization or "",
+        thread_id=f"evaluation-preview-{uuid.uuid4().hex}",
+        device_context=request.device_context,
+        prompt_overlay=request.prompt_overlay,
+    )
+    return {
+        "evaluation_mode": True,
+        "prompt_strategy": "candidate_overlay" if request.prompt_overlay.strip() else "baseline",
+        "production_mutation": False,
+        "response": response.model_dump(),
+    }
 
 
 @app.post("/api/v1/evaluations/medical-device/runs")

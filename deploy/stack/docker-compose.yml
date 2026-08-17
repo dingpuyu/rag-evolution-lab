@@ -228,6 +228,7 @@ services:
       args:
         NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-http://localhost:8080}
         NEXT_PUBLIC_AGENT_API_BASE: ${NEXT_PUBLIC_AGENT_API_BASE:-http://localhost:8090}
+        NEXT_PUBLIC_AGENT_EVALUATION_URL: ${NEXT_PUBLIC_AGENT_EVALUATION_URL:-http://localhost:18200}
     restart: unless-stopped
     ports:
       - "${RAGLAB_WEB_PORT:-3000}:3000"

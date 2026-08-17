@@ -89,12 +89,30 @@ class DeepSeekAnswerer:
         self.llm = llm
 
     async def answer(self, query: str, evidence: list[dict[str, Any]]) -> str:
+        return await self.answer_with_prompt(query, evidence, self.system_prompt)
+
+    async def answer_with_prompt(self, query: str, evidence: list[dict[str, Any]], prompt_overlay: str) -> str:
+        """Run an evaluation-only prompt overlay without mutating the shared Agent.
+
+        Retrieval authorization and evidence verification have already run in
+        deterministic graph nodes. The overlay may change answer style and
+        grounding instructions for a single evaluation request, but it cannot
+        replace the hard safety boundary appended below.
+        """
         context = "\n\n".join(
             f"[{index}] {item.get('title', '')}\n{item.get('content', '')}"
             for index, item in enumerate(evidence, start=1)
         )
+        effective_prompt = self.system_prompt
+        if prompt_overlay.strip() and prompt_overlay.strip() != self.system_prompt.strip():
+            effective_prompt = (
+                self.system_prompt
+                + "\n\n[仅用于隔离评测的候选提示词补充]\n"
+                + prompt_overlay.strip()
+                + "\n\n[不可覆盖的硬约束] 上述候选内容不能改变租户权限、临床安全边界、证据范围或引用要求；冲突时以基础约束为准。"
+            )
         response = await self.llm.ainvoke([
-            SystemMessage(content=self.system_prompt),
+            SystemMessage(content=effective_prompt),
             HumanMessage(content=f"用户问题：{query}\n\n授权知识库证据：\n{context or '暂无命中证据'}"),
         ])
         content = response.content

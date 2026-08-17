@@ -11,6 +11,7 @@ deploy/stack/docker-compose.remote-secrets.yml
 bin/
 dist/
 coverage/
+node_modules/
 *.out
 *.test
 
