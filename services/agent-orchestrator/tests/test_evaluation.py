@@ -78,7 +78,7 @@ def test_evaluate_case_checks_customer_answer_boundary_language():
 
 def test_medical_golden_contains_development_and_regression_cases():
     cases = load_medical_golden()
-    assert len(cases) == 40
+    assert len(cases) == 43
     assert {case["split"] for case in cases} == {"development", "regression"}
 
 
@@ -118,6 +118,49 @@ def test_retrieval_case_deduplicates_chunks_before_document_metrics():
     }, 4.0)
     assert item["details"]["retrieved_document_ids"] == ["right", "noise"]
     assert score == {"hit5": 1.0, "mrr": 1.0, "ndcg": 1.0}
+
+
+def test_retrieval_case_requires_expected_source_location():
+    case = {
+        "id": "xlsx-location", "query": "最低固件", "split": "regression", "category": "cross_format_provenance",
+        "expected": {
+            "answerable": True,
+            "relevant_doc_ids": ["matrix-xlsx"],
+            "source_locations": [{
+                "document_id": "matrix-xlsx", "source_sheet": "兼容矩阵",
+                "source_cell_range": "A1:C1,A3:C3", "heading_path": ["兼容矩阵"],
+            }],
+        },
+    }
+    wrong, _ = evaluate_retrieval_case(case, {
+        "result": {"hits": [{
+            "document_id": "matrix-xlsx", "source_sheet": "兼容矩阵",
+            "source_cell_range": "A1:C1,A2:C2", "heading_path": ["兼容矩阵"],
+        }]},
+    }, 2.0)
+    assert not wrong["passed"]
+    assert wrong["actual_decision"] == "wrong_source_location"
+
+    right, _ = evaluate_retrieval_case(case, {
+        "result": {"hits": [{
+            "document_id": "matrix-xlsx", "source_sheet": "兼容矩阵",
+            "source_cell_range": "A1:C1,A3:C3", "heading_path": ["兼容矩阵"],
+        }]},
+    }, 2.0)
+    assert right["passed"]
+    assert right["details"]["source_location_passed"] is True
+
+
+def test_retrieval_case_treats_reviewed_cross_format_copy_as_equivalent():
+    case = {
+        "id": "docx-equivalent", "query": "SYS-NET-042", "split": "regression", "category": "exact_match",
+        "expected": {"answerable": True, "relevant_doc_ids": ["vsm100-error-codes-fw2.6"]},
+    }
+    item, score = evaluate_retrieval_case(case, {
+        "result": {"hits": [{"document_id": "vsm100-error-codes-fw2.6-docx"}]},
+    }, 2.0)
+    assert item["passed"]
+    assert score["mrr"] == 1.0
 
 
 def test_unanswerable_case_is_scored_by_agent_not_raw_retrieval():

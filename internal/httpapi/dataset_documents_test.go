@@ -32,3 +32,19 @@ func TestNormalizeSourceMetadataRejectsUnsafeOrUnreviewedClaims(t *testing.T) {
 		}
 	}
 }
+
+func TestIngestionMetadataHashChangesWithRetrievalScope(t *testing.T) {
+	base := documentUploadMetadata{
+		Title: "兼容矩阵", Version: "2.6", Domain: "medical-device",
+		ProductFamily: "pulsecare-vsm100-family", ModelCodes: []string{"VSM-100"},
+		Region: "CN", Language: "zh-CN",
+	}
+	first := ingestionMetadataHash(base)
+	if first == "" || first != ingestionMetadataHash(base) {
+		t.Fatal("ingestion metadata hash must be stable")
+	}
+	base.ModelCodes = append(base.ModelCodes, "VSM-100 Pro")
+	if first == ingestionMetadataHash(base) {
+		t.Fatal("model scope changes must invalidate ingestion metadata hash")
+	}
+}

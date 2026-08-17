@@ -60,14 +60,16 @@ type documentPreviewInput struct {
 }
 
 type documentPreviewChunk struct {
-	ID             string   `json:"id"`
-	ParentID       string   `json:"parent_id"`
-	ParentSequence int      `json:"parent_sequence"`
-	SourcePage     int      `json:"source_page"`
-	Sequence       int      `json:"sequence"`
-	HeadingPath    []string `json:"heading_path,omitempty"`
-	Content        string   `json:"content"`
-	ParentContent  string   `json:"parent_content"`
+	ID              string   `json:"id"`
+	ParentID        string   `json:"parent_id"`
+	ParentSequence  int      `json:"parent_sequence"`
+	SourcePage      int      `json:"source_page"`
+	SourceSheet     string   `json:"source_sheet,omitempty"`
+	SourceCellRange string   `json:"source_cell_range,omitempty"`
+	Sequence        int      `json:"sequence"`
+	HeadingPath     []string `json:"heading_path,omitempty"`
+	Content         string   `json:"content"`
+	ParentContent   string   `json:"parent_content"`
 }
 
 type documentUploadMetadata struct {
@@ -160,6 +162,21 @@ func normalizeSourceMetadata(metadata *documentUploadMetadata) error {
 	return nil
 }
 
+func ingestionMetadataHash(metadata documentUploadMetadata) string {
+	payload := map[string]any{
+		"title": metadata.Title, "version": metadata.Version, "domain": metadata.Domain,
+		"manufacturer": metadata.Manufacturer, "product_family": metadata.ProductFamily,
+		"model_codes": metadata.ModelCodes, "software_version_from": metadata.SoftwareVersionFrom,
+		"software_version_to": metadata.SoftwareVersionTo, "hardware_revision": metadata.HardwareRevision,
+		"region": metadata.Region, "language": metadata.Language, "effective_from": metadata.EffectiveFrom,
+		"effective_to": metadata.EffectiveTo, "authority_level": metadata.AuthorityLevel,
+		"document_revision": metadata.DocumentRevision, "supersedes": metadata.Supersedes,
+		"device_identifiers": metadata.DeviceIdentifiers, "affected_lots": metadata.AffectedLots,
+	}
+	data, _ := json.Marshal(payload)
+	return fmt.Sprintf("%x", sha256.Sum256(data))
+}
+
 func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.Request) {
 	dataset, identity, ok := api.authorizeDataset(writer, request)
 	if !ok {
@@ -234,6 +251,7 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 	irURI, _ := api.documentStore.Put(request.Context(), objectKey+".document-ir.json", "application/json", irData)
 	registry, hasRegistry := api.store.(datasetaccess.DocumentRegistry)
 	sourceHash := fmt.Sprintf("%x", sha256.Sum256(data))
+	metadataHash := ingestionMetadataHash(metadata)
 	registryRecord := datasetaccess.KnowledgeDocumentRevision{
 		DatasetID: dataset.ID, DocumentID: metadata.DocumentID, Title: metadata.Title,
 		SourceRevision: metadata.SourceRevision, DocumentVersion: metadata.Version,
@@ -248,7 +266,8 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 			"device_identifiers": metadata.DeviceIdentifiers, "affected_lots": metadata.AffectedLots,
 			"source_type": metadata.SourceType, "source_urls": metadata.SourceURLs, "collected_at": metadata.CollectedAt,
 			"source_review_status": metadata.SourceReviewStatus, "source_reviewed_at": metadata.SourceReviewedAt,
-			"source_content_sha256": sourceHash,
+			"source_content_sha256": sourceHash, "document_ir_schema_version": documentIR.SchemaVersion,
+			"ingestion_metadata_sha256": metadataHash,
 		}, Warnings: documentIR.Warnings, CreatedBy: identity.Subject,
 	}
 	if documentIR.Status == "ocr_required" {
@@ -464,7 +483,7 @@ func (api *DatasetAPI) previewDocument(writer http.ResponseWriter, request *http
 		}
 		previewChunks = append(previewChunks, documentPreviewChunk{
 			ID: chunk.ID, ParentID: chunk.ParentID, ParentSequence: chunk.ParentSequence,
-			SourcePage: chunk.SourcePage, Sequence: chunk.Sequence,
+			SourcePage: chunk.SourcePage, SourceSheet: chunk.SourceSheet, SourceCellRange: chunk.SourceCellRange, Sequence: chunk.Sequence,
 			HeadingPath: append([]string(nil), chunk.HeadingPath...), Content: chunk.Content,
 			ParentContent: chunk.ParentContent,
 		})
@@ -475,7 +494,7 @@ func (api *DatasetAPI) previewDocument(writer http.ResponseWriter, request *http
 	}
 	sort.Ints(pageList)
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"chunker_version": "header-page-parent-v1",
+		"chunker_version": "document-ir-provenance-v2",
 		"max_runes":       input.MaxRunes,
 		"overlap_runes":   input.OverlapRunes,
 		"parent_count":    len(parents),

@@ -19,6 +19,13 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "datasets/domains/medical-device/corpus"
 SALES_CORPUS = ROOT / "datasets/domains/medical-device-sales/corpus"
 GENERATED = ROOT / "data/medical/generated"
+DOCUMENT_IR_SCHEMA_VERSION = "document-ir-v2"
+INGESTION_METADATA_FIELDS = (
+    "title", "version", "domain", "manufacturer", "product_family", "model_codes",
+    "software_version_from", "software_version_to", "hardware_revision", "region", "language",
+    "effective_from", "effective_to", "authority_level", "document_revision", "supersedes",
+    "device_identifiers", "affected_lots",
+)
 ACCOUNTS = {
     "platform": ("admin@raglab.local", os.getenv("RAGLAB_PLATFORM_ADMIN_PASSWORD", "change-this-admin-password")),
     "tenant_a": ("alice@tenant-a.local", os.getenv("RAGLAB_TENANT_A_PASSWORD", "RagLab-Alice-2026!")),
@@ -155,7 +162,10 @@ def select_revision(path: Path, meta: dict, existing: dict[str, list[dict]]) -> 
     records = existing.get(str(meta["document_id"]), [])
     identical = [
         int(record.get("source_revision", 0)) for record in records
-        if record.get("source_hash") == digest and record.get("index_status") not in {"failed", "cancelled"}
+        if record.get("source_hash") == digest
+        and record.get("index_status") not in {"failed", "cancelled"}
+        and record_parser_version(record) == DOCUMENT_IR_SCHEMA_VERSION
+        and record_metadata_matches(record, meta)
     ]
     if identical:
         prepared["source_revision"] = max(identical)
@@ -168,7 +178,10 @@ def upload(api: str, token: str, dataset: str, path: Path, meta: dict, revisions
     digest = hashlib.sha256(path.read_bytes()).hexdigest()
     identical = [
         record for record in revisions.get(dataset, {}).get(str(meta["document_id"]), [])
-        if record.get("source_hash") == digest and record.get("index_status") in {"queued", "running", "completed"}
+        if record.get("source_hash") == digest
+        and record.get("index_status") in {"queued", "running", "completed"}
+        and record_parser_version(record) == DOCUMENT_IR_SCHEMA_VERSION
+        and record_metadata_matches(record, meta)
     ]
     if identical:
         current = max(identical, key=lambda record: int(record.get("source_revision", 0)))
@@ -183,6 +196,41 @@ def upload(api: str, token: str, dataset: str, path: Path, meta: dict, revisions
     if status not in (200, 202, 409):
         raise RuntimeError(f"upload {path.name} failed ({status}): {response}")
     return response
+
+
+def record_parser_version(record: dict) -> str:
+    metadata_value = record_metadata(record)
+    return str(metadata_value.get("document_ir_schema_version") or "")
+
+
+def record_metadata(record: dict) -> dict:
+    metadata_value = record.get("metadata") or {}
+    if isinstance(metadata_value, str):
+        try:
+            metadata_value = json.loads(metadata_value)
+        except json.JSONDecodeError:
+            return {}
+    return metadata_value
+
+
+def ingestion_metadata_hash(metadata_value: dict) -> str:
+    payload = {field: metadata_value.get(field, [] if field in {"model_codes", "supersedes", "device_identifiers", "affected_lots"} else "") for field in INGESTION_METADATA_FIELDS}
+    encoded = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def record_metadata_matches(record: dict, desired: dict) -> bool:
+    current = record_metadata(record)
+    expected_hash = ingestion_metadata_hash(desired)
+    if current.get("ingestion_metadata_sha256"):
+        return current["ingestion_metadata_sha256"] == expected_hash
+    # Compatibility for records created before the metadata fingerprint was
+    # introduced. This prevents a parser upgrade from re-embedding every
+    # unchanged document while still detecting model/version scope changes.
+    current = dict(current)
+    current["title"] = record.get("title", "")
+    current["version"] = record.get("document_version", "")
+    return all(current.get(field, [] if field in {"model_codes", "supersedes", "device_identifiers", "affected_lots"} else "") == desired.get(field, [] if field in {"model_codes", "supersedes", "device_identifiers", "affected_lots"} else "") for field in INGESTION_METADATA_FIELDS)
 
 
 def main() -> None:
@@ -233,7 +281,13 @@ def main() -> None:
         }
         for name, entry in by_name.items():
             suffix = "-" + Path(name).suffix.removeprefix(".")
-            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, metadata(entry, suffix, arguments.source_revision), revisions)
+            derived_metadata = metadata(entry, suffix, arguments.source_revision)
+            if name == "vsm100-compatibility-fw2.6.xlsx":
+                # The workbook contains both the standard and Pro rows. Scope
+                # metadata must describe the file, not only its source fixture.
+                derived_metadata["model_codes"] = ["VSM-100", "VSM-100 Pro"]
+                derived_metadata["product_family"] = "pulsecare-vsm100-family"
+            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, derived_metadata, revisions)
             submitted.append({"document_id": entry["doc_id"] + suffix, "dataset_id": "public-medical-device", "job_id": result.get("job_id"), "status": result.get("status")})
     print(json.dumps({"submitted": len(submitted), "documents": submitted}, ensure_ascii=False, indent=2))
 

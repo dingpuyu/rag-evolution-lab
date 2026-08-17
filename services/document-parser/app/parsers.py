@@ -8,6 +8,11 @@ from pathlib import Path
 
 from bs4 import BeautifulSoup
 from docx import Document
+from docx.document import Document as _Document
+from docx.table import Table
+from docx.text.paragraph import Paragraph
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
 import fitz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
@@ -51,8 +56,9 @@ def parse_markdown(filename: str, text: str) -> list[DocumentBlock]:
     blocks: list[DocumentBlock] = []
     headings: list[str] = []
     paragraph: list[str] = []
+    table_rows: list[str] = []
 
-    def flush() -> None:
+    def flush_paragraph() -> None:
         if paragraph:
             value = " ".join(line.strip() for line in paragraph if line.strip())
             if value:
@@ -60,22 +66,31 @@ def parse_markdown(filename: str, text: str) -> list[DocumentBlock]:
                 blocks.append(_block(kind, value, filename, headings))
             paragraph.clear()
 
+    def flush_table() -> None:
+        if table_rows:
+            blocks.append(_block("table", "\n".join(table_rows), filename, headings))
+            table_rows.clear()
+
     for line in text.splitlines():
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
         if heading:
-            flush()
+            flush_paragraph()
+            flush_table()
             level = len(heading.group(1))
             headings[:] = headings[: level - 1]
             headings.append(heading.group(2).strip())
             blocks.append(_block("heading", heading.group(2).strip(), filename, headings))
         elif line.strip().startswith("|") and line.strip().endswith("|"):
-            flush()
-            blocks.append(_block("table", line.strip(), filename, headings))
+            flush_paragraph()
+            table_rows.append(line.strip())
         elif not line.strip():
-            flush()
+            flush_paragraph()
+            flush_table()
         else:
+            flush_table()
             paragraph.append(line)
-    flush()
+    flush_paragraph()
+    flush_table()
     return blocks
 
 
@@ -107,26 +122,25 @@ def parse_html(filename: str, text: str) -> list[DocumentBlock]:
 def parse_pdf(filename: str, content: bytes) -> list[DocumentBlock]:
     blocks: list[DocumentBlock] = []
     document = fitz.open(stream=content, filetype="pdf")
+    headings: list[str] = []
     try:
         for page_number, page in enumerate(document, start=1):
             table_boxes: list[fitz.Rect] = []
+            candidates: list[tuple[float, float, str, object]] = []
             try:
                 finder = page.find_tables()
                 for table in finder.tables:
                     rows = table.extract()
                     value = "\n".join(" | ".join("" if cell is None else str(cell).strip() for cell in row) for row in rows)
                     if value.strip(" |\n"):
-                        blocks.append(DocumentBlock(
-                            block_type="table", text=value, heading_path=[],
-                            provenance=Provenance(source_file=filename, page=page_number),
-                        ))
-                        table_boxes.append(fitz.Rect(table.bbox))
+                        bbox = fitz.Rect(table.bbox)
+                        table_boxes.append(bbox)
+                        candidates.append((bbox.y0, bbox.x0, "table", value))
             except Exception:
                 # Some PDFs do not expose table geometry; text extraction still
                 # provides a safe, page-addressable fallback.
                 table_boxes = []
-            headings: list[str] = []
-            page_dict = page.get_text("dict")
+            page_dict = page.get_text("dict", sort=True)
             for raw in page_dict.get("blocks", []):
                 if raw.get("type") != 0:
                     continue
@@ -139,6 +153,19 @@ def parse_pdf(filename: str, content: bytes) -> list[DocumentBlock]:
                     continue
                 max_size = max((float(span.get("size", 0)) for span in spans), default=0)
                 bold = any(int(span.get("flags", 0)) & 16 for span in spans)
+                candidates.append((bbox.y0, bbox.x0, "text", (value, max_size, bold)))
+
+            # PyMuPDF exposes text and tables through separate APIs. Sorting
+            # them back into visual order is essential: otherwise every table
+            # loses the section heading that gives its columns meaning.
+            for _, _, kind, payload in sorted(candidates, key=lambda item: (item[0], item[1])):
+                if kind == "table":
+                    blocks.append(DocumentBlock(
+                        block_type="table", text=str(payload), heading_path=list(headings),
+                        provenance=Provenance(source_file=filename, page=page_number),
+                    ))
+                    continue
+                value, max_size, bold = payload  # type: ignore[misc]
                 is_heading = len(value) <= 120 and (max_size >= 14 or bold)
                 if is_heading:
                     headings = [value]
@@ -156,22 +183,23 @@ def parse_docx(filename: str, content: bytes) -> list[DocumentBlock]:
     document = Document(io.BytesIO(content))
     blocks: list[DocumentBlock] = []
     headings: list[str] = []
-    for paragraph in document.paragraphs:
-        value = paragraph.text.strip()
-        if not value:
+    for item in _iter_docx_blocks(document):
+        if isinstance(item, Paragraph):
+            value = item.text.strip()
+            if not value:
+                continue
+            style = item.style.name if item.style else ""
+            match = re.match(r"Heading\s+(\d+)", style, re.IGNORECASE)
+            if match:
+                level = int(match.group(1))
+                headings[:] = headings[: level - 1]
+                headings.append(value)
+                kind = "heading"
+            else:
+                kind = "list" if "List" in style else "paragraph"
+            blocks.append(_block(kind, value, filename, headings))
             continue
-        style = paragraph.style.name if paragraph.style else ""
-        match = re.match(r"Heading\s+(\d+)", style, re.IGNORECASE)
-        if match:
-            level = int(match.group(1))
-            headings[:] = headings[: level - 1]
-            headings.append(value)
-            kind = "heading"
-        else:
-            kind = "list" if "List" in style else "paragraph"
-        blocks.append(_block(kind, value, filename, headings))
-    for table in document.tables:
-        rows = [" | ".join(cell.text.strip() for cell in row.cells) for row in table.rows]
+        rows = [" | ".join(cell.text.strip() for cell in row.cells) for row in item.rows]
         value = "\n".join(row for row in rows if row.strip(" |"))
         if value:
             blocks.append(_block("table", value, filename, headings))
@@ -183,31 +211,82 @@ def parse_xlsx(filename: str, content: bytes) -> list[DocumentBlock]:
     blocks: list[DocumentBlock] = []
     try:
         for sheet in workbook.worksheets:
-            rows: list[str] = []
-            min_row = min_col = None
-            max_row = max_col = 0
-            for row in sheet.iter_rows():
-                values = ["" if cell.value is None else str(cell.value).strip() for cell in row]
-                if not any(values):
+            segments: list[list[tuple[int, list[tuple[int, str]]]]] = []
+            current: list[tuple[int, list[tuple[int, str]]]] = []
+            previous_row = 0
+            for row_number, row in enumerate(sheet.iter_rows(), start=1):
+                values = [(column, "" if cell.value is None else str(cell.value).strip()) for column, cell in enumerate(row, start=1)]
+                nonempty = [(column, value) for column, value in values if value]
+                if not nonempty:
+                    if current:
+                        segments.append(current)
+                        current = []
                     continue
-                rows.append(" | ".join(values))
-                nonempty = [cell for cell in row if cell.value is not None]
-                if nonempty:
-                    min_row = min(min_row or row[0].row, row[0].row)
-                    min_col = min(min_col or nonempty[0].column, nonempty[0].column)
-                    max_row = max(max_row, row[0].row)
-                    max_col = max(max_col, nonempty[-1].column)
-            if rows:
-                cell_range = f"{get_column_letter(min_col)}{min_row}:{get_column_letter(max_col)}{max_row}"
-                blocks.append(DocumentBlock(
-                    block_type="table",
-                    text="\n".join(rows),
-                    heading_path=[sheet.title],
-                    provenance=Provenance(source_file=filename, sheet=sheet.title, cell_range=cell_range),
-                ))
+                if current and row_number > previous_row + 1:
+                    segments.append(current)
+                    current = []
+                current.append((row_number, nonempty))
+                previous_row = row_number
+            if current:
+                segments.append(current)
+
+            for segment in segments:
+                _append_xlsx_segment(blocks, filename, sheet.title, segment)
     finally:
         workbook.close()
     return blocks
+
+
+def _iter_docx_blocks(document: _Document):
+    """Yield paragraphs and tables in their actual body order."""
+    for child in document.element.body.iterchildren():
+        if isinstance(child, CT_P):
+            yield Paragraph(child, document)
+        elif isinstance(child, CT_Tbl):
+            yield Table(child, document)
+
+
+def _append_xlsx_segment(
+    blocks: list[DocumentBlock],
+    filename: str,
+    sheet_name: str,
+    rows: list[tuple[int, list[tuple[int, str]]]],
+) -> None:
+    """Create row-addressable table blocks while retaining header semantics."""
+    header_row, header_cells = rows[0]
+    headers = {column: value for column, value in header_cells}
+    header_range = _xlsx_row_range(header_row, header_cells)
+    if len(rows) == 1:
+        blocks.append(DocumentBlock(
+            block_type="table",
+            text=" | ".join(value for _, value in header_cells),
+            heading_path=[sheet_name],
+            provenance=Provenance(source_file=filename, sheet=sheet_name, cell_range=header_range),
+        ))
+        return
+
+    for row_number, cells in rows[1:]:
+        values = []
+        for column, value in cells:
+            label = headers.get(column) or get_column_letter(column)
+            values.append(f"{label}: {value}")
+        row_range = _xlsx_row_range(row_number, cells)
+        blocks.append(DocumentBlock(
+            block_type="table",
+            text=" | ".join(values),
+            heading_path=[sheet_name],
+            provenance=Provenance(
+                source_file=filename,
+                sheet=sheet_name,
+                cell_range=f"{header_range},{row_range}",
+            ),
+        ))
+
+
+def _xlsx_row_range(row_number: int, cells: list[tuple[int, str]]) -> str:
+    start = get_column_letter(min(column for column, _ in cells))
+    end = get_column_letter(max(column for column, _ in cells))
+    return f"{start}{row_number}:{end}{row_number}"
 
 
 def _block(kind: str, text: str, filename: str, headings: list[str]) -> DocumentBlock:

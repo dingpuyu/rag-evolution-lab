@@ -27,6 +27,8 @@ make medical-smoke
 
 公开资料在入库前执行来源和内容指纹门禁；可用 `make medical-source-audit` 检查官网可达性，详细设计与可复用经验见 [医疗公开资料来源治理](docs/medical-source-governance.md)。
 
+复杂 PDF、DOCX、XLSX 不再只转成纯文本：Document IR v2 会把页码、标题路径、工作表和单元格范围贯穿到 Chunk、Milvus 引用与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
+
 ## 项目目标
 
 - 系统探索 RAG 的核心原理、常见问题和工程实践。

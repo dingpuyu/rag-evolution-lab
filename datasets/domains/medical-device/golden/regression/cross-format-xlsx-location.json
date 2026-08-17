@@ -1,0 +1,27 @@
+{
+  "id": "medical_cross_format_xlsx_location",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "cross_format_provenance",
+  "query": "在 XLSX 跨格式测试副本中，VSM-100 Pro 搭配 WLM-2 的最低固件版本是什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-compatibility-fw2.6"],
+    "equivalent_relevant_doc_ids": ["vsm100-compatibility-fw2.6-xlsx"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["3.4"],
+    "forbidden_facts": ["3.2"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null,
+    "source_locations": [
+      {
+        "document_id": "vsm100-compatibility-fw2.6-xlsx",
+        "source_sheet": "兼容矩阵",
+        "source_cell_range": "A1:E1,A4:E4",
+        "heading_path": ["兼容矩阵"]
+      }
+    ]
+  },
+  "notes": "验证 XLSX 表头语义随目标数据行进入 Chunk，并能精确回溯到表头与第 4 行。"
+}

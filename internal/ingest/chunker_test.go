@@ -98,6 +98,40 @@ func TestChunkerPreservesSheetAndCellRangeProvenance(t *testing.T) {
 	}
 }
 
+func TestChunkerDoesNotMergeDifferentDocumentIRLocations(t *testing.T) {
+	document := domain.Document{ID: "matrix", Content: strings.Join([]string{
+		"<!-- source: page=0; sheet=兼容矩阵; range=A1:C1,A2:C2 -->\n# 兼容矩阵\n\n型号: VSM-100 | 配件: WLM-2 | 固件: 3.2",
+		"<!-- source: page=0; sheet=兼容矩阵; range=A1:C1,A3:C3 -->\n型号: VSM-100 Pro | 配件: WLM-2 | 固件: 3.4",
+	}, "\n\n")}
+	chunks := (Chunker{MaxRunes: 300, PageAware: true}).Chunk(document)
+	if len(chunks) != 2 {
+		t.Fatalf("expected one chunk per source row, got %d: %#v", len(chunks), chunks)
+	}
+	if chunks[0].SourceCellRange != "A1:C1,A2:C2" || chunks[1].SourceCellRange != "A1:C1,A3:C3" {
+		t.Fatalf("source ranges were merged or shifted: %#v", chunks)
+	}
+	if !reflect.DeepEqual(chunks[1].HeadingPath, []string{"兼容矩阵"}) {
+		t.Fatalf("heading path was not retained across source rows: %#v", chunks[1].HeadingPath)
+	}
+}
+
+func TestChunkerResetsPageAndSheetFromExplicitSourceMarker(t *testing.T) {
+	document := domain.Document{ID: "mixed", Content: strings.Join([]string{
+		"<!-- source: page=3; sheet=; range= -->\n# 排障\n\n第三页内容",
+		"<!-- source: page=0; sheet=工作表; range=B2:D2 -->\n表格内容",
+	}, "\n\n")}
+	chunks := (Chunker{MaxRunes: 300, PageAware: true}).Chunk(document)
+	if len(chunks) != 2 {
+		t.Fatalf("expected two provenance chunks, got %d: %#v", len(chunks), chunks)
+	}
+	if chunks[0].SourcePage != 3 || chunks[0].SourceSheet != "" {
+		t.Fatalf("unexpected PDF provenance: %#v", chunks[0])
+	}
+	if chunks[1].SourcePage != 0 || chunks[1].SourceSheet != "工作表" || chunks[1].SourceCellRange != "B2:D2" {
+		t.Fatalf("explicit marker did not reset provenance: %#v", chunks[1])
+	}
+}
+
 func TestChunkerOverlapIsDeterministicAndSharedByParent(t *testing.T) {
 	document := domain.Document{ID: "long", Content: "abcdefghijklmnopqrstuvwx"}
 	chunks := (Chunker{MaxRunes: 10, OverlapRunes: 3}).Chunk(document)

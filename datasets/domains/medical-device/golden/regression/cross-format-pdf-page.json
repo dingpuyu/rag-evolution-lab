@@ -1,0 +1,25 @@
+{
+  "id": "medical_cross_format_pdf_page",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "cross_format_provenance",
+  "query": "PDF 跨格式测试副本里，FC-2026-04 更正后的目标软件版本是什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100-pro", "version": "2.5.2"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["field-correction-fc-2026-04"],
+    "equivalent_relevant_doc_ids": ["field-correction-fc-2026-04-pdf"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["2.5.4"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null,
+    "source_locations": [
+      {
+        "document_id": "field-correction-fc-2026-04-pdf",
+        "source_page": 1
+      }
+    ]
+  },
+  "notes": "验证 PDF 检索命中真实页码，而不是只引用整个文件。"
+}

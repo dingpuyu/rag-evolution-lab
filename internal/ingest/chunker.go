@@ -208,14 +208,30 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 			}
 			if pageAware {
 				var markerPage int
-				block, markerPage = stripPageMarker(block)
-				if markerPage > 0 {
-					currentPage = markerPage
-				}
 				var markerSheet, markerRange string
-				block, markerSheet, markerRange = stripSheetMarker(block)
-				if markerSheet != "" {
+				var explicitSource bool
+				block, markerPage, markerSheet, markerRange, explicitSource = stripSourceMarker(block)
+				if explicitSource {
+					if current.Len() > 0 && (currentSourcePage != markerPage || currentSourceSheet != markerSheet || currentSourceCellRange != markerRange) {
+						flush()
+					}
+					currentPage, currentSourcePage = markerPage, markerPage
 					currentSourceSheet, currentSourceCellRange = markerSheet, markerRange
+				} else {
+					block, markerPage = stripPageMarker(block)
+					if markerPage > 0 {
+						if current.Len() > 0 && currentSourcePage != markerPage {
+							flush()
+						}
+						currentPage, currentSourcePage = markerPage, markerPage
+					}
+					block, markerSheet, markerRange = stripSheetMarker(block)
+					if markerSheet != "" {
+						if current.Len() > 0 && (currentSourceSheet != markerSheet || currentSourceCellRange != markerRange) {
+							flush()
+						}
+						currentSourceSheet, currentSourceCellRange = markerSheet, markerRange
+					}
 				}
 				block = strings.TrimSpace(block)
 				if block == "" {
@@ -249,6 +265,32 @@ func parseMarkdownParents(content string, pageAware bool) []parentSection {
 		flush()
 	}
 	return result
+}
+
+func stripSourceMarker(block string) (string, int, string, string, bool) {
+	const prefix = "<!-- source:"
+	start := strings.Index(block, prefix)
+	if start < 0 {
+		return block, 0, "", "", false
+	}
+	rest := block[start+len(prefix):]
+	end := strings.Index(rest, "-->")
+	if end < 0 {
+		return block, 0, "", "", false
+	}
+	values := map[string]string{}
+	for _, part := range strings.Split(rest[:end], ";") {
+		key, value, ok := strings.Cut(strings.TrimSpace(part), "=")
+		if ok {
+			values[strings.TrimSpace(key)] = strings.TrimSpace(value)
+		}
+	}
+	page, err := strconv.Atoi(values["page"])
+	if err != nil || page < 0 {
+		return block, 0, "", "", false
+	}
+	cleaned := strings.TrimSpace(block[:start] + " " + rest[end+3:])
+	return cleaned, page, values["sheet"], values["range"], true
 }
 
 func stripSheetMarker(block string) (string, string, string) {

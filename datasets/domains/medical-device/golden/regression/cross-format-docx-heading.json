@@ -1,0 +1,25 @@
+{
+  "id": "medical_cross_format_docx_heading",
+  "dataset_version": "0.2.0",
+  "split": "regression",
+  "category": "cross_format_provenance",
+  "query": "DOCX 跨格式测试副本中，SYS-NET-042 的排查入口是什么？",
+  "context": {"tenant_id": "tenant_a", "user_role": "admin", "product": "pulsecare-vsm100", "version": "2.6"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["vsm100-error-codes-fw2.6"],
+    "equivalent_relevant_doc_ids": ["vsm100-error-codes-fw2.6-docx"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["设置 > 网络 > 接口状态"],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null,
+    "source_locations": [
+      {
+        "document_id": "vsm100-error-codes-fw2.6-docx",
+        "heading_path": ["VSM-100 软件 2.6 系统错误码（DOCX 测试副本）", "SYS-NET-042"]
+      }
+    ]
+  },
+  "notes": "验证 DOCX 表格保持原始文档顺序，并继承表格所在章节的完整标题路径。"
+}

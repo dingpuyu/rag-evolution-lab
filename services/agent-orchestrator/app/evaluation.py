@@ -76,6 +76,17 @@ MEDICAL_CUSTOMER_CASES = [
     },
 ]
 
+# The professional corpus intentionally stores the same reviewed fact in its
+# source Markdown and generated office-format fixtures. Retrieval of either is
+# relevant; provenance-specific cases still separately require the PDF page,
+# DOCX heading or XLSX cell range.
+MEDICAL_EQUIVALENT_DOCUMENTS = (
+    {"vsm100-error-codes-fw2.6", "vsm100-error-codes-fw2.6-docx"},
+    {"vsm100-compatibility-fw2.6", "vsm100-compatibility-fw2.6-xlsx"},
+    {"field-correction-fc-2026-04", "field-correction-fc-2026-04-pdf"},
+    {"vsm100-family-release-fw2.6", "vsm100-family-release-fw2.6-html"},
+)
+
 
 def is_customer_app(app_id: str) -> bool:
     return "medical-device-customer-agent" in app_id
@@ -157,7 +168,7 @@ class EvaluationRun:
     app_id: str
     environment_id: str
     status: str = "queued"
-    suite_version: str = "medical-rag-agent-v2"
+    suite_version: str = "medical-rag-agent-v3"
     total_cases: int = len(MEDICAL_AGENT_CASES)
     passed_cases: int = 0
     failed_cases: int = 0
@@ -190,7 +201,7 @@ class EvaluationStore:
 
     async def create(self, tenant_id: str, created_by: str, app_id: str, environment_id: str) -> dict[str, Any]:
         run = EvaluationRun(run_id="medeval_" + uuid.uuid4().hex, tenant_id=tenant_id, created_by=created_by, app_id=app_id, environment_id=environment_id)
-        run.suite_version = "medical-sales-customer-agent-v3" if is_customer_app(app_id) else "medical-rag-agent-v2"
+        run.suite_version = "medical-sales-customer-agent-v3" if is_customer_app(app_id) else "medical-rag-agent-v3"
         run.total_cases = len(agent_cases_for(app_id)) + len(golden_cases_for(app_id, tenant_id))
         payload = vars(run)
         pool = await self._pool()
@@ -374,9 +385,10 @@ def evaluate_retrieval_case(case: dict[str, Any], payload: dict[str, Any], laten
     # document-level. Collapse repeated chunks from the same document before
     # assigning ranks; otherwise a single relevant document can be counted
     # several times and produce an impossible NDCG greater than 1.
+    raw_hits = list((payload.get("result") or {}).get("hits") or [])
     hits: list[dict[str, Any]] = []
     seen_documents: set[str] = set()
-    for hit in (payload.get("result") or {}).get("hits") or []:
+    for hit in raw_hits:
         document_id = str(hit.get("document_id") or "")
         dedupe_key = document_id or str(hit.get("chunk_id") or "")
         if dedupe_key in seen_documents:
@@ -387,6 +399,10 @@ def evaluate_retrieval_case(case: dict[str, Any], payload: dict[str, Any], laten
             break
     expected = case.get("expected", {})
     relevant = set(expected.get("relevant_doc_ids", []))
+    relevant.update(expected.get("equivalent_relevant_doc_ids", []))
+    for group in MEDICAL_EQUIVALENT_DOCUMENTS:
+        if relevant.intersection(group):
+            relevant.update(group)
     ranks = [index + 1 for index, hit in enumerate(hits) if hit.get("document_id") in relevant]
     answerable = bool(expected.get("answerable"))
     hit5 = 1.0 if ranks else 0.0
@@ -405,12 +421,23 @@ def evaluate_retrieval_case(case: dict[str, Any], payload: dict[str, Any], laten
         # while this layer records (but does not punish) the raw candidates.
         passed = True
         actual = "not_scored" if hits else "empty"
+    expected_locations = expected.get("source_locations", [])
+    location_checks: list[dict[str, Any]] = []
+    for location in expected_locations:
+        matching = [hit for hit in raw_hits[:10] if _matches_source_location(hit, location)]
+        location_checks.append({"expected": location, "matched": bool(matching), "actual": matching[:1]})
+    location_passed = all(check["matched"] for check in location_checks)
+    if answerable and not location_passed:
+        passed = False
+        actual = "wrong_source_location" if ranks else actual
+
     details = {
         "layer": "rag", "category": case.get("category"), "split": case.get("split"),
         "relevant_document_ids": sorted(relevant),
         "retrieved_document_ids": [hit.get("document_id", "") for hit in hits],
         "hit_at_5": hit5, "reciprocal_rank": reciprocal_rank, "ndcg": ndcg,
         "bindings": payload.get("bindings", []), "scored": answerable,
+        "source_location_passed": location_passed, "source_location_checks": location_checks,
     }
     item = {
         "case_id": "rag:" + case["id"], "query": case["query"],
@@ -420,6 +447,18 @@ def evaluate_retrieval_case(case: dict[str, Any], payload: dict[str, Any], laten
         "latency_ms": latency_ms, "error": "", "details": details,
     }
     return item, {"hit5": hit5, "mrr": reciprocal_rank, "ndcg": ndcg}
+
+
+def _matches_source_location(hit: dict[str, Any], expected: dict[str, Any]) -> bool:
+    for field in ("document_id", "source_page", "source_sheet", "source_cell_range"):
+        if field in expected and hit.get(field) != expected[field]:
+            return False
+    expected_heading = [str(value) for value in expected.get("heading_path", [])]
+    if expected_heading:
+        actual_heading = [str(value) for value in hit.get("heading_path") or []]
+        if actual_heading != expected_heading:
+            return False
+    return True
 
 
 async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, authorization: str) -> None:
@@ -499,6 +538,11 @@ async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, a
             model_categories.update({"product_spec", "product_feature", "configuration_boundary", "system_integration", "regulatory_fact"})
         model_cases = [item for item in cases if item.get("details", {}).get("layer") == "rag" and item.get("details", {}).get("category") in model_categories]
         version_cases = [item for item in cases if item.get("details", {}).get("layer") == "rag" and item.get("details", {}).get("category") in {"version_filter", "table_numeric"}]
+        source_location_cases = [
+            item for item in cases
+            if item.get("details", {}).get("layer") == "rag"
+            and item.get("details", {}).get("source_location_checks")
+        ]
         metrics = {
             "overall_pass_rate": passed / total,
             "decision_accuracy": agent_passed / len(agent_cases),
@@ -512,6 +556,7 @@ async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, a
             "correct_model_at_5": sum(bool(item["details"].get("hit_at_5")) for item in model_cases) / len(model_cases) if model_cases else None,
             "correct_version_at_5": sum(bool(item["details"].get("hit_at_5")) for item in version_cases) / len(version_cases) if version_cases else None,
             "wrong_model_rate": sum(not bool(item["details"].get("hit_at_5")) for item in model_cases) / len(model_cases) if model_cases else None,
+            "source_location_accuracy": sum(bool(item["details"].get("source_location_passed")) for item in source_location_cases) / len(source_location_cases) if source_location_cases else 1.0,
             "permission_leaks": permission_leaks,
             "p50_latency_ms": latencies[len(latencies) // 2] if latencies else 0,
             "total_cost_usd": 0,
@@ -525,6 +570,7 @@ async def run_suite(store: EvaluationStore, run: dict[str, Any], runtime: Any, a
             ("mrr", metrics["mrr"] >= 0.80),
             ("correct_model_at_5", metrics["correct_model_at_5"] is None or metrics["correct_model_at_5"] >= 0.95),
             ("correct_version_at_5", metrics["correct_version_at_5"] is None or metrics["correct_version_at_5"] >= 0.90),
+            ("source_location_accuracy", metrics["source_location_accuracy"] == 1.0),
             ("decision_accuracy", metrics["decision_accuracy"] >= 0.90),
         ):
             if not ok:

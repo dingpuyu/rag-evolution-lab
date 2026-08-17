@@ -38,18 +38,35 @@ type DocumentIR struct {
 
 func (document DocumentIR) Markdown() string {
 	var output strings.Builder
-	lastHeading := ""
+	var lastHeadingPath []string
 	for _, block := range document.Blocks {
-		if block.Provenance.Page > 0 {
-			fmt.Fprintf(&output, "<!-- page: %d -->\n", block.Provenance.Page)
-		}
-		if block.Provenance.Sheet != "" {
-			fmt.Fprintf(&output, "<!-- sheet: %s; range: %s -->\n", safeMarkerValue(block.Provenance.Sheet), safeMarkerValue(block.Provenance.CellRange))
-		}
+		fmt.Fprintf(&output, "<!-- source: page=%d; sheet=%s; range=%s -->\n",
+			block.Provenance.Page, safeMarkerValue(block.Provenance.Sheet), safeMarkerValue(block.Provenance.CellRange))
 		heading := strings.Join(block.HeadingPath, " > ")
-		if heading != "" && heading != lastHeading {
-			fmt.Fprintf(&output, "## %s\n\n", heading)
-			lastHeading = heading
+		if heading != "" {
+			common := 0
+			for common < len(lastHeadingPath) && common < len(block.HeadingPath) && lastHeadingPath[common] == block.HeadingPath[common] {
+				common++
+			}
+			for index := common; index < len(block.HeadingPath); index++ {
+				part := block.HeadingPath[index]
+				part = strings.TrimSpace(strings.ReplaceAll(part, "\n", " "))
+				if part == "" {
+					continue
+				}
+				level := index + 1
+				if level > 6 {
+					level = 6
+				}
+				fmt.Fprintf(&output, "%s %s\n\n", strings.Repeat("#", level), part)
+			}
+			lastHeadingPath = append(lastHeadingPath[:0], block.HeadingPath...)
+		}
+		// A heading block has already been represented by the structured
+		// heading path above. Writing its text again would pollute retrieval
+		// with duplicate titles and can produce artificial parent chunks.
+		if block.BlockType == "heading" && heading != "" {
+			continue
 		}
 		output.WriteString(strings.TrimSpace(block.Text))
 		output.WriteString("\n\n")

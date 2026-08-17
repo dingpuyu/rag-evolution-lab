@@ -56,8 +56,8 @@ func TestLoadMedicalDeviceDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(regression) != 19 {
-		t.Fatalf("expected 19 medical-device regression cases, got %d", len(regression))
+	if len(regression) != 22 {
+		t.Fatalf("expected 22 medical-device regression cases, got %d", len(regression))
 	}
 	if err := Validate(documents, regression); err != nil {
 		t.Fatalf("validate medical-device regression: %v", err)

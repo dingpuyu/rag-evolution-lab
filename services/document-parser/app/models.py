@@ -20,7 +20,7 @@ class DocumentBlock(BaseModel):
 
 
 class DocumentIR(BaseModel):
-    schema_version: str = "document-ir-v1"
+    schema_version: str = "document-ir-v2"
     status: Literal["ready", "ocr_required"] = "ready"
     source_file: str
     mime_type: str
