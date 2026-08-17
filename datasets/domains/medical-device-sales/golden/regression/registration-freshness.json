@@ -1,0 +1,18 @@
+{
+  "id": "sales_registration_freshness",
+  "dataset_version": "1.0.0",
+  "split": "regression",
+  "category": "freshness_boundary",
+  "query": "IntelliVue MX500/MX550 的注册证信息以后都不用再查了吗？",
+  "context": {"region": "CN"},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["philips-intellivue-mx500-mx550-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["可能变更", "正式交易", "再次核验"],
+    "forbidden_facts": ["永久有效", "不用再查"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证公开资料采集时点与交易时点之间的新鲜度边界。"
+}

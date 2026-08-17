@@ -130,7 +130,7 @@ services:
       RAGLAB_QUERY_INSTRUCTION: ${RAGLAB_QUERY_INSTRUCTION:-}
       RAGLAB_RERANK_BACKEND: ${RAGLAB_RERANK_BACKEND:-heuristic}
       RAGLAB_RERANK_API_KEY: ${RAGLAB_RERANK_API_KEY:-${QWEN_API_KEY:-${DASHSCOPE_API_KEY:-}}}
-      RAGLAB_RERANK_URL: ${RAGLAB_RERANK_URL:-https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank}
+      RAGLAB_RERANK_URL: ${RAGLAB_RERANK_URL:-https://dashscope.aliyuncs.com/compatible-api/v1/reranks}
       RAGLAB_RERANK_MODEL: ${RAGLAB_RERANK_MODEL:-qwen3-rerank}
       RAGLAB_RERANK_STRICT: ${RAGLAB_RERANK_STRICT:-false}
       RAGLAB_GENERATION_PROVIDER: ${RAGLAB_GENERATION_PROVIDER:-extractive}
@@ -206,6 +206,7 @@ services:
       DEEPSEEK_MODEL: ${RAGLAB_GENERATION_MODEL:-deepseek-chat}
       AGENT_CORS_ORIGINS: ${AGENT_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:13000,http://127.0.0.1:13000}
       MEDICAL_GOLDEN_ROOT: /app/datasets/domains/medical-device/golden
+      MEDICAL_SALES_GOLDEN_ROOT: /app/datasets/domains/medical-device-sales/golden
     volumes:
       - ../../datasets:/app/datasets:ro
     ports:

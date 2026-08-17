@@ -5,6 +5,7 @@ import (
 	"errors"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/auth"
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
@@ -132,6 +133,30 @@ func TestSearchFailsClosedWhenBindingIsNotVisible(t *testing.T) {
 	}
 }
 
+func TestFieldCorrectionLookupDefersApplicabilityFilters(t *testing.T) {
+	searcher := &fakeSearcher{}
+	service, err := New(searcher, fakeDatasetStore{catalog: datasetaccess.Defaults()}, fakeApps{bindings: []datasetaccess.KnowledgeBinding{
+		{DatasetID: "public-medical-device", Status: "active", Policy: datasetaccess.RetrievalPolicy{TopK: 5}},
+	}}, generation.ExtractiveGenerator{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = service.Search(context.Background(), auth.Identity{Subject: "alice", TenantID: "tenant_a", Roles: []string{"admin"}}, Request{
+		AppID: "tenant_a-medical-device-agent", Query: "VSM-100 2.5.2 是否适用 FC-2026-04？",
+		DeviceContext: DeviceContext{ModelCode: "VSM-100", SoftwareVersion: "2.5.2", LotOrBatch: "L26A04"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(searcher.queries) != 1 {
+		t.Fatalf("expected one authorized lookup, got %#v", searcher.queries)
+	}
+	query := searcher.queries[0]
+	if query.ModelCode != "" || query.Version != "" || query.DatasetID != "public-medical-device" || query.AccessScope != "public_only" {
+		t.Fatalf("applicability filters were not deferred safely: %#v", query)
+	}
+}
+
 func TestAnswerUsesMergedEvidence(t *testing.T) {
 	service, err := New(&fakeSearcher{}, fakeDatasetStore{catalog: datasetaccess.Defaults()}, fakeApps{bindings: []datasetaccess.KnowledgeBinding{
 		{DatasetID: "public-identity", Status: "active", Policy: datasetaccess.RetrievalPolicy{TopK: 1, CandidateK: 1}},
@@ -206,5 +231,24 @@ func TestSearchGloballyMergesRerankedBindingsBeforeTopK(t *testing.T) {
 	}
 	if len(result.Result.Hits) != 1 || result.Result.Hits[0].DocumentID != "reports-doc" {
 		t.Fatalf("global rerank was not applied before TopK: bindings=%#v hits=%#v", result.Bindings, result.Result.Hits)
+	}
+}
+
+func TestMergePreservesPrivateBindingAndDocumentDiversity(t *testing.T) {
+	public := milvus.SearchResult{Hits: []milvus.SearchHit{
+		{ChunkID: "public-1", DocumentID: "public-doc", RerankScoreSet: true, RerankScore: 0.99},
+		{ChunkID: "public-2", DocumentID: "public-doc", RerankScoreSet: true, RerankScore: 0.98},
+		{ChunkID: "public-3", DocumentID: "another-public-doc", RerankScoreSet: true, RerankScore: 0.90},
+	}}
+	private := milvus.SearchResult{Hits: []milvus.SearchHit{
+		{ChunkID: "private-1", DocumentID: "tenant-runbook", Distance: 0.40},
+	}}
+	merged := mergeResults("connector", "medical", "dev", []milvus.SearchResult{public, private}, 3, time.Millisecond)
+	got := make(map[string]bool)
+	for _, hit := range merged.Hits {
+		got[hit.DocumentID] = true
+	}
+	if len(merged.Hits) != 3 || !got["public-doc"] || !got["another-public-doc"] || !got["tenant-runbook"] {
+		t.Fatalf("binding coverage or document diversity lost: %#v", merged.Hits)
 	}
 }

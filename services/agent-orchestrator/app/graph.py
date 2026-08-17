@@ -10,7 +10,15 @@ from langgraph.types import interrupt
 
 from .gateway import GatewayError, KnowledgeGatewayClient
 from .llm import Answerer, Planner, RuleAnswerer, RulePlanner, citations_from_hits
-from .medical import assess_field_correction, resolve_medical_query, verify_medical_evidence
+from .medical import (
+    assess_field_correction,
+    resolve_customer_query,
+    resolve_medical_query,
+    sanitize_customer_retrieval_query,
+    verify_customer_evidence,
+    verify_field_correction_evidence,
+    verify_medical_evidence,
+)
 from .models import Action, AgentResponse, AgentResult, AgentState, AgentStep, DeviceContext
 
 
@@ -31,12 +39,14 @@ class AgentRuntime:
         planner: Planner,
         answerer: Answerer,
         medical_answerer: Answerer | None = None,
+        medical_customer_answerer: Answerer | None = None,
         max_steps: int = 4,
     ) -> None:
         self.gateway = gateway
         self.planner = planner
         self.answerer = answerer
         self.medical_answerer = medical_answerer or answerer
+        self.medical_customer_answerer = medical_customer_answerer or self.medical_answerer
         self.max_steps = max_steps
         self.contexts: dict[str, RequestContext] = {}
         builder = StateGraph(AgentState)
@@ -91,7 +101,10 @@ class AgentRuntime:
 
     async def _entry(self, state: AgentState) -> dict[str, Any]:
         context = self._context(state)
-        return {"is_medical": "medical-device-agent" in context.app_id}
+        return {
+            "is_medical": "medical-device" in context.app_id and "agent" in context.app_id,
+            "is_customer": "medical-device-customer-agent" in context.app_id,
+        }
 
     @staticmethod
     def _entry_route(state: AgentState) -> str:
@@ -162,7 +175,8 @@ class AgentRuntime:
         return {"response": result.model_dump()}
 
     async def _medical_resolve(self, state: AgentState) -> dict[str, Any]:
-        resolution = resolve_medical_query(str(state["query"]), self._context(state).device_context)
+        resolver = resolve_customer_query if state.get("is_customer") else resolve_medical_query
+        resolution = resolver(str(state["query"]), self._context(state).device_context)
         return {
             "medical_intent": resolution.intent,
             "reason_code": resolution.reason_code,
@@ -173,7 +187,7 @@ class AgentRuntime:
     @staticmethod
     def _medical_route(state: AgentState) -> str:
         intent = str(state.get("medical_intent", "knowledge"))
-        if intent == "persona":
+        if intent in {"persona", "customer_onboarding"}:
             return "medical_persona"
         if intent == "refuse":
             return "medical_refuse"
@@ -182,6 +196,27 @@ class AgentRuntime:
         return "medical_search"
 
     async def _medical_persona(self, state: AgentState) -> dict[str, Any]:
+        if state.get("is_customer"):
+            result = AgentResult(
+                status="completed",
+                decision="answer",
+                reason_code="customer_guided_onboarding",
+                answer_source="persona",
+                answer=(
+                    "你好，我是医疗设备销售顾问 Agent。你不需要先懂专业术语，我们可以从零开始："
+                    "先认识病人监护、AED、输注系统、超声和呼吸机等产品线，再查看迈瑞、飞利浦、德尔格等厂商的公开型号资料，"
+                    "最后学习报价前的配置与注册核验，或按设备铭牌和现场现象进行安全售后分诊。产品事实会给出公开资料引用。"
+                ),
+                resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
+                candidate_entities=list(state.get("candidate_entities", [])),
+                suggested_questions=[
+                    "你们目前有哪些医疗设备产品线？",
+                    "BeneVision N1 和 IntelliVue MX550 都是什么设备？",
+                    "购买医疗设备前需要核对哪些注册和配置信息？",
+                    "设备网络连不上，但我不知道型号，应该怎么开始排查？",
+                ],
+            )
+            return {"response": result.model_dump()}
         result = AgentResult(
             status="completed",
             decision="answer",
@@ -205,18 +240,26 @@ class AgentRuntime:
 
     async def _medical_clarify(self, state: AgentState) -> dict[str, Any]:
         candidates = list(state.get("candidate_entities", []))
-        if str(state.get("reason_code")) == "missing_applicability_context":
+        reason_code = str(state.get("reason_code"))
+        if reason_code == "customer_missing_model_for_troubleshooting":
+            answer = (
+                "可以继续帮你分诊，不过不同厂商、型号和配置的错误含义可能不同。请先查看设备铭牌、"
+                "采购合同或装箱单，告诉我厂商与完整型号；也请记录屏幕上的原始错误码和发生时间。"
+                "在型号未确认前，不要拆机、屏蔽报警或进入受限维护菜单。"
+            )
+        elif reason_code == "missing_applicability_context":
             answer = "判断现场更正通知是否适用前，请补充：" + "、".join(candidates) + "。"
         else:
             answer = "该问题在不同型号上的答案可能不同，请先确认设备型号。可选型号：" + "、".join(candidates) + "。"
         result = AgentResult(
             status="needs_clarification",
             decision="clarify",
-            reason_code=str(state.get("reason_code", "ambiguous_device_context")),
+            reason_code=reason_code or "ambiguous_device_context",
             answer_source="tool",
             answer=answer,
             resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
             candidate_entities=candidates,
+            suggested_questions=["我不知道型号在哪里看", "先介绍你们的产品线"] if state.get("is_customer") else [],
             tool_calls=["resolve_device_context"],
         )
         return {"response": result.model_dump()}
@@ -225,15 +268,17 @@ class AgentRuntime:
         context = self._context(state)
         resolved = DeviceContext.model_validate(state.get("resolved_context", {}))
         gateway_context = resolved.model_dump()
+        retrieval_query = sanitize_customer_retrieval_query(str(state["query"])) if state.get("is_customer") else str(state["query"])
         if state.get("medical_intent") == "field_correction":
-            # The notice covers a version range, so an exact version scalar filter
-            # would incorrectly hide the governing document.
+            # Retrieve the governing notice first. Applicability is evaluated by
+            # the deterministic tool after evidence identity/authority checks.
+            gateway_context["model_code"] = ""
             gateway_context["software_version"] = ""
         try:
             payload = await self.gateway.search(
                 context.app_id,
                 context.environment_id,
-                str(state["query"]),
+                retrieval_query,
                 context.authorization,
                 device_context=gateway_context,
             )
@@ -243,7 +288,8 @@ class AgentRuntime:
         except GatewayError as exc:
             hits, trace_id = [], ""
             observation = {"tool": "knowledge_search", "status": "error", "summary": str(exc)}
-        step = AgentStep(step=1, action={"type": "knowledge_search", "arguments": gateway_context}, observation=observation).model_dump(exclude_none=True)
+        action_arguments = {**gateway_context, "retrieval_query": retrieval_query}
+        step = AgentStep(step=1, action={"type": "knowledge_search", "arguments": action_arguments}, observation=observation).model_dump(exclude_none=True)
         return {"evidence": hits, "trace_id": trace_id, "gateway_error": "" if observation["status"] == "ok" else observation["summary"], "steps": [step], "observations": [observation]}
 
     async def _medical_answer(self, state: AgentState) -> dict[str, Any]:
@@ -258,10 +304,17 @@ class AgentRuntime:
             )
             return {"response": result.model_dump()}
         if not evidence:
+            customer = bool(state.get("is_customer"))
             result = AgentResult(
                 status="needs_clarification", decision="clarify", reason_code="insufficient_evidence",
-                answer="当前授权资料中没有找到与该型号和版本匹配的可靠证据。请检查型号、软件版本，或联系知识库管理员补充资料。",
+                answer=(
+                    "我在已采集的厂商官网和公开销售资料中没有找到能可靠回答这个问题的内容。请补充厂商、完整型号、"
+                    "所在地区、配置或你看到的原始错误码；库存、价格、注册有效性和维修操作需要销售或授权服务人员再次核验。"
+                    if customer else
+                    "当前授权资料中没有找到与该型号和版本匹配的可靠证据。请检查型号、软件版本，或联系知识库管理员补充资料。"
+                ),
                 answer_source="rag", resolved_context=resolved, steps=steps, tool_calls=["knowledge_search"], trace_id=str(state.get("trace_id", "")),
+                suggested_questions=["我在哪里查看完整型号？", "先介绍产品线"] if customer else [],
             )
             return {"response": result.model_dump()}
         citations = citations_from_hits(evidence)
@@ -280,17 +333,29 @@ class AgentRuntime:
                 tool_calls=["knowledge_search", "assess_field_correction"], trace_id=str(state.get("trace_id", "")),
             )
             return {"response": result.model_dump()}
-        answer = await self.medical_answerer.answer(str(state["query"]), evidence)
+        customer = bool(state.get("is_customer"))
+        answerer = self.medical_customer_answerer if customer else self.medical_answerer
+        answer = await answerer.answer(str(state["query"]), evidence)
         result = AgentResult(
-            status="completed", decision="answer", reason_code="grounded_medical_answer", answer=answer,
+            status="completed", decision="answer", reason_code="grounded_customer_answer" if customer else "grounded_medical_answer", answer=answer,
             answer_source="rag", resolved_context=resolved, citations=citations, steps=steps,
             tool_calls=["resolve_device_context", "knowledge_search", "verify_evidence"], trace_id=str(state.get("trace_id", "")),
+            suggested_questions=(
+                ["继续对比同类型号", "购买前需要核验什么？", "按我的型号开始售后分诊"]
+                if customer and state.get("medical_intent") == "product_discovery" else
+                (["还有哪些安全检查？", "什么时候需要联系专业人员？"] if customer else [])
+            ),
         )
         return {"response": result.model_dump()}
 
     async def _medical_verify(self, state: AgentState) -> dict[str, Any]:
         resolved = DeviceContext.model_validate(state.get("resolved_context", {}))
-        evidence, reason = verify_medical_evidence(resolved, list(state.get("evidence", [])))
+        if state.get("medical_intent") == "field_correction":
+            evidence, reason = verify_field_correction_evidence("FC-2026-04", list(state.get("evidence", [])))
+        elif state.get("is_customer"):
+            evidence, reason = verify_customer_evidence(str(state.get("medical_intent", "knowledge")), resolved, list(state.get("evidence", [])))
+        else:
+            evidence, reason = verify_medical_evidence(resolved, list(state.get("evidence", [])))
         steps = list(state.get("steps", []))
         steps.append(AgentStep(
             step=len(steps) + 1,
@@ -433,10 +498,16 @@ def build_runtime(gateway: KnowledgeGatewayClient, llm: Any, max_steps: int = 4)
     planner: Planner = RulePlanner()
     answerer: Answerer = RuleAnswerer()
     medical_answerer: Answerer = answerer
+    medical_customer_answerer: Answerer = answerer
     if llm is not None:
-        from .llm import DeepSeekAnswerer, DeepSeekMedicalAnswerer, DeepSeekPlanner
+        from .llm import DeepSeekAnswerer, DeepSeekMedicalAnswerer, DeepSeekMedicalCustomerAnswerer, DeepSeekPlanner
 
         planner = DeepSeekPlanner(llm, fallback=planner)
         answerer = DeepSeekAnswerer(llm)
         medical_answerer = DeepSeekMedicalAnswerer(llm)
-    return AgentRuntime(gateway=gateway, planner=planner, answerer=answerer, medical_answerer=medical_answerer, max_steps=max_steps)
+        medical_customer_answerer = DeepSeekMedicalCustomerAnswerer(llm)
+    return AgentRuntime(
+        gateway=gateway, planner=planner, answerer=answerer,
+        medical_answerer=medical_answerer, medical_customer_answerer=medical_customer_answerer,
+        max_steps=max_steps,
+    )

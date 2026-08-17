@@ -78,6 +78,7 @@ class AgentResult(BaseModel):
     reason_code: str = ""
     resolved_context: DeviceContext = Field(default_factory=lambda: DeviceContext())
     candidate_entities: list[str] = Field(default_factory=list)
+    suggested_questions: list[str] = Field(default_factory=list)
     trace_id: str = ""
 
 
@@ -144,6 +145,7 @@ class AgentState(TypedDict, total=False):
     steps: list[dict[str, Any]]
     response: dict[str, Any]
     is_medical: bool
+    is_customer: bool
     medical_intent: str
     reason_code: str
     resolved_context: dict[str, Any]

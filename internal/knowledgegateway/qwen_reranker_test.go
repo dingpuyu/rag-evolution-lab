@@ -15,6 +15,20 @@ func TestQwenRerankerMapsProviderIndexesBackToHits(t *testing.T) {
 		if request.Header.Get("Authorization") != "Bearer test-key" {
 			t.Fatalf("missing bearer token")
 		}
+		var payload struct {
+			Model     string   `json:"model"`
+			Query     string   `json:"query"`
+			Documents []string `json:"documents"`
+			TopN      int      `json:"top_n"`
+			Instruct  string   `json:"instruct"`
+			Input     any      `json:"input"`
+		}
+		if err := json.NewDecoder(request.Body).Decode(&payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Model != "qwen3-rerank" || payload.Query != "SYS-NET-042" || len(payload.Documents) != 2 || payload.TopN != 2 || payload.Instruct == "" || payload.Input != nil {
+			t.Fatalf("unexpected qwen3-rerank payload: %#v", payload)
+		}
 		writeTestJSON(t, writer, map[string]any{"results": []map[string]any{
 			{"index": 1, "relevance_score": 0.98}, {"index": 0, "relevance_score": 0.12},
 		}})
@@ -32,6 +46,16 @@ func TestQwenRerankerMapsProviderIndexesBackToHits(t *testing.T) {
 	}
 	if result[0].ChunkID != "exact" || !result[0].RerankScoreSet || result[0].RerankScore != 0.98 {
 		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+func TestQwenRerankerUsesCompatibleEndpointByDefault(t *testing.T) {
+	reranker, err := NewQwenReranker(QwenRerankerConfig{APIKey: "test-key", StrictMode: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reranker.url != "https://dashscope.aliyuncs.com/compatible-api/v1/reranks" {
+		t.Fatalf("unexpected default endpoint: %s", reranker.url)
 	}
 }
 

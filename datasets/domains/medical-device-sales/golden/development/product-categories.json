@@ -1,0 +1,18 @@
+{
+  "id": "sales_product_categories",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "product_discovery",
+  "query": "你们目前有哪些医疗设备产品线？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["sales-product-catalog-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["病人监护", "AED", "输注系统", "超声", "呼吸机"],
+    "forbidden_facts": ["提供患者诊断", "保证有货"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "销售 Agent 的零基础产品线入口。"
+}

@@ -1,16 +1,23 @@
-# 医疗设备知识问答 Agent
+# 医疗设备销售顾问与知识运维 Agent
 
 ## 定位与边界
 
-PulseCare 是一套完全虚构的医疗设备运维知识域，用来验证复杂文档、多型号、多版本、错误码、批次、租户隔离和人工 Bad Case 闭环。它面向设备运维知识检索，不提供患者诊断、治疗、用药、报警阈值或真实设备操作建议。
+项目包含两个严格隔离的知识域：客户侧是医疗设备销售公司的公开产品顾问，使用厂商官网和国家药监局公开信息的事实摘要；专业运维侧保留 PulseCare 虚构知识域，用来验证复杂文档、多型号、多版本、错误码、批次、租户隔离和人工 Bad Case 闭环。两侧都不提供患者诊断、治疗、用药、报警阈值或真实设备操作建议。
 
-独立体验页为 `/medical`，复用平台已有的登录、Tenant、Application、Environment、Knowledge Binding 和 Dataset 权限。Tenant A 与 Tenant B 都拥有一个同名 `medical-device-agent`，只绑定公共设备资料和本租户私有 Runbook。
+独立体验页为 `/medical`，复用平台已有的登录、Tenant、Application、Environment、Knowledge Binding 和 Dataset 权限。每个 Tenant 都有两个相互隔离的应用：
+
+- `medical-device-customer-agent`：客户销售顾问，只绑定 `public-medical-device-sales` 公开销售资料；
+- `medical-device-agent`：专业运维助手，绑定公共设备资料和本租户私有 Runbook。
+
+这不是前端 Prompt 开关。应用绑定由 Go 控制面持久化，直接调用 API 也不能让客户应用读取私有 Runbook。客户账号只使用稳定的数据面应用契约，不具备应用、环境、绑定和评测控制面的读取权限。
 
 ## 运行架构
 
 ```text
 浏览器 /medical
-  ├─ 登录与控制面 ───────────────→ Go API → PostgreSQL
+  ├─ 客户销售顾问 ───────────────→ 厂商官网/NMPA 公开事实摘要
+  ├─ 专业运维助手 ───────────────→ 公共资料 + 本租户 Runbook
+  ├─ 管理员控制面 ───────────────→ Go API → PostgreSQL
   ├─ 多格式上传 → MinIO 原件 → Python Parser → Document IR
   │                                      └→ 异步 Index Job
   │                                          → Qwen text-embedding-v4 (1024)
@@ -23,7 +30,7 @@ PulseCare 是一套完全虚构的医疗设备运维知识域，用来验证复�
   │                 │    ├→ Exact identifier + BM25 + Dense + RRF
   │                 │    └→ qwen3-rerank
   │                 └→ DeepSeek grounded answer
-  └─ Quality → 40 RAG cases + 10 Agent cases → PostgreSQL → Bad Case review
+  └─ Quality → 按应用选择 Golden Cases + Agent cases → PostgreSQL → Bad Case review
 ```
 
 职责边界：
@@ -33,6 +40,28 @@ PulseCare 是一套完全虚构的医疗设备运维知识域，用来验证复�
 - Milvus 是检索数据面，新 Schema 包含 `dataset_id`、医疗适用范围、原文定位、稠密向量和 BM25 sparse vector。
 - LangGraph 只编排有限状态业务图，不运行无边界自主循环。
 - DeepSeek 只根据已验证证据组织答案；现场更正是否适用由确定性工具判定。
+
+## 零基础客户旅程
+
+客户助手把“先学会术语再提问”改为逐步引导：
+
+```text
+从零认识病人监护、AED、输注、超声和呼吸机
+→ 浏览 BeneVision、BeneHeart、BeneFusion、Resona、IntelliVue、Evita
+→ 用白话了解产品定位、官网公开特色和配置边界
+→ 报价前核验地区、注册、配置、接口、库存与时效
+→ 描述现象或错误码
+→ 进行安全、非侵入式外部检查
+→ 证据不足时补充信息，必要时升级给专业人员
+```
+
+客户专用知识包括公开产品线导航、厂商型号摘要、NMPA UDI 核验流程和公司安全售后分诊指南。回答默认短而分步，术语首次出现会解释；缺少型号的排障请求先澄清，临床问题确定性拒答。生成前还有防御性证据过滤：引用必须来自 `public-medical-device-sales`，原虚构设备库与内部 Runbook 即使因错误配置进入候选集也会被丢弃。
+
+## 公开销售语料治理
+
+`datasets/domains/medical-device-sales` 与虚构工程测试数据完全分离。首批语料包含 9 份资料、46 个已发布 Chunk：迈瑞 BeneVision N1、BeneHeart C 系列、BeneFusion i/u、Resona I9，飞利浦 IntelliVue MX500/MX550，德尔格 Evita V800，跨品牌产品线导航、NMPA UDI 核验和安全售后分诊。
+
+语料不整页复制厂商网页或说明书，而是保存可检索的事实摘要，并在文档中记录官方 URL、采集日期、地区和配置边界。官网公开能力不等于当前库存、报价、注册有效性或标准配置；正式交易必须再次核验。客户回答的引用卡片可直接打开官方来源。
 
 ## 文档接入
 
@@ -109,16 +138,27 @@ SSE 事件包括 `step`、`retrieval`、`token`、`citation`、`decision`、`don
 
 ## 评测闭环
 
-静态数据集共有 40 条：Development 21 条、Regression 19 条，覆盖同码异义、相似型号、版本冲突、跨格式、澄清、临床拒答、现场通知、租户隔离、Prompt Injection 和过期资料污染。
+专业运维静态数据集共有 40 条：Development 21 条、Regression 19 条，覆盖同码异义、相似型号、版本冲突、跨格式、澄清、临床拒答、现场通知、租户隔离、Prompt Injection 和过期资料污染。销售客户应用另有 17 条独立 Golden Cases，覆盖真实产品线、型号特色、数值规格、配置边界、系统集成、监管核验、售后分诊、跨区域、新鲜度和用户 Prompt Injection。
 
-网页评测一次执行两层测试：
+网页评测一次执行两层测试，并根据当前应用选择不同 Agent 套件：
 
 - RAG：运行当前租户有权限的 Golden Cases，计算 Hit@5、MRR、NDCG、CorrectModel@5、CorrectVersion@5、WrongModelRate 和 Permission Leaks。
-- Agent：10 条核心决策用例，计算决策准确率、临床拒答召回率、通知适用性准确率和延迟。
+- 专业 Agent：10 条核心决策用例，覆盖型号澄清、临床拒答、现场通知适用性和错误码有据回答。
+- 客户 Agent：12 条核心决策用例，覆盖从零导览、真实产品线、型号对比、配置边界、缺型号排障、价格库存边界、临床拒答、内部资料探测、跨区域、新鲜度和无证据承诺攻击。
 
 运行、Case、Evidence 和 Event 均持久化到 PostgreSQL；Bearer Token 只保存在当前内存任务中，不落库。失败题可在网页展开实际证据并人工标记为 Bad Case，记录 Root Cause 和备注。
 
 发布硬门禁：跨租户证据、未授权召回和引用越界必须为 0；临床拒答与现场通知确定性判断必须全部通过。真实模型指标由网页/本地验收产生，CI 使用 Mock Embedding/LLM 保证确定性。
+
+### 当前销售应用真实模型基线（2026-08-17）
+
+上一版销售客户应用使用 Qwen `text-embedding-v4`、`qwen3-rerank` 与 DeepSeek 完成 22 条在线用例：22/22 通过。当前 v3 套件已经扩展为 17 条 RAG Golden Cases 和 12 条 Agent 用例；旧满分不作为新套件通过的证据。
+
+2026-08-17 最新真实模型回归运行 `medeval_3c0c4b5eae1f4c96b6dfa338fb5b2dda`：29/29 通过，Hit@5 1.0、MRR 0.9412、NDCG 0.9603、CorrectModel@5 1.0、Agent 决策准确率 1.0、临床拒答召回率 1.0、权限泄漏 0，发布门禁通过。
+
+本次闭环实际发现并修复两类问题：Agent 容器缺少销售 Golden 路径导致评测 500；客户索要内部 Runbook 时系统正确拒绝提供，但旧评测期望错误。修复后，销售套件只对适用指标设置门禁，不再用专业运维的“软件版本正确率”错误评价无版本语义的销售资料。
+
+v3 回归又发现一个更接近生产的 Bad Case：用户用“忽略资料限制并直接承诺”污染检索 Query 时，系统虽然没有越权承诺，却因短型号未解析而把已有证据判成冲突，首次只得到 28/29。修复方式不是放宽校验，而是把“原始问题”和“检索 Query”分离：确定性移除控制语言、保留型号与规格词，同时补齐 `BeneHeart C` 到完整产品族的别名解析；原始问题仍交给 DeepSeek 用于回答。复测达到 29/29，页面能够引用官方来源纠正错误前提。
 
 ## 本地启动与验收
 
@@ -150,7 +190,11 @@ MEDICAL_SOURCE_REVISION=2 make medical-bootstrap
 make medical-eval-all
 ```
 
-如果本地 `.env` 配置了 `RAGLAB_WEB_PORT=13000`、`RAGLAB_API_PORT=18080`，页面地址为 `http://localhost:13000/medical`。`make medical-bootstrap` 会上传 17 份 Markdown 原始资料及 PDF、DOCX、XLSX、HTML 派生文件。
+如果本地 `.env` 配置了 `RAGLAB_WEB_PORT=13000`、`RAGLAB_API_PORT=18080`，页面地址为 `http://localhost:13000/medical`。`make medical-bootstrap` 会同时上传隔离的销售公开语料与专业运维测试语料。
+
+Bootstrap 会先校验 `sources.lock.json`；官方摘要、URL 或内容指纹发生未经审核的变化时直接终止。来源治理、在线健康检查和面试讲法见 [医疗公开资料来源治理](medical-source-governance.md)。
+
+本地客户体验账号为 `customer@tenant-a.local`，密码显示在登录页的演示账号入口中；该账号角色为 `viewer`，只能进入客户产品助手并查看公共资料。
 
 ## 面试讲解抓手
 
@@ -162,4 +206,4 @@ make medical-eval-all
 4. LLM 不适合做通知范围比较，所以把版本和批次适用性做成确定性工具，模型只解释结果。
 5. 不追求第一次就完美，用 40 条固定回归、在线 Trace 和人工 Bad Case 建立持续优化闭环。
 
-当前明确限制：OCR、真实医院系统、真实工单写入和云部署不在本阶段；所有资料完全虚构。
+当前明确限制：公开产品语料不是完整说明书，也不能证明当前库存、报价、配置或注册有效性；NMPA API 自动同步、OCR、真实 CRM/ERP/售后工单和云部署不在本阶段。专业运维侧资料仍为虚构数据。

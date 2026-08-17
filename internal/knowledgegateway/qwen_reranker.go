@@ -39,7 +39,7 @@ type QwenRerankerConfig struct {
 func NewQwenReranker(config QwenRerankerConfig) (*QwenReranker, error) {
 	config.URL = strings.TrimRight(strings.TrimSpace(config.URL), "/")
 	if config.URL == "" {
-		config.URL = "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"
+		config.URL = "https://dashscope.aliyuncs.com/compatible-api/v1/reranks"
 	}
 	if strings.TrimSpace(config.APIKey) == "" {
 		return nil, fmt.Errorf("qwen reranker API key is required")

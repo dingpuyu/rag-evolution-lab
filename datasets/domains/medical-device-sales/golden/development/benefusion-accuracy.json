@@ -1,0 +1,18 @@
+{
+  "id": "sales_benefusion_accuracy",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "product_spec",
+  "query": "BeneFusion i/u 系列官网公开的输注精度是多少？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["mindray-benefusion-iu-series-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["注射泵", "±1.8%", "输液泵", "±4.5%"],
+    "forbidden_facts": ["任何条件都保证"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "数值型规格查询。"
+}

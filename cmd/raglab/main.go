@@ -353,7 +353,7 @@ func runLabServer(args []string) {
 	documentStoreBucket := flags.String("document-store-bucket", environmentOr("RAGLAB_DOCUMENT_STORE_BUCKET", "raglab-documents"), "document object store bucket")
 	documentStoreTLS := flags.Bool("document-store-tls", environmentBool("RAGLAB_DOCUMENT_STORE_TLS", false), "use TLS for document object store")
 	rerankBackend := flags.String("rerank-backend", environmentOr("RAGLAB_RERANK_BACKEND", "heuristic"), "reranker: heuristic or qwen")
-	rerankURL := flags.String("rerank-url", environmentOr("RAGLAB_RERANK_URL", "https://dashscope.aliyuncs.com/api/v1/services/rerank/text-rerank/text-rerank"), "qwen rerank endpoint")
+	rerankURL := flags.String("rerank-url", environmentOr("RAGLAB_RERANK_URL", "https://dashscope.aliyuncs.com/compatible-api/v1/reranks"), "qwen rerank endpoint")
 	rerankAPIKey := flags.String("rerank-api-key", firstNonEmptyEnv("RAGLAB_RERANK_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY"), "qwen rerank API key")
 	rerankModel := flags.String("rerank-model", environmentOr("RAGLAB_RERANK_MODEL", "qwen3-rerank"), "qwen rerank model")
 	rerankStrict := flags.Bool("rerank-strict", environmentBool("RAGLAB_RERANK_STRICT", false), "fail retrieval instead of using the deterministic fallback")
@@ -561,6 +561,7 @@ func runLabServer(args []string) {
 			{"admin@raglab.local", *platformAdminPassword, "platform", []string{"platform_admin"}},
 			{"alice@tenant-a.local", "RagLab-Alice-2026!", "tenant_a", []string{"admin"}},
 			{"bob@tenant-b.local", "RagLab-Bob-2026!", "tenant_b", []string{"admin"}},
+			{"customer@tenant-a.local", "PulseCare-Customer-2026!", "tenant_a", []string{"viewer"}},
 		} {
 			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, demo.roles); managerErr != nil {
 				fatal(managerErr)

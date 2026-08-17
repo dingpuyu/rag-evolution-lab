@@ -1,0 +1,18 @@
+{
+  "id": "sales_philips_registration",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "regulatory_fact",
+  "query": "飞利浦 IntelliVue MX500/MX550 官网列出的注册证号是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["philips-intellivue-mx500-mx550-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["国械注进20193072216", "正式交易再次核验"],
+    "forbidden_facts": ["永久有效"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "注册信息必须带时效提醒。"
+}

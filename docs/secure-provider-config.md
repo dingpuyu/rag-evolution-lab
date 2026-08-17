@@ -30,6 +30,11 @@ docker-compose --env-file .env --env-file .env.remote \
   -f deploy/stack/docker-compose.yml up -d --build api
 ```
 
+`qwen3-rerank` 使用
+`https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-api/v1/reranks`。
+不要沿用 `gte-rerank-v2` 等模型使用的旧
+`/api/v1/services/rerank/text-rerank/text-rerank` 路径；两者请求与响应契约不同。
+
 如果当前终端没有继承 launchd 环境，重新打开终端，或在启动命令前使用一次性环境变量；不要把真实值写入仓库。
 
 ## 服务器

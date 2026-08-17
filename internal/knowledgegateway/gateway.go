@@ -6,6 +6,7 @@ package knowledgegateway
 import (
 	"context"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -231,8 +232,10 @@ func (service *Service) Search(ctx context.Context, identity auth.Identity, requ
 			}
 		}
 		query := buildQuery(dataset, identity, effectiveQuery, limit)
-		query.ModelCode = strings.TrimSpace(request.DeviceContext.ModelCode)
-		query.Version = strings.TrimSpace(request.DeviceContext.SoftwareVersion)
+		if !isFieldCorrectionLookup(text) {
+			query.ModelCode = strings.TrimSpace(request.DeviceContext.ModelCode)
+			query.Version = strings.TrimSpace(request.DeviceContext.SoftwareVersion)
+		}
 		query.Collection = indexRelease.Collection
 		retrievalCtx, retrievalSpan := service.tracer.Start(ctx, "rag.retrieval", trace.WithAttributes(attribute.String("rag.dataset_id", binding.DatasetID), attribute.Int("rag.candidate_k", limit)))
 		result, err := service.searcher.Search(retrievalCtx, query)
@@ -451,9 +454,20 @@ func buildQuery(dataset datasetaccess.Dataset, identity auth.Identity, text stri
 	return query
 }
 
+var fieldCorrectionLookupPattern = regexp.MustCompile(`(?i)\bFC[-_. ]?\d{4}[-_. ]?\d+\b`)
+
+// A field-correction question must retrieve the governing notice before its
+// applicability is evaluated. Filtering by the supplied model/version here
+// would hide the notice precisely when the correct result is "does not apply".
+// Tenant, dataset, role and status filters remain enforced by buildQuery.
+func isFieldCorrectionLookup(query string) bool {
+	return fieldCorrectionLookupPattern.MatchString(query)
+}
+
 func mergeResults(query, appID, environmentID string, results []milvus.SearchResult, topK int, elapsed time.Duration) milvus.SearchResult {
 	seen := make(map[string]struct{})
-	hits := make([]milvus.SearchHit, 0)
+	candidates := make([]milvus.SearchHit, 0)
+	bindingHits := make([][]milvus.SearchHit, 0, len(results))
 	var merged milvus.SearchResult
 	for index, result := range results {
 		if index == 0 {
@@ -462,22 +476,97 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 			merged.EmbeddingLatencyMS += result.EmbeddingLatencyMS
 			merged.SearchLatencyMS += result.SearchLatencyMS
 		}
+		currentBinding := make([]milvus.SearchHit, 0, len(result.Hits))
 		for _, hit := range result.Hits {
-			key := hit.ChunkID
-			if key == "" {
-				key = hit.DocumentID + "\x00" + hit.Title + "\x00" + hit.Content
-			}
+			key := gatewayHitKey(hit)
 			if _, ok := seen[key]; ok {
 				continue
 			}
 			seen[key] = struct{}{}
-			hits = append(hits, hit)
+			candidates = append(candidates, hit)
+			currentBinding = append(currentBinding, hit)
 		}
+		bindingHits = append(bindingHits, currentBinding)
 	}
 	// Each binding is reranked independently. Preserve that ordering inside a
 	// binding, but still perform a global merge before applying the application's
 	// final TopK; otherwise the first binding would consume the whole answer
 	// budget even when a later knowledge domain has stronger evidence.
+	sortGatewayHits(candidates)
+
+	// Scores produced by separate rerank requests are not guaranteed to be
+	// calibrated across datasets. Reserve one evidence slot per authorized
+	// binding before the global fill so a public corpus cannot erase a tenant's
+	// only private Runbook hit. Then prefer document diversity before allowing a
+	// second chunk from the same document.
+	hits := make([]milvus.SearchHit, 0, min(topK, len(candidates)))
+	selectedChunks := make(map[string]struct{})
+	selectedDocuments := make(map[string]struct{})
+	add := func(hit milvus.SearchHit) bool {
+		if len(hits) >= topK {
+			return false
+		}
+		key := gatewayHitKey(hit)
+		if _, ok := selectedChunks[key]; ok {
+			return true
+		}
+		selectedChunks[key] = struct{}{}
+		selectedDocuments[gatewayDocumentKey(hit)] = struct{}{}
+		hits = append(hits, hit)
+		return true
+	}
+	nonEmptyBindings := 0
+	for _, bound := range bindingHits {
+		if len(bound) > 0 {
+			nonEmptyBindings++
+		}
+	}
+	if topK >= nonEmptyBindings {
+		for _, bound := range bindingHits {
+			if len(bound) > 0 && !add(bound[0]) {
+				break
+			}
+		}
+	}
+	for _, hit := range candidates {
+		if len(hits) >= topK {
+			break
+		}
+		if _, exists := selectedDocuments[gatewayDocumentKey(hit)]; exists {
+			continue
+		}
+		add(hit)
+	}
+	for _, hit := range candidates {
+		if len(hits) >= topK {
+			break
+		}
+		add(hit)
+	}
+	sortGatewayHits(hits)
+	merged.Query = query
+	merged.Collection = "knowledge-gateway"
+	merged.Filter = fmt.Sprintf("app_id=%q environment_id=%q bindings=%d", appID, environmentID, len(results))
+	merged.TotalLatencyMS = milliseconds(elapsed)
+	merged.Hits = hits
+	return merged
+}
+
+func gatewayHitKey(hit milvus.SearchHit) string {
+	if hit.ChunkID != "" {
+		return hit.ChunkID
+	}
+	return hit.DocumentID + "\x00" + hit.Title + "\x00" + hit.Content
+}
+
+func gatewayDocumentKey(hit milvus.SearchHit) string {
+	if hit.DocumentID != "" {
+		return hit.DocumentID
+	}
+	return gatewayHitKey(hit)
+}
+
+func sortGatewayHits(hits []milvus.SearchHit) {
 	sort.SliceStable(hits, func(i, j int) bool {
 		if hits[i].RerankScoreSet || hits[j].RerankScoreSet {
 			if hits[i].RerankScoreSet != hits[j].RerankScoreSet {
@@ -489,15 +578,6 @@ func mergeResults(query, appID, environmentID string, results []milvus.SearchRes
 		}
 		return hits[i].Distance < hits[j].Distance
 	})
-	if len(hits) > topK {
-		hits = hits[:topK]
-	}
-	merged.Query = query
-	merged.Collection = "knowledge-gateway"
-	merged.Filter = fmt.Sprintf("app_id=%q environment_id=%q bindings=%d", appID, environmentID, len(results))
-	merged.TotalLatencyMS = milliseconds(elapsed)
-	merged.Hits = hits
-	return merged
 }
 
 func milliseconds(duration time.Duration) float64 { return float64(duration.Microseconds()) / 1000 }

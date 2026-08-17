@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"path"
 	"sort"
 	"strconv"
@@ -90,6 +91,73 @@ type documentUploadMetadata struct {
 	Supersedes          []string `json:"supersedes"`
 	DeviceIdentifiers   []string `json:"device_identifiers"`
 	AffectedLots        []string `json:"affected_lots"`
+	SourceType          string   `json:"source_type"`
+	SourceURLs          []string `json:"source_urls"`
+	CollectedAt         string   `json:"collected_at"`
+	SourceReviewStatus  string   `json:"source_review_status"`
+	SourceReviewedAt    string   `json:"source_reviewed_at"`
+}
+
+func normalizeSourceMetadata(metadata *documentUploadMetadata) error {
+	metadata.SourceType = strings.TrimSpace(metadata.SourceType)
+	metadata.CollectedAt = strings.TrimSpace(metadata.CollectedAt)
+	metadata.SourceReviewStatus = strings.TrimSpace(metadata.SourceReviewStatus)
+	metadata.SourceReviewedAt = strings.TrimSpace(metadata.SourceReviewedAt)
+	if metadata.SourceReviewStatus == "" {
+		metadata.SourceReviewStatus = "draft"
+	}
+	switch metadata.SourceReviewStatus {
+	case "draft", "approved", "review_required":
+	default:
+		return fmt.Errorf("source_review_status must be draft, approved or review_required")
+	}
+	if metadata.CollectedAt != "" {
+		if _, err := time.Parse(time.DateOnly, metadata.CollectedAt); err != nil {
+			return fmt.Errorf("collected_at must use YYYY-MM-DD")
+		}
+	}
+	if metadata.SourceReviewedAt != "" {
+		if _, err := time.Parse(time.RFC3339, metadata.SourceReviewedAt); err != nil {
+			return fmt.Errorf("source_reviewed_at must use RFC3339")
+		}
+	}
+	if metadata.SourceReviewStatus == "approved" && metadata.SourceReviewedAt == "" {
+		return fmt.Errorf("source_reviewed_at is required when source_review_status is approved")
+	}
+	if len(metadata.SourceURLs) > 8 {
+		return fmt.Errorf("source_urls must contain at most 8 URLs")
+	}
+	seen := make(map[string]struct{}, len(metadata.SourceURLs))
+	normalized := make([]string, 0, len(metadata.SourceURLs))
+	for _, raw := range metadata.SourceURLs {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		parsed, err := url.Parse(raw)
+		if err != nil || parsed.Scheme != "https" || parsed.Hostname() == "" || parsed.User != nil {
+			return fmt.Errorf("source_urls must contain absolute HTTPS URLs without credentials")
+		}
+		host := strings.ToLower(parsed.Hostname())
+		if host == "localhost" || strings.HasSuffix(host, ".local") {
+			return fmt.Errorf("source_urls must not reference local hosts")
+		}
+		parsed.Fragment = ""
+		canonical := parsed.String()
+		if len(canonical) > 2048 {
+			return fmt.Errorf("source URL exceeds 2048 characters")
+		}
+		if _, exists := seen[canonical]; exists {
+			continue
+		}
+		seen[canonical] = struct{}{}
+		normalized = append(normalized, canonical)
+	}
+	if len(normalized) > 0 && metadata.SourceType == "" {
+		return fmt.Errorf("source_type is required when source_urls are provided")
+	}
+	metadata.SourceURLs = normalized
+	return nil
 }
 
 func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.Request) {
@@ -141,6 +209,14 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 	if metadata.SourceRevision <= 0 {
 		metadata.SourceRevision = 1
 	}
+	if err := normalizeSourceMetadata(&metadata); err != nil {
+		writeError(writer, http.StatusBadRequest, "invalid_source_metadata", err.Error())
+		return
+	}
+	if dataset.ID == "public-medical-device-sales" && metadata.SourceReviewStatus != "approved" {
+		writeError(writer, http.StatusUnprocessableEntity, "public_source_review_required", "public medical sales documents must pass source review before indexing")
+		return
+	}
 	filename := path.Base(header.Filename)
 	contentType := header.Header.Get("Content-Type")
 	objectKey := strings.Join([]string{identity.TenantID, dataset.ID, strings.ReplaceAll(metadata.DocumentID, "/", "_"), "r" + strconv.FormatInt(metadata.SourceRevision, 10), filename}, "/")
@@ -157,11 +233,12 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 	irData, _ := json.Marshal(documentIR)
 	irURI, _ := api.documentStore.Put(request.Context(), objectKey+".document-ir.json", "application/json", irData)
 	registry, hasRegistry := api.store.(datasetaccess.DocumentRegistry)
+	sourceHash := fmt.Sprintf("%x", sha256.Sum256(data))
 	registryRecord := datasetaccess.KnowledgeDocumentRevision{
 		DatasetID: dataset.ID, DocumentID: metadata.DocumentID, Title: metadata.Title,
 		SourceRevision: metadata.SourceRevision, DocumentVersion: metadata.Version,
 		FileName: filename, ContentType: contentType, SourceURI: sourceURI, IRURI: irURI,
-		SourceHash: fmt.Sprintf("%x", sha256.Sum256(data)), ParserStatus: documentIR.Status,
+		SourceHash: sourceHash, ParserStatus: documentIR.Status,
 		IndexStatus: "parsed", BlockCount: len(documentIR.Blocks), Metadata: map[string]any{
 			"domain": metadata.Domain, "manufacturer": metadata.Manufacturer, "product_family": metadata.ProductFamily,
 			"model_codes": metadata.ModelCodes, "software_version_from": metadata.SoftwareVersionFrom, "software_version_to": metadata.SoftwareVersionTo,
@@ -169,6 +246,9 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 			"effective_from": metadata.EffectiveFrom, "effective_to": metadata.EffectiveTo,
 			"authority_level": metadata.AuthorityLevel, "document_revision": metadata.DocumentRevision, "supersedes": metadata.Supersedes,
 			"device_identifiers": metadata.DeviceIdentifiers, "affected_lots": metadata.AffectedLots,
+			"source_type": metadata.SourceType, "source_urls": metadata.SourceURLs, "collected_at": metadata.CollectedAt,
+			"source_review_status": metadata.SourceReviewStatus, "source_reviewed_at": metadata.SourceReviewedAt,
+			"source_content_sha256": sourceHash,
 		}, Warnings: documentIR.Warnings, CreatedBy: identity.Subject,
 	}
 	if documentIR.Status == "ocr_required" {
@@ -197,8 +277,7 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 			firstSheet, firstRange = block.Provenance.Sheet, block.Provenance.CellRange
 		}
 	}
-	hash := fmt.Sprintf("%x", sha256.Sum256(data))
-	idempotencyKey := fmt.Sprintf("upload:%s:%s:%d:%s", dataset.ID, metadata.DocumentID, metadata.SourceRevision, hash[:16])
+	idempotencyKey := fmt.Sprintf("upload:%s:%s:%d:%s", dataset.ID, metadata.DocumentID, metadata.SourceRevision, sourceHash[:16])
 	job, duplicate, err := api.ingestionJobs.Submit(ingestionjob.SubmitRequest{
 		IdempotencyKey: idempotencyKey, TenantID: identity.TenantID, DatasetID: dataset.ID, CreatedBy: identity.Subject,
 		Change: milvus.LifecycleChange{

@@ -71,12 +71,35 @@ async def create_medical_evaluation(
     identity = await evaluation_identity(authorization)
     app_id = request.app_id.strip() or f"{identity.tenant_id}-medical-device-agent"
     environment_id = request.environment_id.strip() or f"{app_id}-dev"
-    if "platform_admin" not in identity.roles and app_id != f"{identity.tenant_id}-medical-device-agent":
+    allowed_apps = {
+        f"{identity.tenant_id}-medical-device-agent",
+        f"{identity.tenant_id}-medical-device-customer-agent",
+    }
+    if "platform_admin" not in identity.roles and app_id not in allowed_apps:
         raise HTTPException(status_code=403, detail="evaluation app must belong to the authenticated tenant")
     run = await evaluation_store.create(identity.tenant_id, identity.subject, app_id, environment_id)
     # The bearer exists only in this in-process task and is never persisted.
     asyncio.create_task(run_suite(evaluation_store, run, runtime, authorization or ""))
     return JSONResponse(status_code=202, content=run)
+
+
+@app.get("/api/v1/evaluations/medical-device/runs/latest")
+async def get_latest_medical_evaluation(
+    app_id: str = "",
+    environment_id: str = "",
+    authorization: str | None = Header(default=None),
+) -> dict:
+    identity = await evaluation_identity(authorization)
+    allowed_apps = {
+        f"{identity.tenant_id}-medical-device-agent",
+        f"{identity.tenant_id}-medical-device-customer-agent",
+    }
+    if app_id and "platform_admin" not in identity.roles and app_id not in allowed_apps:
+        raise HTTPException(status_code=403, detail="evaluation app must belong to the authenticated tenant")
+    try:
+        return await evaluation_store.latest(identity.tenant_id, app_id.strip(), environment_id.strip())
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail="evaluation run not found") from exc
 
 
 @app.get("/api/v1/evaluations/runs/{run_id}")

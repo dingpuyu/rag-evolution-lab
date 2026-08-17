@@ -553,6 +553,44 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			}
 		}
 	}
+	// The customer-facing medical Agent deliberately binds only the public sales
+	// corpus built from attributed official sources. It is a separate application
+	// boundary rather than a prompt toggle, so a novice/customer identity can
+	// never retrieve either tenant Runbooks or the synthetic engineering corpus.
+	for _, application := range []struct{ id, tenant string }{
+		{"tenant_a-medical-device-customer-agent", "tenant_a"},
+		{"tenant_b-medical-device-customer-agent", "tenant_b"},
+	} {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO applications (app_id,tenant_id,name,slug,description,status,created_by)
+			VALUES ($1,$2,'医疗设备销售顾问 Agent','medical-device-customer-agent',$3,'active','system')
+			ON CONFLICT (app_id) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description
+			WHERE applications.created_by='system'`, application.id, application.tenant,
+			"面向零基础客户的多品牌公开产品介绍、售前核验和安全售后分诊应用"); err != nil {
+			return err
+		}
+		environmentID := application.id + "-dev"
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO app_environments (environment_id,app_id,name,config_version,status)
+			VALUES ($1,$2,'dev','sales-v1','active')
+			ON CONFLICT (environment_id) DO UPDATE SET config_version=EXCLUDED.config_version,status='active'`, environmentID, application.id); err != nil {
+			return err
+		}
+		policy, _ := json.Marshal(RetrievalPolicy{TopK: 6, CandidateK: 24, Rerank: true, QueryRewrite: true, TokenBudget: 4500, AllowFallback: true})
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE knowledge_bindings SET status='disabled'
+			WHERE app_id=$1 AND environment_id=$2 AND dataset_id='public-medical-device' AND created_by='system'`, application.id, environmentID); err != nil {
+			return err
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO knowledge_bindings (app_id,environment_id,dataset_id,purpose,priority,status,policy,created_by)
+			VALUES ($1,$2,'public-medical-device-sales','official-source product education, sales verification and safe after-sales triage',20,'active',$3,'system')
+			ON CONFLICT (app_id,environment_id,dataset_id) DO UPDATE SET purpose=EXCLUDED.purpose,
+			priority=EXCLUDED.priority,status='active',policy=EXCLUDED.policy
+			WHERE knowledge_bindings.created_by='system'`, application.id, environmentID, policy); err != nil {
+			return err
+		}
+	}
 	return tx.Commit()
 }
 

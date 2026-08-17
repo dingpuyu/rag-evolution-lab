@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "dataset_id": "public-medical-device-sales",
+  "approved_at": "2026-08-17T01:51:23.113174Z",
+  "reviewed_by": "local-corpus-review",
+  "documents": {
+    "sales-product-catalog-2026": {
+      "path": "documents/sales-product-catalog-2026.md",
+      "content_sha256": "947b637297d3c7609a110ef57afab31c3e689a7acd78322de571f10506b61ed4",
+      "source_urls": [
+        "https://www.mindray.com/cn/products",
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+        "https://www.draeger.com/zh_tw/Products/Evita-V800"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "mindray-benevision-n1-2026": {
+      "path": "documents/mindray-benevision-n1-2026.md",
+      "content_sha256": "62cc46ad8262685f86cd6ce9cb99823d3e41f87726f3e1471956722b04d8ce82",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "mindray-beneheart-c-series-2026": {
+      "path": "documents/mindray-beneheart-c-series-2026.md",
+      "content_sha256": "151faa895d04b4afe0d3be1acd03da0ad26292019813018a16b33b85a1e422f3",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/aed/beneheart-c-series"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "mindray-benefusion-iu-series-2026": {
+      "path": "documents/mindray-benefusion-iu-series-2026.md",
+      "content_sha256": "9877ff351a2de877994ffc54fbb4920b5ed0c811f6f26ebce89a0a1848d19ae9",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "mindray-resona-i9-2026": {
+      "path": "documents/mindray-resona-i9-2026.md",
+      "content_sha256": "f89df039e145374314eb61c8632a1a0d7febd9f4b803311188a7f46c6d91c112",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "philips-intellivue-mx500-mx550-2026": {
+      "path": "documents/philips-intellivue-mx500-mx550-2026.md",
+      "content_sha256": "a56dfb63bd13da9ee820f355d9115db3aadeec54f69408dd02ea0e856f40ca9c",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "draeger-evita-v800-2026": {
+      "path": "documents/draeger-evita-v800-2026.md",
+      "content_sha256": "ffbc62bd56bba76257e15ced892e525a55766cd1c3f0e583ddd0bf2e0d97e8ac",
+      "source_urls": [
+        "https://www.draeger.com/zh_tw/Products/Evita-V800"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "nmpa-udi-verification-guide-2026": {
+      "path": "documents/nmpa-udi-verification-guide-2026.md",
+      "content_sha256": "92625244b46bb91a1eab9805acbd3f3ef0cd2cd033e837dfee37032028a7c642",
+      "source_urls": [
+        "https://udi.nmpa.gov.cn/",
+        "https://udi.nmpa.gov.cn/download.html"
+      ],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    },
+    "sales-after-sales-triage-2026": {
+      "path": "documents/sales-after-sales-triage-2026.md",
+      "content_sha256": "ea834d2221f3c1f90dd0523743b262115903e2fb324ed30d452d52b24843b447",
+      "source_urls": [],
+      "reviewed_at": "2026-08-17T01:51:23.113174Z",
+      "reviewed_by": "local-corpus-review",
+      "remote_fingerprints": {}
+    }
+  }
+}

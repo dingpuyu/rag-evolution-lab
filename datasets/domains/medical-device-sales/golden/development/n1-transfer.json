@@ -1,0 +1,18 @@
+{
+  "id": "sales_n1_transfer",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "product_feature",
+  "query": "BeneVision N1 适合了解哪些转运和联网能力？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["mindray-benevision-n1-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["EN1789", "无线网络", "离线续传"],
+    "forbidden_facts": ["保证适合所有转运场景"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "核验真实型号与官网公开卖点。"
+}

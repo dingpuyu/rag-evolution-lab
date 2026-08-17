@@ -1,0 +1,18 @@
+{
+  "id": "sales_cross_model_configuration",
+  "dataset_version": "1.0.0",
+  "split": "regression",
+  "category": "cross_model_hard_negative",
+  "query": "BeneVision N1 和 IntelliVue MX550 是否默认包含各自页面提到的全部联网与集成能力？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["mindray-benevision-n1-2026", "philips-intellivue-mx500-mx550-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["配置需确认", "IntelliBridge", "并非默认包含"],
+    "forbidden_facts": ["默认包含全部能力", "两个型号配置相同"],
+    "minimum_citations": 2,
+    "expected_refusal_reason": null
+  },
+  "notes": "验证跨厂商、相似监护设备的配置边界与多文档召回。"
+}

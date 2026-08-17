@@ -1,0 +1,18 @@
+{
+  "id": "sales_beneheart_durability",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "product_spec",
+  "query": "BeneHeart C 系列公开的防护和跌落指标是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["mindray-beneheart-c-series-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["IP55", "1.5 米", "六面跌落"],
+    "forbidden_facts": ["完全防水"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "精确规格召回。"
+}

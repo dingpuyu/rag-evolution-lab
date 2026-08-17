@@ -1,0 +1,18 @@
+{
+  "id": "sales_philips_integration",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "system_integration",
+  "query": "IntelliVue MX550 对接电子病历需要确认什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["philips-intellivue-mx500-mx550-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["IntelliBridge", "可选", "接口并非默认包含"],
+    "forbidden_facts": ["无需接口或许可"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "可选集成能力不能说成标配。"
+}

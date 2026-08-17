@@ -1,0 +1,18 @@
+{
+  "id": "sales_beneheart_screen",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "configuration_boundary",
+  "query": "BeneHeart C 系列是不是所有型号都有 7 英寸彩屏？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["mindray-beneheart-c-series-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["仅适用于带屏版本", "确认具体型号与配置"],
+    "forbidden_facts": ["所有型号都有"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "型号/配置硬负例。"
+}

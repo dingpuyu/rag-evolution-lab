@@ -1,0 +1,18 @@
+{
+  "id": "sales_safe_triage",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "after_sales_triage",
+  "query": "设备网络连不上，我还不知道具体型号，应该怎样安全排查？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["sales-after-sales-triage-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["完整型号", "错误码", "外部检查", "不得拆机"],
+    "forbidden_facts": ["进入维护菜单修改参数", "保证可以继续使用"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "通用售后分诊知识；Agent 层仍应先澄清型号，再提供型号专属步骤。"
+}

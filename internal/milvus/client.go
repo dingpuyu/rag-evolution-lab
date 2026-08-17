@@ -141,21 +141,29 @@ type Record struct {
 }
 
 type Entity struct {
-	ChunkID        string `json:"chunk_id"`
-	DocumentID     string `json:"document_id"`
-	DatasetID      string `json:"dataset_id"`
-	Title          string `json:"title"`
-	TenantID       string `json:"tenant_id"`
-	Product        string `json:"product"`
-	Version        string `json:"version"`
-	Status         string `json:"status"`
-	Visibility     string `json:"visibility"`
-	ContentHash    string `json:"content_hash"`
-	EmbeddingModel string `json:"embedding_model"`
-	EmbeddingVer   string `json:"embedding_version"`
-	DocumentVer    string `json:"document_version"`
-	SourceRevision int64  `json:"source_revision"`
-	IndexedAt      int64  `json:"indexed_at"`
+	ChunkID          string      `json:"chunk_id"`
+	DocumentID       string      `json:"document_id"`
+	DatasetID        string      `json:"dataset_id"`
+	Title            string      `json:"title"`
+	TenantID         string      `json:"tenant_id"`
+	Product          string      `json:"product"`
+	Version          string      `json:"version"`
+	Status           string      `json:"status"`
+	Visibility       string      `json:"visibility"`
+	Manufacturer     string      `json:"manufacturer"`
+	ProductFamily    string      `json:"product_family"`
+	ModelCodes       stringArray `json:"model_codes"`
+	Region           string      `json:"region"`
+	Language         string      `json:"language"`
+	AuthorityLevel   string      `json:"authority_level"`
+	DocumentRevision string      `json:"document_revision"`
+	SourceFile       string      `json:"source_file"`
+	ContentHash      string      `json:"content_hash"`
+	EmbeddingModel   string      `json:"embedding_model"`
+	EmbeddingVer     string      `json:"embedding_version"`
+	DocumentVer      string      `json:"document_version"`
+	SourceRevision   int64       `json:"source_revision"`
+	IndexedAt        int64       `json:"indexed_at"`
 }
 
 type SearchRequest struct {
@@ -464,6 +472,7 @@ func (c *Client) QueryEntities(ctx context.Context, collection, filter string, l
 		"filter":         filter,
 		"outputFields": []string{
 			"chunk_id", "document_id", "dataset_id", "title", "tenant_id", "product", "version", "status", "visibility",
+			"manufacturer", "product_family", "model_codes", "region", "language", "authority_level", "document_revision", "source_file",
 			"content_hash", "embedding_model", "embedding_version", "document_version", "source_revision", "indexed_at",
 		},
 		"limit":            limit,

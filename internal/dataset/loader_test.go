@@ -39,8 +39,8 @@ func TestLoadMedicalDeviceDomain(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(documents) != 17 {
-		t.Fatalf("expected 17 medical-device documents, got %d", len(documents))
+	if len(documents) != 21 {
+		t.Fatalf("expected 21 medical-device documents, got %d", len(documents))
 	}
 	cases, err := LoadGolden(filepath.Join(root, "golden"), "development")
 	if err != nil {

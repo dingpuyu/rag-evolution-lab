@@ -23,7 +23,9 @@ make medical-bootstrap
 make medical-smoke
 ```
 
-随后打开 <http://localhost:3000/medical>（端口以 `.env` 为准）。该页面包含受控问答、Document IR 多格式接入、知识目录、40 条 Golden Cases 检索评测、10 条 Agent 决策评测和 Bad Case 人工复核。资料、品牌、型号、错误码和通知均为虚构内容，不能用于真实设备或临床决策。架构与验收方式见 [医疗设备知识问答 Agent](docs/medical-device-agent.md)。
+随后打开 <http://localhost:3000/medical>（若 `.env` 使用 `RAGLAB_WEB_PORT=13000`，则打开 `http://localhost:13000/medical`）。页面提供相互隔离的医疗设备销售顾问和专业运维助手：客户侧使用带官方链接与采集日期的厂商官网/NMPA 公开事实摘要，可从零了解产品线、真实型号、配置边界、售前核验和安全售后分诊；专业侧继续用虚构资料验证型号/版本/错误码与租户 Runbook。系统同时包含 Document IR 多格式接入、知识目录、分应用 Golden Cases、Agent 决策评测和 Bad Case 人工复核。公开摘要不能替代正式说明书、报价、注册核验或临床判断。架构与验收方式见 [医疗设备销售顾问与知识运维 Agent](docs/medical-device-agent.md)。
+
+公开资料在入库前执行来源和内容指纹门禁；可用 `make medical-source-audit` 检查官网可达性，详细设计与可复用经验见 [医疗公开资料来源治理](docs/medical-source-governance.md)。
 
 ## 项目目标
 

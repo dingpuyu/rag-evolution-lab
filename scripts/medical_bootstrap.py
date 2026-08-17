@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Upload the fictional medical corpus through the real authenticated pipeline."""
+"""Upload the synthetic engineering and official-source sales corpora."""
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import mimetypes
 import os
@@ -16,6 +17,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "datasets/domains/medical-device/corpus"
+SALES_CORPUS = ROOT / "datasets/domains/medical-device-sales/corpus"
 GENERATED = ROOT / "data/medical/generated"
 ACCOUNTS = {
     "platform": ("admin@raglab.local", os.getenv("RAGLAB_PLATFORM_ADMIN_PASSWORD", "change-this-admin-password")),
@@ -35,6 +37,12 @@ def call(url: str, data: bytes, headers: dict[str, str]) -> tuple[int, dict]:
             return error.code, json.loads(payload)
         except json.JSONDecodeError:
             return error.code, {"message": payload}
+
+
+def get_json(url: str, token: str) -> dict:
+    request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request, timeout=30) as response:
+        return json.loads(response.read())
 
 
 def login(api: str, account: str) -> str:
@@ -108,7 +116,64 @@ def metadata(entry: dict, suffix: str = "", source_revision: int = 1) -> dict:
     }
 
 
-def upload(api: str, token: str, dataset: str, path: Path, meta: dict) -> dict:
+def sales_metadata(entry: dict, source_revision: int = 1, review: dict | None = None) -> dict:
+    """Map the reviewed sales manifest to the production ingestion contract."""
+    collected_at = str(entry.get("collected_at") or "")[:10]
+    return {
+        "document_id": entry["doc_id"],
+        "title": entry["title"],
+        "version": entry.get("version", collected_at),
+        "source_revision": source_revision,
+        "domain": "medical-device-sales",
+        "manufacturer": entry.get("manufacturer", ""),
+        "product_family": entry.get("product_family", ""),
+        "model_codes": entry.get("model_codes", []),
+        "software_version_from": "",
+        "software_version_to": "",
+        "hardware_revision": "",
+        "region": entry.get("region", "CN"),
+        "language": entry.get("language", "zh-CN"),
+        "effective_from": collected_at,
+        "effective_to": "",
+        "authority_level": entry.get("authority_level", "official_source_summary"),
+        "document_revision": f"R{source_revision}",
+        "supersedes": [],
+        "device_identifiers": [],
+        "affected_lots": [],
+        "source_type": entry.get("source_type", ""),
+        "source_urls": entry.get("source_urls", []),
+        "collected_at": collected_at,
+        "source_review_status": "approved",
+        "source_reviewed_at": (review or {}).get("reviewed_at", entry.get("source_reviewed_at", "2026-08-17T08:00:00Z")),
+    }
+
+
+def select_revision(path: Path, meta: dict, existing: dict[str, list[dict]]) -> dict:
+    """Reuse a revision for identical bytes; advance it for changed bytes."""
+    prepared = dict(meta)
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    records = existing.get(str(meta["document_id"]), [])
+    identical = [
+        int(record.get("source_revision", 0)) for record in records
+        if record.get("source_hash") == digest and record.get("index_status") not in {"failed", "cancelled"}
+    ]
+    if identical:
+        prepared["source_revision"] = max(identical)
+    elif records:
+        prepared["source_revision"] = max(int(meta.get("source_revision", 1)), max(int(record.get("source_revision", 0)) for record in records) + 1)
+    return prepared
+
+
+def upload(api: str, token: str, dataset: str, path: Path, meta: dict, revisions: dict[str, dict[str, list[dict]]]) -> dict:
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    identical = [
+        record for record in revisions.get(dataset, {}).get(str(meta["document_id"]), [])
+        if record.get("source_hash") == digest and record.get("index_status") in {"queued", "running", "completed"}
+    ]
+    if identical:
+        current = max(identical, key=lambda record: int(record.get("source_revision", 0)))
+        return {"job_id": current.get("job_id"), "status": current.get("index_status"), "duplicate": True}
+    meta = select_revision(path, meta, revisions.get(dataset, {}))
     body, boundary = multipart(path, meta)
     status, response = call(
         f"{api}/api/v1/datasets/{dataset}/documents/uploads",
@@ -129,12 +194,35 @@ def main() -> None:
     api = arguments.api.rstrip("/")
     tokens = {name: login(api, name) for name in ACCOUNTS}
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
+    sales_manifest = json.loads((SALES_CORPUS / "manifest.json").read_text(encoding="utf-8"))
+    sales_lock = json.loads((SALES_CORPUS / "sources.lock.json").read_text(encoding="utf-8"))["documents"]
+    datasets = ["public-medical-device", "tenant-a-medical-runbook", "tenant-b-medical-runbook", "public-medical-device-sales"]
+    revisions: dict[str, dict[str, list[dict]]] = {}
+    for dataset_id in datasets:
+        records = get_json(f"{api}/api/v1/datasets/{dataset_id}/documents", tokens["platform"]).get("uploads", [])
+        revisions[dataset_id] = {}
+        for record in records:
+            revisions[dataset_id].setdefault(record["document_id"], []).append(record)
     submitted: list[dict] = []
     for entry in manifest:
         tenant = (entry.get("allowed_tenants") or ["platform"])[0]
         dataset = {"platform": "public-medical-device", "tenant_a": "tenant-a-medical-runbook", "tenant_b": "tenant-b-medical-runbook"}[tenant]
-        result = upload(api, tokens[tenant], dataset, CORPUS / entry["path"], metadata(entry, source_revision=arguments.source_revision))
+        result = upload(api, tokens[tenant], dataset, CORPUS / entry["path"], metadata(entry, source_revision=arguments.source_revision), revisions)
         submitted.append({"document_id": entry["doc_id"], "dataset_id": dataset, "job_id": result.get("job_id"), "status": result.get("status")})
+
+    for entry in sales_manifest:
+        result = upload(
+            api,
+            tokens["platform"],
+            "public-medical-device-sales",
+            SALES_CORPUS / entry["path"],
+            sales_metadata(entry, arguments.source_revision, sales_lock.get(entry["doc_id"])),
+            revisions,
+        )
+        submitted.append({
+            "document_id": entry["doc_id"], "dataset_id": "public-medical-device-sales",
+            "job_id": result.get("job_id"), "status": result.get("status"),
+        })
 
     if not arguments.skip_derived and GENERATED.exists():
         by_name = {
@@ -145,7 +233,7 @@ def main() -> None:
         }
         for name, entry in by_name.items():
             suffix = "-" + Path(name).suffix.removeprefix(".")
-            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, metadata(entry, suffix, arguments.source_revision))
+            result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, metadata(entry, suffix, arguments.source_revision), revisions)
             submitted.append({"document_id": entry["doc_id"] + suffix, "dataset_id": "public-medical-device", "job_id": result.get("job_id"), "status": result.get("status")})
     print(json.dumps({"submitted": len(submitted), "documents": submitted}, ensure_ascii=False, indent=2))
 

@@ -53,18 +53,26 @@ type SeedResult struct {
 // in a vector collection. It intentionally contains metadata only; document
 // content remains available through authorized search/citation paths.
 type StoredDocument struct {
-	DocumentID       string `json:"document_id"`
-	DatasetID        string `json:"dataset_id,omitempty"`
-	Title            string `json:"title"`
-	TenantID         string `json:"tenant_id,omitempty"`
-	Product          string `json:"product,omitempty"`
-	Version          string `json:"version,omitempty"`
-	Status           string `json:"status,omitempty"`
-	Visibility       string `json:"visibility,omitempty"`
-	Chunks           int    `json:"chunks"`
-	IndexedAt        int64  `json:"indexed_at,omitempty"`
-	EmbeddingModel   string `json:"embedding_model,omitempty"`
-	EmbeddingVersion string `json:"embedding_version,omitempty"`
+	DocumentID       string   `json:"document_id"`
+	DatasetID        string   `json:"dataset_id,omitempty"`
+	Title            string   `json:"title"`
+	TenantID         string   `json:"tenant_id,omitempty"`
+	Product          string   `json:"product,omitempty"`
+	Version          string   `json:"version,omitempty"`
+	Status           string   `json:"status,omitempty"`
+	Visibility       string   `json:"visibility,omitempty"`
+	Manufacturer     string   `json:"manufacturer,omitempty"`
+	ProductFamily    string   `json:"product_family,omitempty"`
+	ModelCodes       []string `json:"model_codes,omitempty"`
+	Region           string   `json:"region,omitempty"`
+	Language         string   `json:"language,omitempty"`
+	AuthorityLevel   string   `json:"authority_level,omitempty"`
+	DocumentRevision string   `json:"document_revision,omitempty"`
+	SourceFile       string   `json:"source_file,omitempty"`
+	Chunks           int      `json:"chunks"`
+	IndexedAt        int64    `json:"indexed_at,omitempty"`
+	EmbeddingModel   string   `json:"embedding_model,omitempty"`
+	EmbeddingVersion string   `json:"embedding_version,omitempty"`
 }
 
 type Catalog struct {
@@ -211,7 +219,10 @@ func (s *Service) catalogWithStatus(ctx context.Context, status Status, filter s
 			document = &StoredDocument{
 				DocumentID: documentID, DatasetID: entity.DatasetID, Title: entity.Title, TenantID: entity.TenantID,
 				Product: entity.Product, Version: entity.Version, Status: entity.Status,
-				Visibility: entity.Visibility, IndexedAt: entity.IndexedAt,
+				Visibility: entity.Visibility, Manufacturer: entity.Manufacturer, ProductFamily: entity.ProductFamily,
+				ModelCodes: []string(entity.ModelCodes), Region: entity.Region, Language: entity.Language,
+				AuthorityLevel: entity.AuthorityLevel, DocumentRevision: entity.DocumentRevision,
+				SourceFile: entity.SourceFile, IndexedAt: entity.IndexedAt,
 				EmbeddingModel: entity.EmbeddingModel, EmbeddingVersion: entity.EmbeddingVer,
 			}
 			byDocument[documentID] = document

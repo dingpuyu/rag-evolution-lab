@@ -1,0 +1,18 @@
+{
+  "id": "sales_evita_spec",
+  "dataset_version": "1.0.0",
+  "split": "development",
+  "category": "product_spec",
+  "query": "Evita V800 支持哪些患者类别，屏幕和最大吸气流量是多少？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": ["draeger-evita-v800-2026"],
+    "relevant_chunk_ids": [],
+    "required_facts": ["成人", "儿童", "新生儿", "18.5 英寸", "180 L/min"],
+    "forbidden_facts": ["中国大陆一定在售", "提供通气参数"],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "区域官网信息必须保留区域边界。"
+}

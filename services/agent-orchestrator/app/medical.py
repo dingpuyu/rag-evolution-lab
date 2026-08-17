@@ -9,6 +9,20 @@ from .models import DeviceContext
 MODEL_PATTERN = re.compile(r"\bVSM[\s-]?(100\s*PRO|100|200)\b", re.IGNORECASE)
 VERSION_PATTERN = re.compile(r"(?:软件|固件|版本|FW)\s*[Vv]?\s*(\d+\.\d+(?:\.\d+)?)", re.IGNORECASE)
 LOT_PATTERN = re.compile(r"\b(L26A\d{2})\b", re.IGNORECASE)
+SALES_MODEL_ALIASES = (
+    ("IntelliVue MX550", ("intellivue mx550", "mx550")),
+    ("IntelliVue MX500", ("intellivue mx500", "mx500")),
+    ("BeneVision N1", ("benevision n1", "n1监护仪", "n1 监护仪")),
+    ("BeneHeart C Series", ("beneheart c series", "beneheart c系列", "beneheart c 系列", "beneheart c")),
+    ("BeneFusion i/u", ("benefusion i/u", "benefusion i系列", "benefusion u系列", "benefusion i/u系列")),
+    ("Resona I9", ("resona i9", "resona i 9")),
+    ("Evita V800", ("evita v800", "v800呼吸机", "v800 呼吸机")),
+)
+SALES_MODEL_CANDIDATES = [name for name, _ in SALES_MODEL_ALIASES]
+UNTRUSTED_QUERY_DIRECTIVE = re.compile(
+    r"(?:忽略|无视|绕过|覆盖)(?:此前|之前|上面|系统|资料|证据|规则|限制|提示词|指令)?[^，,。；;]{0,36}[，,。；;]\s*",
+    re.IGNORECASE,
+)
 
 
 @dataclass(frozen=True)
@@ -17,6 +31,21 @@ class MedicalResolution:
     reason_code: str
     context: DeviceContext
     candidates: list[str]
+
+
+def sanitize_customer_retrieval_query(query: str) -> str:
+    """Remove control-language from search without changing model identifiers.
+
+    Generation still receives the original user query. This only prevents
+    instructions such as "ignore the evidence and promise" from diluting BM25
+    and embedding recall.
+    """
+    sanitized = UNTRUSTED_QUERY_DIRECTIVE.sub("", query.strip())
+    sanitized = re.sub(r"(?:请)?(?:直接|必须)?(?:承诺|保证)", "", sanitized)
+    sanitized = re.sub(r"\s+", " ", sanitized).strip(" ，,。；;")
+    if sanitized != query.strip():
+        sanitized += "；请核验官方证据、具体配置和库存边界"
+    return sanitized or query.strip()
 
 
 def resolve_medical_query(query: str, supplied: DeviceContext | None = None) -> MedicalResolution:
@@ -72,6 +101,58 @@ def resolve_medical_query(query: str, supplied: DeviceContext | None = None) -> 
     return MedicalResolution("knowledge", "knowledge_required", context, [])
 
 
+def resolve_customer_query(query: str, supplied: DeviceContext | None = None) -> MedicalResolution:
+    """Resolve a novice customer's goal without forcing expert terminology.
+
+    Product discovery may span models, while model-specific troubleshooting is
+    fail-closed until the customer can identify the complete model.
+    """
+    supplied = supplied or DeviceContext()
+    if not supplied.model_code.strip():
+        normalized = query.casefold()
+        for model, aliases in SALES_MODEL_ALIASES:
+            if any(alias in normalized for alias in aliases):
+                supplied = DeviceContext(
+                    model_code=model,
+                    software_version=supplied.software_version,
+                    lot_or_batch=supplied.lot_or_batch,
+                    region=supplied.region,
+                )
+                break
+    base = resolve_medical_query(query, supplied)
+    if base.intent in {"refuse", "field_correction"}:
+        return base
+    text = query.strip()
+    lower = text.casefold()
+    onboarding_terms = ("一窍不通", "完全不了解", "什么都不懂", "从零开始", "怎么开始了解", "第一次了解")
+    if base.intent == "persona" or any(term in lower for term in onboarding_terms):
+        return MedicalResolution("customer_onboarding", "customer_guided_onboarding", base.context, ["产品线概览", "认识型号", "开始排障"])
+
+    product_terms = ("产品线", "有哪些产品", "有哪些型号", "产品介绍", "型号介绍", "特点", "特色", "区别", "对比", "哪款", "哪个好", "适合")
+    if any(term in lower for term in product_terms):
+        context = base.context
+        if any(term in lower for term in ("产品线", "有哪些产品", "有哪些型号", "区别", "对比", "哪款", "哪个好")):
+            context = DeviceContext(region=base.context.region)
+        return MedicalResolution("product_discovery", "customer_product_discovery", context, SALES_MODEL_CANDIDATES)
+
+    getting_started_terms = ("型号在哪里", "哪里看型号", "版本在哪里", "哪里看版本", "怎么提问", "如何提问", "第一次使用", "入门")
+    if any(term in lower for term in getting_started_terms):
+        return MedicalResolution("customer_getting_started", "customer_getting_started", base.context, [])
+
+    troubleshooting_terms = ("故障", "排障", "连不上", "连接不上", "失败", "异常", "找不到", "没有菜单", "报错", "错误码", "网络问题")
+    if any(term in lower for term in troubleshooting_terms):
+        if not base.context.model_code:
+            return MedicalResolution(
+                "clarify", "customer_missing_model_for_troubleshooting", base.context,
+                SALES_MODEL_CANDIDATES + ["我不知道型号在哪里看"],
+            )
+        return MedicalResolution("customer_troubleshooting", "customer_guided_troubleshooting", base.context, [])
+
+    if base.intent == "clarify":
+        return base
+    return MedicalResolution("knowledge", "customer_public_knowledge", base.context, [])
+
+
 def assess_field_correction(context: DeviceContext) -> tuple[str, str]:
     """Evaluate the fully synthetic FC-2026-04 scope without delegating policy to an LLM."""
     if not context.model_code or not context.software_version or not context.lot_or_batch:
@@ -118,6 +199,47 @@ def verify_medical_evidence(context: DeviceContext, evidence: list[dict]) -> tup
         if len(candidate_models) > 1:
             return [], "conflicting_model_scope"
     return verified, "evidence_scope_verified"
+
+
+def verify_field_correction_evidence(notice_id: str, evidence: list[dict]) -> tuple[list[dict], str]:
+    """Verify notice identity and authority before applicability is evaluated.
+
+    Model/version/lot mismatches are deliberately not rejected here: those are
+    inputs to the deterministic applicability rule and may legitimately produce
+    a "does not apply" answer.
+    """
+    expected = notice_id.casefold().strip()
+    verified: list[dict] = []
+    for hit in evidence:
+        if str(hit.get("status", "active")) not in {"", "active"}:
+            continue
+        authority = str(hit.get("authority_level", "")).casefold().strip()
+        haystack = " ".join(str(hit.get(field, "")) for field in ("document_id", "title", "content", "source_file")).casefold()
+        if expected not in haystack:
+            continue
+        if authority and authority not in {"field_correction", "manufacturer"}:
+            continue
+        verified.append(hit)
+    if not verified:
+        return [], "field_correction_notice_not_verified"
+    return verified, "field_correction_notice_verified"
+
+
+def verify_customer_evidence(intent: str, context: DeviceContext, evidence: list[dict]) -> tuple[list[dict], str]:
+    """Defense-in-depth filter for the public customer application."""
+    public = [
+        hit for hit in evidence
+        if str(hit.get("dataset_id", "")) in {"", "public-medical-device-sales"}
+        and str(hit.get("status", "active")) in {"", "active"}
+        and str(hit.get("authority_level", "")).casefold() not in {"tenant_runbook", "internal", "unverified"}
+        and not str(hit.get("document_id", "")).casefold().startswith(("legacy-", "archived-"))
+    ]
+    if not public:
+        return [], "no_public_customer_evidence"
+    if intent in {"product_discovery", "customer_getting_started"}:
+        return public, "public_product_evidence_verified"
+    verified, reason = verify_medical_evidence(context, public)
+    return verified, reason
 
 
 def _version_tuple(value: str) -> tuple[int, ...] | None:
