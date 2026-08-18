@@ -304,6 +304,54 @@ def main() -> None:
                 derived_metadata["product_family"] = "pulsecare-vsm100-family"
             result = upload(api, tokens["platform"], "public-medical-device", GENERATED / name, derived_metadata, revisions)
             submitted.append({"document_id": entry["doc_id"] + suffix, "dataset_id": "public-medical-device", "job_id": result.get("job_id"), "status": result.get("status")})
+
+        # A stable, tenant-private revision pair powers the document-diff and
+        # retrieval-probe workbench on every fresh deployment. Keeping the
+        # same document_id with distinct source revisions mirrors the way a
+        # production knowledge base receives corrected manuals.
+        revision_entry = next(item for item in manifest if item["doc_id"] == "vsm100-error-codes-fw2.6")
+        revision_document_id = "vsm100-error-codes-fw2.6-revision-demo"
+        for revision, name in (
+            (1, "vsm100-error-codes-fw2.6.docx"),
+            (2, "vsm100-error-codes-fw2.6-r2.docx"),
+        ):
+            revision_metadata = metadata(revision_entry, source_revision=revision)
+            revision_metadata.update({
+                "document_id": revision_document_id,
+                "title": "VSM-100 SYS-NET-042 修订演示",
+                "document_revision": f"R{revision}",
+                "source_review_status": "approved",
+                "source_reviewed_at": "2026-08-18T08:00:00Z",
+            })
+            existing_revision = next((
+                record for record in revisions["tenant-a-medical-runbook"].get(revision_document_id, [])
+                if record_metadata(record).get("document_revision") == f"R{revision}"
+                and record_parser_version(record) == DOCUMENT_IR_SCHEMA_VERSION
+                and record.get("index_status") in {"queued", "running", "completed"}
+            ), None)
+            result = (
+                {
+                    "job_id": existing_revision.get("job_id"),
+                    "status": existing_revision.get("index_status"),
+                    "duplicate": True,
+                }
+                if existing_revision
+                else upload(
+                    api,
+                    tokens["tenant_a"],
+                    "tenant-a-medical-runbook",
+                    GENERATED / name,
+                    revision_metadata,
+                    revisions,
+                )
+            )
+            submitted.append({
+                "document_id": revision_document_id,
+                "dataset_id": "tenant-a-medical-runbook",
+                "source_revision": revision,
+                "job_id": result.get("job_id"),
+                "status": result.get("status"),
+            })
     print(json.dumps({"submitted": len(submitted), "documents": submitted}, ensure_ascii=False, indent=2))
 
 

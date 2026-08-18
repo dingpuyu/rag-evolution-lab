@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -66,14 +67,7 @@ func (api *DatasetAPI) documentDetail(writer http.ResponseWriter, request *http.
 		writeError(writer, http.StatusServiceUnavailable, "document_registry_unavailable", err.Error())
 		return
 	}
-	var selected *datasetaccess.KnowledgeDocumentRevision
-	for index := range revisions {
-		if revisions[index].DocumentID == documentID && revisions[index].SourceRevision == revision {
-			copy := revisions[index]
-			selected = &copy
-			break
-		}
-	}
+	selected := selectKnowledgeRevision(revisions, documentID, revision)
 	if selected == nil {
 		writeError(writer, http.StatusNotFound, "document_revision_not_found", "document revision not found")
 		return
@@ -116,20 +110,15 @@ func (api *DatasetAPI) documentDetail(writer http.ResponseWriter, request *http.
 	}
 	preview := documentIRPreview{BlockCount: selected.BlockCount, Blocks: []documentparser.Block{}}
 	previewError := ""
-	if selected.IRURI != "" && api.documentStore != nil {
-		object, getErr := api.documentStore.Get(request.Context(), selected.IRURI, maxDocumentIRPreviewBytes)
+	if selected.IRURI != "" {
+		documentIR, getErr := api.readDocumentIR(request.Context(), selected.IRURI)
 		if getErr != nil {
 			previewError = getErr.Error()
 		} else {
-			var documentIR documentparser.DocumentIR
-			if decodeErr := json.Unmarshal(object.Data, &documentIR); decodeErr != nil {
-				previewError = fmt.Sprintf("decode Document IR: %v", decodeErr)
-			} else {
-				preview = documentIRPreview{
-					SchemaVersion: documentIR.SchemaVersion, Status: documentIR.Status, SourceFile: documentIR.SourceFile,
-					MIMEType: documentIR.MIMEType, SHA256: documentIR.SHA256, BlockCount: len(documentIR.Blocks),
-					Blocks: previewIRBlocks(documentIR.Blocks, previewLimit),
-				}
+			preview = documentIRPreview{
+				SchemaVersion: documentIR.SchemaVersion, Status: documentIR.Status, SourceFile: documentIR.SourceFile,
+				MIMEType: documentIR.MIMEType, SHA256: documentIR.SHA256, BlockCount: len(documentIR.Blocks),
+				Blocks: previewIRBlocks(documentIR.Blocks, previewLimit),
 			}
 		}
 	}
@@ -145,6 +134,31 @@ func (api *DatasetAPI) documentDetail(writer http.ResponseWriter, request *http.
 		"preview_error": previewError, "searchable": searchable, "catalog_status": catalogStatus,
 		"pipeline": pipeline, "progress_percent": completed * 100 / len(pipeline),
 	})
+}
+
+func selectKnowledgeRevision(revisions []datasetaccess.KnowledgeDocumentRevision, documentID string, sourceRevision int64) *datasetaccess.KnowledgeDocumentRevision {
+	for index := range revisions {
+		if revisions[index].DocumentID == documentID && revisions[index].SourceRevision == sourceRevision {
+			selected := revisions[index]
+			return &selected
+		}
+	}
+	return nil
+}
+
+func (api *DatasetAPI) readDocumentIR(ctx context.Context, uri string) (documentparser.DocumentIR, error) {
+	if api.documentStore == nil {
+		return documentparser.DocumentIR{}, fmt.Errorf("document store is not configured")
+	}
+	object, err := api.documentStore.Get(ctx, uri, maxDocumentIRPreviewBytes)
+	if err != nil {
+		return documentparser.DocumentIR{}, err
+	}
+	var documentIR documentparser.DocumentIR
+	if err := json.Unmarshal(object.Data, &documentIR); err != nil {
+		return documentparser.DocumentIR{}, fmt.Errorf("decode Document IR: %w", err)
+	}
+	return documentIR, nil
 }
 
 func buildDocumentPipeline(record datasetaccess.KnowledgeDocumentRevision, job *ingestionjob.Job, searchable bool) []documentPipelineStage {

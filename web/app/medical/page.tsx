@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
+import KnowledgeValidationWorkbench from "./knowledge-validation-workbench";
+
 type Identity = { subject: string; tenant_id: string; roles: string[] };
 type Session = { access_token: string; expires_at: number; identity: Identity };
 type Dataset = {
@@ -106,6 +108,7 @@ type UploadRecord = {
   document_id: string;
   title: string;
   source_revision: number;
+  document_version?: string;
   file_name: string;
   source_uri: string;
   parser_status: string;
@@ -912,7 +915,7 @@ export default function MedicalWorkspace() {
               (item) =>
                 item.document_id === current.document_id &&
                 item.source_revision === current.source_revision,
-            ) ?? current)
+            ) ?? null)
           : current,
       );
     } catch (error) {
@@ -1716,6 +1719,9 @@ export default function MedicalWorkspace() {
                   className={datasetID === item.id ? "active" : ""}
                   key={item.id}
                   onClick={() => {
+                    setSelectedRevision(null);
+                    setDocumentDetail(null);
+                    setParsePreview([]);
                     setDatasetID(item.id);
                     void loadDocuments(item.id);
                   }}
@@ -2189,6 +2195,18 @@ export default function MedicalWorkspace() {
           title={selectedRevision?.title}
           total={documentDetail?.document_ir.block_count}
           error={documentDetail?.preview_error}
+        />
+      )}
+      {tab === "knowledge" && canUpload && audience === "professional" && session && (
+        <KnowledgeValidationWorkbench
+          apiBase={API_BASE}
+          token={session.access_token}
+          datasetID={datasetID}
+          appID={appID}
+          environmentID={environmentID}
+          revisions={uploads}
+          selected={selectedRevision}
+          deviceContext={context}
         />
       )}
     </main>

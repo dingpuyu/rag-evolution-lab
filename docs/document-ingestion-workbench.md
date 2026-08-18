@@ -90,6 +90,8 @@ make medical-smoke
 
 - Parser 完全异步化，支持超大文件和断点重试；
 - OCR 队列与人工版面复核；
-- 同一文档多修订差异视图和发布/回滚操作；
-- Chunk 级检索试跑，把“已索引”进一步验证为“目标 Query 能命中正确证据”；
+- 同一文档多修订差异视图已完成；下一步补充基于差异的审核、发布与回滚操作；
+- 应用级 Chunk 检索试跑已完成，可查看 Rewrite、Rerank、授权绑定、排名和引用位置；
 - 文档级质量卡：Golden Case 覆盖率、引用正确率和最近 Bad Case。
+
+修订差异算法、正式 Gateway 复用方式和可复现 R1/R2 样本见[文档修订差异与检索验证工作台](document-revision-retrieval-validation.md)。

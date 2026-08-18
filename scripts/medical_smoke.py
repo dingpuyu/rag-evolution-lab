@@ -67,7 +67,15 @@ def main() -> None:
 
     status, body = call("GET", f"{api}/api/v1/datasets/tenant-a-medical-runbook/documents", alice)
     assert status == 200 and body.get("uploads"), (status, body)
-    revision = body["uploads"][0]
+    demo_revisions = sorted(
+        (
+            item for item in body["uploads"]
+            if item["document_id"] == "vsm100-error-codes-fw2.6-revision-demo"
+        ),
+        key=lambda item: int(item["source_revision"]),
+    )
+    assert len(demo_revisions) >= 2, demo_revisions
+    revision = demo_revisions[-1]
     detail_query = urllib.parse.urlencode({
         "document_id": revision["document_id"],
         "source_revision": revision["source_revision"],
@@ -84,6 +92,32 @@ def main() -> None:
     assert status == 404, status
     status, _ = call("GET", detail_url, customer)
     assert status in {403, 404}, status
+
+    diff_query = urllib.parse.urlencode({
+        "document_id": revision["document_id"],
+        "from_revision": demo_revisions[0]["source_revision"],
+        "to_revision": demo_revisions[-1]["source_revision"],
+    })
+    diff_url = f"{api}/api/v1/datasets/tenant-a-medical-runbook/documents/diff?{diff_query}"
+    status, diff = call("GET", diff_url, alice)
+    assert status == 200, (status, diff)
+    assert diff["summary"]["added"] >= 1 and diff["summary"]["modified"] >= 1, diff
+    assert diff.get("block_changes") and diff.get("metadata_changes"), diff
+    status, _ = call("GET", diff_url, bob)
+    assert status == 404, status
+    status, _ = call("GET", diff_url, customer)
+    assert status in {403, 404}, status
+
+    app_id = "tenant_a-medical-device-agent"
+    status, retrieval = call("POST", f"{api}/api/v1/apps/{app_id}/query", alice, {
+        "environment_id": f"{app_id}-dev",
+        "query": "VSM-100 软件 2.6 的 SYS-NET-042 是什么？",
+        "top_k": 5,
+        "device_context": {"model_code": "VSM-100", "software_version": "2.6", "region": "CN"},
+    })
+    assert status == 200 and retrieval.get("trace_id"), (status, retrieval)
+    assert retrieval.get("bindings") and retrieval.get("result", {}).get("hits"), retrieval
+    assert all(hit["dataset_id"] != "tenant-b-medical-runbook" for hit in retrieval["result"]["hits"]), retrieval
 
     for token, tenant, own, forbidden in (
         (alice, "tenant_a", "tenant-a-medical-runbook", "tenant-b-medical-runbook"),
@@ -131,9 +165,10 @@ def main() -> None:
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
 
     print(json.dumps({
-        "status": "passed", "checks": 28, "tenants": ["tenant_a", "tenant_b"],
+        "status": "passed", "checks": 36, "tenants": ["tenant_a", "tenant_b"],
         "customer_public_only": True, "bad_case_isolation": True,
         "document_pipeline_visible": True, "document_ir_preview": True,
+        "document_revision_diff": True, "authorized_retrieval_probe": True,
     }, ensure_ascii=False))
 
 
