@@ -116,14 +116,14 @@ func TestFailedJobCanBeRetriedWithinAttemptBudget(t *testing.T) {
 		t.Fatal(err)
 	}
 	failed := waitForStatus(t, service, created.ID, StatusFailed)
-	if !strings.Contains(failed.LastError, "temporary embedding failure") || failed.Attempts != 1 {
+	if !strings.Contains(failed.LastError, "temporary embedding failure") || failed.Attempts != 1 || failed.FailureStage != milvus.LifecycleStageVerifying {
 		t.Fatalf("unexpected failed job: %#v", failed)
 	}
 	if _, err := service.Retry(created.ID); err != nil {
 		t.Fatal(err)
 	}
 	completed := waitForStatus(t, service, created.ID, StatusCompleted)
-	if completed.Attempts != 2 {
+	if completed.Attempts != 2 || completed.FailureStage != "" {
 		t.Fatalf("retry did not consume second attempt: %#v", completed)
 	}
 	if _, err := service.Retry(created.ID); !errors.Is(err, ErrJobNotRetryable) {

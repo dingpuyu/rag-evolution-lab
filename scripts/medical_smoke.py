@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 
 
@@ -64,6 +65,26 @@ def main() -> None:
     api, agent = arguments.api.rstrip("/"), arguments.agent.rstrip("/")
     alice, bob, customer = login(api, "tenant_a"), login(api, "tenant_b"), login(api, "customer")
 
+    status, body = call("GET", f"{api}/api/v1/datasets/tenant-a-medical-runbook/documents", alice)
+    assert status == 200 and body.get("uploads"), (status, body)
+    revision = body["uploads"][0]
+    detail_query = urllib.parse.urlencode({
+        "document_id": revision["document_id"],
+        "source_revision": revision["source_revision"],
+        "preview_limit": 20,
+    })
+    detail_url = f"{api}/api/v1/datasets/tenant-a-medical-runbook/documents/detail?{detail_query}"
+    status, detail = call("GET", detail_url, alice)
+    assert status == 200, (status, detail)
+    assert detail.get("searchable") is True and detail.get("progress_percent") == 100, detail
+    assert len(detail.get("pipeline", [])) == 7, detail
+    assert all(stage.get("status") == "completed" for stage in detail["pipeline"]), detail["pipeline"]
+    assert detail.get("document_ir", {}).get("blocks") and not detail.get("preview_error"), detail
+    status, _ = call("GET", detail_url, bob)
+    assert status == 404, status
+    status, _ = call("GET", detail_url, customer)
+    assert status in {403, 404}, status
+
     for token, tenant, own, forbidden in (
         (alice, "tenant_a", "tenant-a-medical-runbook", "tenant-b-medical-runbook"),
         (bob, "tenant_b", "tenant-b-medical-runbook", "tenant-a-medical-runbook"),
@@ -109,7 +130,11 @@ def main() -> None:
     answer(agent, customer, "tenant_a", "设备网络连不上，我应该怎么排障？", "clarify", customer=True)
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
 
-    print(json.dumps({"status": "passed", "checks": 21, "tenants": ["tenant_a", "tenant_b"], "customer_public_only": True, "bad_case_isolation": True}, ensure_ascii=False))
+    print(json.dumps({
+        "status": "passed", "checks": 28, "tenants": ["tenant_a", "tenant_b"],
+        "customer_public_only": True, "bad_case_isolation": True,
+        "document_pipeline_visible": True, "document_ir_preview": True,
+    }, ensure_ascii=False))
 
 
 if __name__ == "__main__":

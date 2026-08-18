@@ -77,6 +77,7 @@ type Job struct {
 	CreatedBy       string                  `json:"created_by,omitempty"`
 	Status          string                  `json:"status"`
 	Stage           string                  `json:"stage"`
+	FailureStage    string                  `json:"failure_stage,omitempty"`
 	Attempts        int                     `json:"attempts"`
 	MaxAttempts     int                     `json:"max_attempts"`
 	CancelRequested bool                    `json:"cancel_requested"`
@@ -357,6 +358,7 @@ func (service *Service) Retry(id string) (Job, error) {
 	record.Stage = StageQueued
 	record.CancelRequested = false
 	record.LastError = ""
+	record.FailureStage = ""
 	record.Result = nil
 	record.StartedAt = nil
 	record.CompletedAt = nil
@@ -436,6 +438,7 @@ func (service *Service) process(id string) {
 	}
 	if record.Attempts >= record.MaxAttempts {
 		now := service.now()
+		record.FailureStage = record.Stage
 		record.Status = StatusFailed
 		record.Stage = StageFailed
 		record.LastError = "maximum attempts reached"
@@ -478,6 +481,7 @@ func (service *Service) process(id string) {
 	record.UpdatedAt = finished
 	record.CompletedAt = &finished
 	if err != nil {
+		failedStage := record.Stage
 		if record.CancelRequested || errors.Is(err, context.Canceled) {
 			record.Status = StatusCancelled
 			record.Stage = StageCancelled
@@ -485,6 +489,7 @@ func (service *Service) process(id string) {
 		} else {
 			record.Status = StatusFailed
 			record.Stage = StageFailed
+			record.FailureStage = failedStage
 			record.LastError = err.Error()
 		}
 	} else {
@@ -577,6 +582,7 @@ func (service *Service) failQueuedJob(id string, cause error) {
 		return
 	}
 	now := service.now()
+	record.FailureStage = record.Stage
 	record.Status = StatusFailed
 	record.Stage = StageFailed
 	record.LastError = cause.Error()

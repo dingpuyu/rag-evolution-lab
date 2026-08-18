@@ -81,7 +81,7 @@
 }
 ```
 
-页面会显示本次解析预览。页码、标题路径、工作表和单元格范围继续进入 Chunk、Milvus Hit 和最终 Citation。DOCX 按 XML 中的真实段落/表格顺序解析；XLSX 形成带表头语义的行级 Block；PDF 文本和表格按页面坐标重排。扫描 PDF 会标记 `ocr_required` 并阻止发布；OCR 不在本阶段范围。完整设计与 Bad Case 见 [Document IR v2](medical-document-ir-v2.md)。
+页面会显示本次解析预览。页码、标题路径、工作表和单元格范围继续进入 Chunk、Milvus Hit 和最终 Citation。DOCX 按 XML 中的真实段落/表格顺序解析；XLSX 形成带表头语义的行级 Block；PDF 文本和表格按页面坐标重排。扫描 PDF 会标记 `ocr_required` 并阻止发布；OCR 不在本阶段范围。刷新页面后，管理员还可以从 MinIO 重新读取 Document IR，并查看原件、解析、切块、Embedding、Milvus、写后验证和可检索七阶段状态。完整设计与 Bad Case 见 [Document IR v2](medical-document-ir-v2.md)，工作台的接口和验收方式见 [真实文档上传与知识状态工作台](document-ingestion-workbench.md)。
 
 质量页还提供跨运行的 Bad Case 工作台。人工修订正确文档、设备上下文或来源定位后，旧验证会自动失效；单题复测通过才能晋升 `human_regression`，下一次完整评测自动执行。真实 XLSX 修复与面试讲法见 [Bad Case 人工修复闭环](medical-bad-case-loop.md)。
 
@@ -207,7 +207,7 @@ make medical-eval-all
 
 Bootstrap 会先校验 `sources.lock.json`；官方摘要、URL 或内容指纹发生未经审核的变化时直接终止。来源治理、在线健康检查和面试讲法见 [医疗公开资料来源治理](medical-source-governance.md)。
 
-本地客户体验账号为 `customer@tenant-a.local`，密码显示在登录页的演示账号入口中；该账号角色为 `viewer`，只能进入客户产品助手并查看公共资料。
+本地客户体验账号为 `customer@tenant-a.local`；该账号角色为 `viewer`，只能进入客户产品助手并查看公共资料。登录页只辅助选择账号，不在浏览器代码中保存密码；密码来自部署时生成的环境配置。
 
 ## 面试讲解抓手
 

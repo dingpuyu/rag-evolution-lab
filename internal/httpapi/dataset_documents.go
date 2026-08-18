@@ -182,7 +182,7 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 	if !ok {
 		return
 	}
-	if !identity.HasRole("platform_admin") && (!identity.HasRole("admin") || dataset.Visibility != "tenant" || dataset.OwnerTenant != identity.TenantID) {
+	if !canManageDatasetDocuments(dataset, identity) {
 		writeError(writer, http.StatusForbidden, "document_forbidden", "only the owning tenant administrator may upload documents")
 		return
 	}
