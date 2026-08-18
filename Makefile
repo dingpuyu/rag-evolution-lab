@@ -1,9 +1,11 @@
-.PHONY: fmt test agent-test parser-test validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-smoke medical-source-audit medical-source-lock ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
+.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-smoke medical-source-audit medical-source-lock ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
-DOCKER_COMPOSE ?= docker-compose
-STACK_ENV_FILE = $(if $(wildcard .env),--env-file .env,)
+DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then echo 'docker compose'; elif command -v docker-compose >/dev/null 2>&1; then echo 'docker-compose'; else echo 'docker compose'; fi)
+RAGLAB_ENV_FILE ?= .env
+STACK_ENV_FILE = $(if $(wildcard $(RAGLAB_ENV_FILE)),--env-file $(RAGLAB_ENV_FILE),)
 STACK_COMPOSE = $(DOCKER_COMPOSE) $(STACK_ENV_FILE) -f deploy/stack/docker-compose.yml
 OBSERVABILITY_COMPOSE = $(DOCKER_COMPOSE) -f deploy/observability/docker-compose.yml
+WITH_ENV = RAGLAB_ENV_FILE=$(RAGLAB_ENV_FILE) ./scripts/run_with_env.sh
 
 fmt:
 	gofmt -w cmd internal
@@ -16,6 +18,33 @@ agent-test:
 
 parser-test:
 	cd services/document-parser && uv run --extra test pytest
+
+deploy-test:
+	python3 -m unittest discover -s scripts/tests -p 'test_deploy_init.py'
+
+deploy-init:
+	python3 scripts/deploy_init.py --output $(RAGLAB_ENV_FILE) --profile $${PROFILE:-remote} --host $${DEPLOY_HOST:-localhost}
+
+deploy-check:
+	$(WITH_ENV) ./scripts/deploy_preflight.sh
+
+deploy-up: deploy-check
+	$(WITH_ENV) $(STACK_COMPOSE) up -d --build
+
+deploy-bootstrap:
+	$(WITH_ENV) python3 scripts/medical_source_audit.py
+	$(WITH_ENV) python3 scripts/medical_bootstrap.py --skip-derived --source-revision $${MEDICAL_SOURCE_REVISION:-1}
+	$(WITH_ENV) python3 scripts/wait_ingestion.py
+
+deploy-verify:
+	$(WITH_ENV) ./scripts/stack_smoke.sh
+	$(WITH_ENV) python3 scripts/medical_smoke.py
+
+deploy-status:
+	$(WITH_ENV) $(STACK_COMPOSE) ps
+
+deploy-down:
+	$(WITH_ENV) $(STACK_COMPOSE) down
 
 validate:
 	go run ./cmd/raglab validate
@@ -170,16 +199,16 @@ web-dev:
 	npm --prefix web run dev
 
 stack-up:
-	$(STACK_COMPOSE) up -d --build
+	$(WITH_ENV) $(STACK_COMPOSE) up -d --build
 
 stack-smoke:
-	./scripts/stack_smoke.sh
+	$(WITH_ENV) ./scripts/stack_smoke.sh
 
 stack-down:
-	$(STACK_COMPOSE) down
+	$(WITH_ENV) $(STACK_COMPOSE) down
 
 stack-status:
-	$(STACK_COMPOSE) ps
+	$(WITH_ENV) $(STACK_COMPOSE) ps
 
 production-preflight:
 	bash scripts/production_preflight.sh

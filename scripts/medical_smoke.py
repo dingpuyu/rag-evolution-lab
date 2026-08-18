@@ -58,8 +58,8 @@ def answer(agent: str, token: str, tenant: str, query: str, expected: str, conte
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api", default="http://127.0.0.1:8080")
-    parser.add_argument("--agent", default="http://127.0.0.1:8090")
+    parser.add_argument("--api", default=os.getenv("RAGLAB_API_URL", "http://127.0.0.1:8080"))
+    parser.add_argument("--agent", default=os.getenv("RAGLAB_AGENT_URL", "http://127.0.0.1:8090"))
     arguments = parser.parse_args()
     api, agent = arguments.api.rstrip("/"), arguments.agent.rstrip("/")
     alice, bob, customer = login(api, "tenant_a"), login(api, "tenant_b"), login(api, "customer")

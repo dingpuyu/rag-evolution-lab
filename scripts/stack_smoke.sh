@@ -4,7 +4,7 @@ set -euo pipefail
 api_url="${RAGLAB_API_URL:-http://127.0.0.1:${RAGLAB_API_PORT:-8080}}"
 web_url="${RAGLAB_WEB_URL:-http://127.0.0.1:${RAGLAB_WEB_PORT:-3000}}"
 email="${RAGLAB_STACK_SMOKE_EMAIL:-admin@raglab.local}"
-password="${RAGLAB_STACK_SMOKE_PASSWORD:-change-this-admin-password}"
+password="${RAGLAB_STACK_SMOKE_PASSWORD:-${RAGLAB_PLATFORM_ADMIN_PASSWORD:-change-this-admin-password}}"
 timeout_seconds="${RAGLAB_STACK_SMOKE_TIMEOUT_SECONDS:-240}"
 
 wait_http() {

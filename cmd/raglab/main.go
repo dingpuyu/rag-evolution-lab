@@ -335,6 +335,9 @@ func runLabServer(args []string) {
 	requireOIDC := flags.Bool("require-oidc", environmentBool("RAGLAB_REQUIRE_OIDC", false), "fail startup unless enterprise OIDC/RS256 mode is configured")
 	authAccounts := flags.String("auth-accounts", environmentOr("RAGLAB_AUTH_ACCOUNTS", "data/auth/accounts.json"), "local-lab account store; unused in OIDC mode")
 	platformAdminPassword := flags.String("platform-admin-password", environmentOr("RAGLAB_PLATFORM_ADMIN_PASSWORD", "RagLab-Platform-2026!"), "local-lab platform administrator password")
+	tenantAPassword := flags.String("tenant-a-password", environmentOr("RAGLAB_TENANT_A_PASSWORD", "RagLab-Alice-2026!"), "local-lab tenant A administrator password")
+	tenantBPassword := flags.String("tenant-b-password", environmentOr("RAGLAB_TENANT_B_PASSWORD", "RagLab-Bob-2026!"), "local-lab tenant B administrator password")
+	customerPassword := flags.String("customer-password", environmentOr("RAGLAB_CUSTOMER_PASSWORD", "PulseCare-Customer-2026!"), "local-lab customer password")
 	postgresURL := flags.String("postgres-url", environmentOr("RAGLAB_POSTGRES_URL", "postgres://raglab:raglab-local@127.0.0.1:5433/raglab?sslmode=disable"), "PostgreSQL control-plane URL; set empty for in-memory fallback")
 	otelEndpoint := flags.String("otel-endpoint", os.Getenv("RAGLAB_OTEL_ENDPOINT"), "OTLP HTTP endpoint, e.g. localhost:4318")
 	otelServiceName := flags.String("otel-service-name", environmentOr("RAGLAB_OTEL_SERVICE_NAME", "rag-evolution-lab"), "OpenTelemetry service name")
@@ -559,9 +562,9 @@ func runLabServer(args []string) {
 			roles                   []string
 		}{
 			{"admin@raglab.local", *platformAdminPassword, "platform", []string{"platform_admin"}},
-			{"alice@tenant-a.local", "RagLab-Alice-2026!", "tenant_a", []string{"admin"}},
-			{"bob@tenant-b.local", "RagLab-Bob-2026!", "tenant_b", []string{"admin"}},
-			{"customer@tenant-a.local", "PulseCare-Customer-2026!", "tenant_a", []string{"viewer"}},
+			{"alice@tenant-a.local", *tenantAPassword, "tenant_a", []string{"admin"}},
+			{"bob@tenant-b.local", *tenantBPassword, "tenant_b", []string{"admin"}},
+			{"customer@tenant-a.local", *customerPassword, "tenant_a", []string{"viewer"}},
 		} {
 			if managerErr = localAccounts.EnsureDemo(demo.email, demo.password, demo.tenant, demo.roles); managerErr != nil {
 				fatal(managerErr)

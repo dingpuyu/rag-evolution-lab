@@ -1,0 +1,180 @@
+#!/usr/bin/env python3
+"""Generate a private, portable Compose environment without model API keys."""
+
+from __future__ import annotations
+
+import argparse
+import os
+import secrets
+import tempfile
+from pathlib import Path
+
+
+def secret(label: str, size: int = 24) -> str:
+    return f"{label}-{secrets.token_hex(size)}"
+
+
+def deployment_values(profile: str, host: str, ports: dict[str, int], project_name: str = "raglab") -> dict[str, str]:
+    values = {
+        "COMPOSE_PROJECT_NAME": project_name,
+        "RAGLAB_DEPLOY_PROFILE": profile,
+        "RAGLAB_API_PORT": str(ports["api"]),
+        "RAGLAB_AGENT_PORT": str(ports["agent"]),
+        "RAGLAB_WEB_PORT": str(ports["web"]),
+        "RAGLAB_DOCUMENT_PARSER_PORT": str(ports["parser"]),
+        "RAGLAB_MILVUS_PORT": str(ports["milvus"]),
+        "RAGLAB_MILVUS_HEALTH_PORT": str(ports["milvus_health"]),
+        "RAGLAB_POSTGRES_PORT": str(ports["postgres"]),
+        "RAGLAB_REDIS_PORT": str(ports["redis"]),
+        "NEXT_PUBLIC_API_BASE": f"http://{host}:{ports['api']}",
+        "NEXT_PUBLIC_AGENT_API_BASE": f"http://{host}:{ports['agent']}",
+        "NEXT_PUBLIC_AGENT_EVALUATION_URL": f"http://{host}:18200",
+        "RAGLAB_API_URL": f"http://127.0.0.1:{ports['api']}",
+        "RAGLAB_AGENT_URL": f"http://127.0.0.1:{ports['agent']}",
+        "RAGLAB_WEB_URL": f"http://127.0.0.1:{ports['web']}",
+        "AGENT_CORS_ORIGINS": ",".join(
+            f"http://{name}:{ports['web']}" for name in dict.fromkeys((host, "localhost", "127.0.0.1"))
+        ),
+        "RAGLAB_AUTH_SECRET": secret("jwt", 32),
+        "RAGLAB_PLATFORM_ADMIN_PASSWORD": secret("Platform", 18),
+        "RAGLAB_TENANT_A_PASSWORD": secret("TenantA", 18),
+        "RAGLAB_TENANT_B_PASSWORD": secret("TenantB", 18),
+        "RAGLAB_CUSTOMER_PASSWORD": secret("Customer", 18),
+        "RAGLAB_POSTGRES_PASSWORD": secret("Postgres", 20),
+        "RAGLAB_MINIO_ROOT_USER": f"raglab{secrets.token_hex(5)}",
+        "RAGLAB_MINIO_ROOT_PASSWORD": secret("Minio", 20),
+        "RAGLAB_AUTH_ISSUER": "raglab-portable",
+        "RAGLAB_AUTH_AUDIENCE": "raglab-api",
+        "RAGLAB_REQUIRE_OIDC": "false",
+        "RAGLAB_RATE_LIMIT_RPM": "120",
+        "RAGLAB_RATE_LIMIT_BURST": "30",
+        "RAGLAB_TOKEN_QUOTA_PER_MINUTE": "100000",
+        "RAGLAB_RATE_LIMIT_BACKEND": "redis",
+        "RAGLAB_REDIS_URL": "redis://redis:6379/0",
+        "RAGLAB_REDIS_PREFIX": "raglab:ratelimit",
+        "RAGLAB_HYBRID_SEARCH": "true",
+        "RAGLAB_LIFECYCLE_COLLECTION": "raglab_knowledge_medical_v3_1024",
+        "RAGLAB_LIFECYCLE_ALIAS": "raglab_knowledge_active_v3",
+        "RAGLAB_STACK_SMOKE_EMAIL": "admin@raglab.local",
+    }
+    values["RAGLAB_STACK_SMOKE_PASSWORD"] = values["RAGLAB_PLATFORM_ADMIN_PASSWORD"]
+    if profile == "remote":
+        values.update({
+            "RAGLAB_EMBEDDING_BACKEND": "openai-compatible",
+            "RAGLAB_EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+            "RAGLAB_EMBEDDING_MODEL": "text-embedding-v4",
+            "RAGLAB_EMBEDDING_DIMENSIONS": "1024",
+            "RAGLAB_EMBEDDING_BATCH_SIZE": "10",
+            "RAGLAB_EMBEDDING_VERSION": "dashscope-text-embedding-v4-1024-v1",
+            "RAGLAB_MILVUS_COLLECTION": "raglab_chunks_dashscope_v4_1024",
+            "RAGLAB_RERANK_BACKEND": "qwen",
+            "RAGLAB_RERANK_MODEL": "qwen3-rerank",
+            "RAGLAB_RERANK_URL": "https://dashscope.aliyuncs.com/compatible-api/v1/reranks",
+            "RAGLAB_RERANK_STRICT": "true",
+            "RAGLAB_GENERATION_PROVIDER": "deepseek",
+            "RAGLAB_GENERATION_BASE_URL": "https://api.deepseek.com",
+            "RAGLAB_GENERATION_MODEL": "deepseek-chat",
+        })
+    else:
+        values.update({
+            "RAGLAB_EMBEDDING_BACKEND": "hash",
+            "RAGLAB_HASH_EMBEDDING_DIMENSIONS": "1024",
+            "RAGLAB_EMBEDDING_VERSION": "hash-1024-portable-v1",
+            "RAGLAB_MILVUS_COLLECTION": "raglab_chunks_hash_1024",
+            "RAGLAB_RERANK_BACKEND": "heuristic",
+            "RAGLAB_RERANK_STRICT": "false",
+            "RAGLAB_GENERATION_PROVIDER": "extractive",
+            "RAGLAB_GENERATION_MODEL": "extractive",
+        })
+    return values
+
+
+def write_private(path: Path, content: str, force: bool) -> None:
+    if path.exists() and not force:
+        raise FileExistsError(f"{path} already exists; reuse it or pass --force after removing deployment volumes")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent, text=True)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(content)
+        os.replace(temporary, path)
+        path.chmod(0o600)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def render_env(values: dict[str, str]) -> str:
+    lines = [
+        "# Generated by scripts/deploy_init.py. Keep this file private.",
+        "# Model API keys are intentionally excluded; inject them through the process environment.",
+    ]
+    lines.extend(f"{key}={value}" for key, value in values.items())
+    return "\n".join(lines) + "\n"
+
+
+def render_credentials(values: dict[str, str]) -> str:
+    return "\n".join([
+        "RAG Evolution Lab portable deployment",
+        "=====================================",
+        f"Portal: {values['NEXT_PUBLIC_API_BASE'].replace(':' + values['RAGLAB_API_PORT'], ':' + values['RAGLAB_WEB_PORT'])}/medical",
+        f"API: {values['NEXT_PUBLIC_API_BASE']}",
+        "",
+        f"Platform admin: admin@raglab.local / {values['RAGLAB_PLATFORM_ADMIN_PASSWORD']}",
+        f"Tenant A admin: alice@tenant-a.local / {values['RAGLAB_TENANT_A_PASSWORD']}",
+        f"Tenant B admin: bob@tenant-b.local / {values['RAGLAB_TENANT_B_PASSWORD']}",
+        f"Tenant A customer: customer@tenant-a.local / {values['RAGLAB_CUSTOMER_PASSWORD']}",
+        "",
+        "Model API keys are not stored here or in .env.",
+    ]) + "\n"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--output", default=".env")
+    parser.add_argument("--credentials-output", default=".deploy/credentials.txt")
+    parser.add_argument("--profile", choices=("remote", "offline"), default="remote")
+    parser.add_argument("--project-name", default="raglab")
+    parser.add_argument("--host", default="localhost")
+    parser.add_argument("--embedding-base-url", default="")
+    parser.add_argument("--rerank-url", default="")
+    parser.add_argument("--force", action="store_true")
+    parser.add_argument("--api-port", type=int, default=8080)
+    parser.add_argument("--agent-port", type=int, default=8090)
+    parser.add_argument("--web-port", type=int, default=3000)
+    parser.add_argument("--parser-port", type=int, default=8070)
+    parser.add_argument("--milvus-port", type=int, default=19530)
+    parser.add_argument("--milvus-health-port", type=int, default=9091)
+    parser.add_argument("--postgres-port", type=int, default=5433)
+    parser.add_argument("--redis-port", type=int, default=6379)
+    args = parser.parse_args()
+    ports = {
+        "api": args.api_port, "agent": args.agent_port, "web": args.web_port,
+        "parser": args.parser_port, "milvus": args.milvus_port,
+        "milvus_health": args.milvus_health_port, "postgres": args.postgres_port,
+        "redis": args.redis_port,
+    }
+    if any(port < 1 or port > 65535 for port in ports.values()) or len(set(ports.values())) != len(ports):
+        raise SystemExit("ports must be unique integers between 1 and 65535")
+    if not args.project_name.replace("-", "").replace("_", "").isalnum():
+        raise SystemExit("project name may contain only letters, numbers, hyphens and underscores")
+    values = deployment_values(args.profile, args.host, ports, args.project_name)
+    if args.embedding_base_url:
+        values["RAGLAB_EMBEDDING_BASE_URL"] = args.embedding_base_url.rstrip("/")
+    if args.rerank_url:
+        values["RAGLAB_RERANK_URL"] = args.rerank_url
+    output = Path(args.output).expanduser().resolve()
+    credentials = Path(args.credentials_output).expanduser().resolve()
+    if not args.force and (output.exists() or credentials.exists()):
+        existing = output if output.exists() else credentials
+        raise SystemExit(f"{existing} already exists; reuse it or pass --force after removing deployment volumes")
+    write_private(output, render_env(values), args.force)
+    write_private(credentials, render_credentials(values), args.force)
+    print(f"deployment_env={output}")
+    print(f"credentials={credentials}")
+    print(f"profile={args.profile} model_keys_written=false")
+
+
+if __name__ == "__main__":
+    main()

@@ -33,3 +33,4 @@ eval/reports/generated/
 
 *.log
 tmp/
+.deploy/

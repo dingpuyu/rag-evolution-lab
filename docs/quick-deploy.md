@@ -1,5 +1,7 @@
 # 一键部署 RAG Evolution Lab
 
+> 新电脑优先使用 `make deploy-init → deploy-up → deploy-bootstrap → deploy-verify`，它会生成随机凭据并验证完整医疗 Agent。双平台步骤见[可移植双平台部署](portable-deployment.md)。本页后续内容保留用于手工配置和理解各 Provider 选项。
+
 这套部署栈用于在一台开发机或演示服务器上快速启动完整体验：RAG Lab API、客服门户、PostgreSQL 控制面和 Milvus 向量库。它使用独立的 Docker named volume，不会复用仓库里已有的本地实验数据卷。
 
 ## 1. 前置条件

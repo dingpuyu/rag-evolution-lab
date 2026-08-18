@@ -48,8 +48,23 @@ def call(url: str, data: bytes, headers: dict[str, str]) -> tuple[int, dict]:
 
 def get_json(url: str, token: str) -> dict:
     request = urllib.request.Request(url, headers={"Authorization": f"Bearer {token}"})
-    with urllib.request.urlopen(request, timeout=30) as response:
-        return json.loads(response.read())
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as error:
+        payload = error.read().decode("utf-8", "replace")
+        try:
+            body = json.loads(payload)
+        except json.JSONDecodeError:
+            body = {"message": payload}
+        detail = body.get("error") if isinstance(body.get("error"), dict) else body
+        message = str(detail.get("message", ""))
+        # A genuinely empty deployment has no lifecycle collection yet. The
+        # first upload is responsible for creating it, so absence is equivalent
+        # to an empty revision history during bootstrap—not a reason to abort.
+        if error.code == 503 and "can't find collection" in message:
+            return {"uploads": [], "cold_start": True}
+        raise RuntimeError(f"GET {url} failed ({error.code}): {body}") from error
 
 
 def login(api: str, account: str) -> str:
