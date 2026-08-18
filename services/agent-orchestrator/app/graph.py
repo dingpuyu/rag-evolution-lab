@@ -386,6 +386,7 @@ class AgentRuntime:
         result = AgentResult(
             status="completed", decision="answer", reason_code="grounded_customer_answer" if customer else "grounded_medical_answer", answer=answer,
             answer_source="rag", resolved_context=resolved, citations=citations, steps=steps,
+            candidate_entities=list(state.get("candidate_entities", [])),
             tool_calls=["resolve_device_context", "knowledge_search", "verify_evidence"], trace_id=str(state.get("trace_id", "")),
             suggested_questions=(
                 ["继续对比同类型号", "购买前需要核验什么？", "按我的型号开始售后分诊"]

@@ -260,7 +260,7 @@ def test_search_hit_accepts_null_optional_array_metadata():
 
 def test_customer_evaluation_uses_public_only_suite():
     cases = agent_cases_for("tenant_a-medical-device-customer-agent")
-    assert len(cases) == 12
+    assert len(cases) == 13
     assert any(case["id"] == "customer-onboarding" for case in cases)
     sales_golden = golden_cases_for("tenant_a-medical-device-customer-agent", "tenant_a")
     assert len(sales_golden) == 17

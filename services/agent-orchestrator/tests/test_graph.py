@@ -5,7 +5,12 @@ import pytest
 from app.graph import AgentRuntime
 from app.gateway import GatewayError
 from app.llm import RuleAnswerer, RulePlanner
-from app.medical import mentioned_sales_models, resolve_customer_query, sanitize_customer_retrieval_query
+from app.medical import (
+    mentioned_sales_categories,
+    mentioned_sales_models,
+    resolve_customer_query,
+    sanitize_customer_retrieval_query,
+)
 from app.models import Identity
 
 
@@ -104,6 +109,22 @@ def test_customer_resolver_preserves_every_explicit_comparison_model():
     resolved = resolve_customer_query(query)
     assert resolved.context.model_code == ""
     assert resolved.candidates == ["IntelliVue MX550", "BeneVision N1"]
+
+
+@pytest.mark.parametrize("query", ["AED", "AED 是什么？", "介绍一下自动体外除颤器", "你们有除颤器吗？", "AED 咋都没有？"])
+def test_customer_resolver_treats_novice_aed_queries_as_product_discovery(query):
+    assert mentioned_sales_categories(query) == ["AED"]
+    resolved = resolve_customer_query(query)
+    assert resolved.intent == "product_discovery"
+    assert resolved.context.model_code == ""
+    assert resolved.candidates == ["BeneHeart C Series"]
+
+
+def test_customer_category_troubleshooting_still_requires_an_exact_model():
+    resolved = resolve_customer_query("AED 报错了，应该怎么排障？")
+    assert resolved.intent == "clarify"
+    assert resolved.reason_code == "customer_missing_model_for_troubleshooting"
+    assert resolved.candidates == ["BeneHeart C Series", "我不知道型号在哪里看"]
 
 
 @pytest.mark.asyncio
@@ -286,6 +307,21 @@ async def test_customer_agent_filters_private_runbook_evidence_defensively():
     assert [citation.document_id for citation in response.result.citations] == ["public-guide"]
     assert "secret-queue" not in response.result.answer
     assert "修改型号" not in response.result.answer
+
+
+@pytest.mark.asyncio
+async def test_customer_agent_answers_short_aed_query_with_public_evidence():
+    runtime = AgentRuntime(LeakyCustomerGateway(), RulePlanner(), RuleAnswerer())
+    response = await runtime.run(
+        "tenant_a-medical-device-customer-agent",
+        "tenant_a-medical-device-customer-agent-dev",
+        "AED",
+        "Bearer test",
+    )
+    assert response.result.decision == "answer"
+    assert response.result.reason_code == "grounded_customer_answer"
+    assert response.result.candidate_entities == ["BeneHeart C Series"]
+    assert [citation.document_id for citation in response.result.citations] == ["public-guide"]
 
 
 @pytest.mark.asyncio

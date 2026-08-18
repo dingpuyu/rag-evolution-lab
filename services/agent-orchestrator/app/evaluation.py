@@ -48,6 +48,7 @@ MEDICAL_AGENT_CASES = [
 MEDICAL_CUSTOMER_CASES = [
     {"id": "customer-onboarding", "query": "我对这些产品一窍不通，应该从哪里开始？", "expected": "answer", "reason": "customer_guided_onboarding"},
     {"id": "customer-product-lines", "query": "你们目前有哪些医疗设备产品线？", "expected": "answer", "reason": "grounded_customer_answer", "citations": 1, "public_only": True},
+    {"id": "customer-aed-category", "query": "AED 是什么？你们有哪些 AED 产品？", "expected": "answer", "reason": "grounded_customer_answer", "citations": 1, "public_only": True},
     {"id": "customer-monitor-compare", "query": "BeneVision N1 和 IntelliVue MX550 都是什么类型的设备？", "expected": "answer", "reason": "grounded_customer_answer", "citations": 1, "public_only": True},
     {"id": "customer-aed-configuration", "query": "BeneHeart C 系列是不是所有型号都有 7 英寸彩屏？", "expected": "answer", "reason": "grounded_customer_answer", "citations": 1, "public_only": True},
     {"id": "customer-troubleshoot-missing-model", "query": "设备网络连不上，我应该怎么排障？", "expected": "clarify", "reason": "customer_missing_model_for_troubleshooting"},

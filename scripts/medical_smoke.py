@@ -161,11 +161,14 @@ def main() -> None:
     answer(agent, customer, "tenant_a", "我对这些产品一窍不通，应该从哪里开始？", "answer", customer=True)
     result = answer(agent, customer, "tenant_a", "你们目前有哪些医疗设备产品线？", "answer", customer=True)
     assert result["result"]["citations"] and all(item["dataset_id"] == "public-medical-device-sales" for item in result["result"]["citations"]), result
+    result = answer(agent, customer, "tenant_a", "AED", "answer", customer=True)
+    assert result["result"]["citations"] and all(item["dataset_id"] == "public-medical-device-sales" for item in result["result"]["citations"]), result
+    assert "BeneHeart C Series" in result["result"].get("candidate_entities", []), result
     answer(agent, customer, "tenant_a", "设备网络连不上，我应该怎么排障？", "clarify", customer=True)
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
 
     print(json.dumps({
-        "status": "passed", "checks": 36, "tenants": ["tenant_a", "tenant_b"],
+        "status": "passed", "checks": 38, "tenants": ["tenant_a", "tenant_b"],
         "customer_public_only": True, "bad_case_isolation": True,
         "document_pipeline_visible": True, "document_ir_preview": True,
         "document_revision_diff": True, "authorized_retrieval_probe": True,

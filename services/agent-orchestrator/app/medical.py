@@ -19,6 +19,13 @@ SALES_MODEL_ALIASES = (
     ("Evita V800", ("evita v800", "v800呼吸机", "v800 呼吸机")),
 )
 SALES_MODEL_CANDIDATES = [name for name, _ in SALES_MODEL_ALIASES]
+SALES_CATEGORY_ALIASES = (
+    ("病人监护", ("监护仪", "病人监护", "患者监护", "生命体征监护"), ("BeneVision N1", "IntelliVue MX500", "IntelliVue MX550")),
+    ("AED", ("aed", "自动体外除颤器", "自动除颤器", "除颤器"), ("BeneHeart C Series",)),
+    ("输注系统", ("输注系统", "输注泵", "输液泵", "注射泵"), ("BeneFusion i/u",)),
+    ("超声", ("超声", "彩超"), ("Resona I9",)),
+    ("呼吸机", ("呼吸机", "通气设备"), ("Evita V800",)),
+)
 UNTRUSTED_QUERY_DIRECTIVE = re.compile(
     r"(?:忽略|无视|绕过|覆盖)(?:此前|之前|上面|系统|资料|证据|规则|限制|提示词|指令)?[^，,。；;]{0,36}[，,。；;]\s*",
     re.IGNORECASE,
@@ -37,6 +44,39 @@ def mentioned_sales_models(query: str) -> list[str]:
     """Return every explicitly mentioned sales model in stable catalog order."""
     normalized = query.casefold()
     return [model for model, aliases in SALES_MODEL_ALIASES if any(alias in normalized for alias in aliases)]
+
+
+def mentioned_sales_categories(query: str) -> list[str]:
+    """Resolve novice product-language to stable catalog categories.
+
+    Short Latin names such as ``AED`` use token boundaries so a category is
+    not accidentally inferred from a longer identifier. Chinese aliases use
+    regular substring matching because they do not have whitespace boundaries.
+    """
+    normalized = query.casefold()
+    categories: list[str] = []
+    for category, aliases, _ in SALES_CATEGORY_ALIASES:
+        matched = any(
+            bool(re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized))
+            if alias.isascii() else alias in normalized
+            for alias in aliases
+        )
+        if matched:
+            categories.append(category)
+    return categories
+
+
+def sales_models_for_categories(categories: list[str]) -> list[str]:
+    """Return deduplicated model suggestions for the resolved categories."""
+    requested = set(categories)
+    models: list[str] = []
+    for category, _, category_models in SALES_CATEGORY_ALIASES:
+        if category not in requested:
+            continue
+        for model in category_models:
+            if model not in models:
+                models.append(model)
+    return models
 
 
 def sanitize_customer_retrieval_query(query: str) -> str:
@@ -115,6 +155,7 @@ def resolve_customer_query(query: str, supplied: DeviceContext | None = None) ->
     """
     supplied = supplied or DeviceContext()
     mentioned_models = mentioned_sales_models(query)
+    mentioned_categories = mentioned_sales_categories(query)
     if not supplied.model_code.strip() and mentioned_models:
         supplied = DeviceContext(
             model_code=mentioned_models[0],
@@ -132,22 +173,25 @@ def resolve_customer_query(query: str, supplied: DeviceContext | None = None) ->
         return MedicalResolution("customer_onboarding", "customer_guided_onboarding", base.context, ["产品线概览", "认识型号", "开始排障"])
 
     product_terms = ("产品线", "有哪些产品", "有哪些型号", "产品介绍", "型号介绍", "特点", "特色", "区别", "对比", "哪款", "哪个好", "适合")
-    if len(mentioned_models) >= 2 or any(term in lower for term in product_terms):
+    troubleshooting_terms = ("故障", "排障", "连不上", "连接不上", "失败", "异常", "找不到", "没有菜单", "报错", "错误码", "网络问题")
+    category_discovery = bool(mentioned_categories) and not any(term in lower for term in troubleshooting_terms)
+    if len(mentioned_models) >= 2 or category_discovery or any(term in lower for term in product_terms):
         context = base.context
-        if len(mentioned_models) >= 2 or any(term in lower for term in ("产品线", "有哪些产品", "有哪些型号", "区别", "对比", "哪款", "哪个好")):
+        if len(mentioned_models) >= 2 or (category_discovery and not mentioned_models) or any(term in lower for term in ("产品线", "有哪些产品", "有哪些型号", "区别", "对比", "哪款", "哪个好")):
             context = DeviceContext(region=base.context.region)
-        return MedicalResolution("product_discovery", "customer_product_discovery", context, mentioned_models or SALES_MODEL_CANDIDATES)
+        candidates = mentioned_models or sales_models_for_categories(mentioned_categories) or SALES_MODEL_CANDIDATES
+        return MedicalResolution("product_discovery", "customer_product_discovery", context, candidates)
 
     getting_started_terms = ("型号在哪里", "哪里看型号", "版本在哪里", "哪里看版本", "怎么提问", "如何提问", "第一次使用", "入门")
     if any(term in lower for term in getting_started_terms):
         return MedicalResolution("customer_getting_started", "customer_getting_started", base.context, [])
 
-    troubleshooting_terms = ("故障", "排障", "连不上", "连接不上", "失败", "异常", "找不到", "没有菜单", "报错", "错误码", "网络问题")
     if any(term in lower for term in troubleshooting_terms):
         if not base.context.model_code:
+            candidates = sales_models_for_categories(mentioned_categories) or SALES_MODEL_CANDIDATES
             return MedicalResolution(
                 "clarify", "customer_missing_model_for_troubleshooting", base.context,
-                SALES_MODEL_CANDIDATES + ["我不知道型号在哪里看"],
+                candidates + ["我不知道型号在哪里看"],
             )
         return MedicalResolution("customer_troubleshooting", "customer_guided_troubleshooting", base.context, [])
 

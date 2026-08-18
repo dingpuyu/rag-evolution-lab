@@ -310,6 +310,11 @@ const CUSTOMER_EVALS: EvalCase[] = [
     expected: "answer",
   },
   {
+    id: "customer-aed-category",
+    query: "AED 是什么？你们有哪些 AED 产品？",
+    expected: "answer",
+  },
+  {
     id: "customer-monitor-compare",
     query: "BeneVision N1 和 IntelliVue MX550 都是什么类型的设备？",
     expected: "answer",
@@ -1419,8 +1424,8 @@ export default function MedicalWorkspace() {
       ? [
           "我对这些产品一窍不通，应该从哪里开始？",
           "你们目前有哪些医疗设备产品线？",
+          "AED 是什么？你们有哪些 AED 产品？",
           "BeneVision N1 和 IntelliVue MX550 都是什么设备？",
-          "购买医疗设备前需要核对哪些注册和配置信息？",
         ]
       : [
           "VSM-100 软件 2.6 的 SYS-NET-042 是什么？",
