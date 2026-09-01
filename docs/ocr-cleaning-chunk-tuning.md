@@ -137,3 +137,5 @@ make medical-ocr-smoke
 5. 将真实 Bad Case 归因到 `OCR / layout / cleaning / chunk / retrieval / rerank / answer` 后再选择修复点。
 
 这样面试时可以诚实地说明：已经跑通开源 OCR 与生产式适配边界，也发现了 confidence 偏高但词语仍识错的问题；长说明书参数仍在受控实验阶段，没有用一个拍脑袋的 Chunk Size 冒充生产经验。
+
+配套 `agent-evaluation` 将新增独立的 Document Quality Suite，由质量工程 Agent 读取 OCR、Cleaner、Chunk 和 Retrieval 的分层 Golden 指标，在隔离 Sandbox 中执行单变量 Candidate，并经过 Development、Holdout、Regression 后只给出人工发布建议。实施契约见同级项目 `agent-evaluation/docs/document-quality-agent-evaluation-plan.md`。
