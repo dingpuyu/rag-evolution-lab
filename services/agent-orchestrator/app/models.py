@@ -65,6 +65,14 @@ class AgentStep(BaseModel):
     observation: dict[str, Any] | None = None
 
 
+class ContextUsage(BaseModel):
+    candidate_chunks: int = 0
+    selected_chunks: int = 0
+    estimated_tokens: int = 0
+    token_budget: int = 0
+    truncated: bool = False
+
+
 class AgentResult(BaseModel):
     status: Literal["completed", "needs_confirmation", "needs_clarification", "refused"]
     answer: str
@@ -80,6 +88,7 @@ class AgentResult(BaseModel):
     candidate_entities: list[str] = Field(default_factory=list)
     suggested_questions: list[str] = Field(default_factory=list)
     trace_id: str = ""
+    context_usage: ContextUsage | None = None
 
 
 class AgentResponse(BaseModel):
@@ -152,3 +161,5 @@ class AgentState(TypedDict, total=False):
     candidate_entities: list[str]
     trace_id: str
     evidence_verification: str
+    context_token_budget: int
+    context_usage: dict[str, Any]

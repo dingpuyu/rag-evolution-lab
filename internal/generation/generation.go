@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/contextbuilder"
+	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 )
 
@@ -115,7 +117,19 @@ type Response struct {
 	RefusalReason string              `json:"refusal_reason,omitempty"`
 	AnswerSource  string              `json:"answer_source,omitempty"`
 	Search        milvus.SearchResult `json:"search"`
+	Context       ContextMetadata     `json:"context"`
 	Generation    Metadata            `json:"generation"`
+}
+
+// ContextMetadata makes the evidence budget observable. Provider token usage
+// remains the billing source of truth; this deterministic estimate prevents an
+// unexpectedly large retrieval result from reaching the LLM unchecked.
+type ContextMetadata struct {
+	CandidateChunks int  `json:"candidate_chunks"`
+	SelectedChunks  int  `json:"selected_chunks"`
+	EstimatedTokens int  `json:"estimated_tokens"`
+	TokenBudget     int  `json:"token_budget"`
+	Truncated       bool `json:"truncated"`
 }
 
 type Metadata struct {
@@ -139,6 +153,7 @@ type Service struct {
 	searcher         Searcher
 	generator        Generator
 	generalGenerator Generator
+	contextBuilder   contextbuilder.Packer
 }
 
 func NewService(searcher Searcher, generator Generator) (*Service, error) {
@@ -148,14 +163,19 @@ func NewService(searcher Searcher, generator Generator) (*Service, error) {
 type Options struct {
 	// GeneralGenerator is opt-in so callers that need strict grounded-only
 	// behavior can continue using NewService unchanged.
-	GeneralGenerator Generator
+	GeneralGenerator   Generator
+	ContextMaxChunks   int
+	ContextTokenBudget int
 }
 
 func NewServiceWithOptions(searcher Searcher, generator Generator, options Options) (*Service, error) {
 	if searcher == nil || generator == nil {
 		return nil, fmt.Errorf("answer service requires searcher and generator")
 	}
-	return &Service{searcher: searcher, generator: generator, generalGenerator: options.GeneralGenerator}, nil
+	return &Service{
+		searcher: searcher, generator: generator, generalGenerator: options.GeneralGenerator,
+		contextBuilder: contextbuilder.Packer{MaxChunks: options.ContextMaxChunks, TokenBudget: options.ContextTokenBudget},
+	}, nil
 }
 
 func (service *Service) Answer(ctx context.Context, query milvus.Query) (Response, error) {
@@ -196,7 +216,11 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 	}}); err != nil {
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
-	response := Response{Search: search, AnswerSource: "rag"}
+	contextMetadata := ContextMetadata{CandidateChunks: len(search.Hits)}
+	if !persona {
+		search, contextMetadata = packGenerationContext(search, service.contextBuilder)
+	}
+	response := Response{Search: search, Context: contextMetadata, AnswerSource: "rag"}
 	if persona {
 		// Retrieval remains observable, but irrelevant chunks must not be shown
 		// as evidence for a general persona response.
@@ -361,6 +385,41 @@ func (service *Service) AnswerWithProgress(ctx context.Context, query milvus.Que
 		return Response{}, fmt.Errorf("emit answer progress: %w", err)
 	}
 	return response, nil
+}
+
+func packGenerationContext(search milvus.SearchResult, packer contextbuilder.Packer) (milvus.SearchResult, ContextMetadata) {
+	candidates := make([]domain.RetrievedChunk, 0, len(search.Hits))
+	hitsByChunk := make(map[string]milvus.SearchHit, len(search.Hits))
+	for index, hit := range search.Hits {
+		chunkID := strings.TrimSpace(hit.ChunkID)
+		if chunkID == "" {
+			chunkID = fmt.Sprintf("context-candidate-%d", index)
+		}
+		hit.ChunkID = chunkID
+		hitsByChunk[chunkID] = hit
+		candidates = append(candidates, domain.RetrievedChunk{
+			Chunk: domain.Chunk{ID: chunkID, DocumentID: hit.DocumentID, DocumentTitle: hit.Title, Content: hit.Content},
+			Rank:  index + 1,
+		})
+	}
+	selected, stats := packer.Pack(candidates)
+	packedHits := make([]milvus.SearchHit, 0, len(selected))
+	for _, candidate := range selected {
+		hit := hitsByChunk[candidate.Chunk.ID]
+		// The packer may truncate the last passage to fit the deterministic
+		// budget. Keep all provenance fields from the original Milvus hit.
+		hit.Content = candidate.Chunk.Content
+		packedHits = append(packedHits, hit)
+	}
+	search.Hits = packedHits
+	budget := packer.TokenBudget
+	if budget <= 0 {
+		budget = 4000
+	}
+	return search, ContextMetadata{
+		CandidateChunks: stats.CandidateChunks, SelectedChunks: stats.SelectedChunks,
+		EstimatedTokens: stats.EstimatedTokens, TokenBudget: budget, Truncated: stats.Truncated,
+	}
 }
 
 func searchHitCount(search milvus.SearchResult) int {

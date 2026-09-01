@@ -114,20 +114,26 @@ func main() {
 		}
 	}
 	runtime, err := app.BuildWithOptions(context.Background(), corpusRoot, app.Options{
-		OllamaModel:       ollamaModel,
-		OllamaDimensions:  environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"),
-		OllamaURL:         os.Getenv("RAGLAB_OLLAMA_URL"),
-		QueryInstruction:  os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
-		EmbeddingCacheDir: filepath.Join(root, "data", "cache", "embeddings"),
-		MilvusURL:         milvusURL,
-		MilvusToken:       os.Getenv("RAGLAB_MILVUS_TOKEN"),
-		MilvusCollection:  os.Getenv("RAGLAB_MILVUS_COLLECTION"),
-		MilvusSearchEF:    64,
-		SkipOllamaMemory:  vectorBackend == "milvus",
-		ChunkMaxRunes:     environmentInt("RAGLAB_CHUNK_MAX_RUNES", 700),
-		ChunkOverlapRunes: environmentInt("RAGLAB_CHUNK_OVERLAP_RUNES", 0),
-		ProviderEmbedder:  providerEmbedder,
-		ProviderReranker:  providerReranker,
+		OllamaModel:                    ollamaModel,
+		OllamaDimensions:               environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"),
+		OllamaURL:                      os.Getenv("RAGLAB_OLLAMA_URL"),
+		QueryInstruction:               os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
+		EmbeddingCacheDir:              filepath.Join(root, "data", "cache", "embeddings"),
+		MilvusURL:                      milvusURL,
+		MilvusToken:                    os.Getenv("RAGLAB_MILVUS_TOKEN"),
+		MilvusCollection:               os.Getenv("RAGLAB_MILVUS_COLLECTION"),
+		MilvusSearchEF:                 environmentInt("RAGLAB_MILVUS_SEARCH_EF", 64),
+		SkipOllamaMemory:               vectorBackend == "milvus",
+		ChunkMaxRunes:                  environmentInt("RAGLAB_CHUNK_MAX_RUNES", 700),
+		ChunkOverlapRunes:              environmentInt("RAGLAB_CHUNK_OVERLAP_RUNES", 0),
+		ProviderEmbedder:               providerEmbedder,
+		ProviderReranker:               providerReranker,
+		CandidateTopN:                  environmentInt("RAGLAB_RETRIEVAL_CANDIDATE_TOP_N", 20),
+		ContextMaxChunks:               environmentInt("RAGLAB_CONTEXT_MAX_CHUNKS", 6),
+		ContextTokenBudget:             environmentInt("RAGLAB_CONTEXT_TOKEN_BUDGET", 4000),
+		EvidenceMinScore:               environmentFloat("RAGLAB_EVIDENCE_MIN_SCORE", 0.15),
+		ProviderEvidenceMinScore:       environmentFloat("RAGLAB_PROVIDER_EVIDENCE_MIN_SCORE", 0.10),
+		DisableDocumentDiversification: !environmentBool("RAGLAB_DOCUMENT_DIVERSIFICATION", true),
 	})
 	if err != nil {
 		fatal(err)
@@ -275,7 +281,9 @@ func runMilvusSeed(args []string) {
 	lifecycleVersion := environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1")
 	lifecycle, lifecycleErr := milvus.NewLifecycleService(milvus.NewClient(milvus.Config{BaseURL: *milvusURL}), embedder, milvus.LifecycleConfig{
 		Collection: lifecycleCollection, Alias: lifecycleAlias, EmbeddingVersion: lifecycleVersion,
-		StatePath: lifecycleState, ChunkRunes: 700,
+		StatePath:         lifecycleState,
+		ChunkRunes:        environmentInt("RAGLAB_DOCUMENT_CHUNK_RUNES", 700),
+		ChunkOverlapRunes: environmentInt("RAGLAB_DOCUMENT_CHUNK_OVERLAP_RUNES", 80),
 	})
 	if lifecycleErr != nil {
 		fatal(lifecycleErr)
@@ -334,6 +342,8 @@ func runLabServer(args []string) {
 	scaleVersion := flags.String("scale-version", "v2", "100K scale collection version")
 	lifecycleCollection := flags.String("lifecycle-collection", environmentOr("RAGLAB_LIFECYCLE_COLLECTION", "raglab_lifecycle_v1"), "incremental knowledge collection")
 	lifecycleAlias := flags.String("lifecycle-alias", environmentOr("RAGLAB_LIFECYCLE_ALIAS", "raglab_knowledge_active"), "active knowledge collection alias")
+	documentChunkRunes := flags.Int("document-chunk-runes", environmentInt("RAGLAB_DOCUMENT_CHUNK_RUNES", 700), "maximum runes per indexed document chunk")
+	documentChunkOverlapRunes := flags.Int("document-chunk-overlap-runes", environmentInt("RAGLAB_DOCUMENT_CHUNK_OVERLAP_RUNES", 80), "overlap runes between indexed document chunks")
 	hybridSearch := flags.Bool("hybrid-search", environmentBool("RAGLAB_HYBRID_SEARCH", true), "use Milvus dense + BM25 reciprocal-rank fusion")
 	embeddingVersion := flags.String("embedding-version", environmentOr("RAGLAB_EMBEDDING_VERSION", "qwen3-embedding-4b-q4km-v1"), "immutable embedding build version")
 	generationProviderDefault := strings.TrimSpace(os.Getenv("RAGLAB_GENERATION_PROVIDER"))
@@ -348,7 +358,7 @@ func runLabServer(args []string) {
 	generationModel := flags.String("generation-model", os.Getenv("RAGLAB_GENERATION_MODEL"), "grounded answer model; provider-specific default when empty")
 	generationBaseURL := flags.String("generation-base-url", environmentOr("RAGLAB_GENERATION_BASE_URL", "https://api.deepseek.com"), "OpenAI-compatible generation base URL")
 	generationTimeout := flags.Duration("generation-timeout", 2*time.Minute, "grounded answer generation timeout")
-	generationMaxTokens := flags.Int("generation-max-tokens", 512, "maximum generated answer tokens")
+	generationMaxTokens := flags.Int("generation-max-tokens", environmentInt("RAGLAB_GENERATION_MAX_TOKENS", 512), "maximum generated answer tokens")
 	lifecycleState := flags.String("lifecycle-state", environmentOr("RAGLAB_LIFECYCLE_STATE", "data/lifecycle/state.json"), "durable lifecycle event state")
 	ingestionJobState := flags.String("ingestion-job-state", environmentOr("RAGLAB_INGESTION_JOB_STATE", "data/ingestion/jobs.json"), "durable ingestion job state")
 	ingestionWorkers := flags.Int("ingestion-workers", 1, "number of asynchronous ingestion workers")
@@ -448,7 +458,8 @@ func runLabServer(args []string) {
 	}
 	lifecycleService, err := milvus.NewLifecycleService(milvusClient, embedder, milvus.LifecycleConfig{
 		Collection: *lifecycleCollection, Alias: *lifecycleAlias, EmbeddingVersion: *embeddingVersion,
-		StatePath: *lifecycleState, ChunkRunes: 700, HybridSearch: *hybridSearch,
+		StatePath: *lifecycleState, ChunkRunes: *documentChunkRunes, ChunkOverlapRunes: *documentChunkOverlapRunes,
+		HybridSearch: *hybridSearch,
 	})
 	if err != nil {
 		fatal(err)

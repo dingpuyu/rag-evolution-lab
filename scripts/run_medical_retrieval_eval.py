@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import subprocess
@@ -14,6 +15,45 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 REPORTS = ROOT / "eval/reports"
 DOMAIN = "medical-device-sales"
+
+
+def env_int(name: str, fallback: int) -> int:
+    raw = os.getenv(name, "").strip()
+    return int(raw) if raw else fallback
+
+
+def env_float(name: str, fallback: float) -> float:
+    raw = os.getenv(name, "").strip()
+    return float(raw) if raw else fallback
+
+
+def env_bool(name: str, fallback: bool) -> bool:
+    raw = os.getenv(name, "").strip().casefold()
+    if not raw:
+        return fallback
+    return raw in {"1", "true", "yes", "on"}
+
+
+def experiment_profile(provider: bool, chunk_size: int, chunk_overlap: int) -> dict:
+    profile = {
+        "chunk": {"max_runes": chunk_size, "overlap_runes": chunk_overlap, "heading_aware": True},
+        "retrieval": {
+            "candidate_top_n": env_int("RAGLAB_RETRIEVAL_CANDIDATE_TOP_N", 20),
+            "final_top_k": 5,
+            "rrf_constant": 60,
+            "context_max_chunks": env_int("RAGLAB_CONTEXT_MAX_CHUNKS", 6),
+            "context_token_budget": env_int("RAGLAB_CONTEXT_TOKEN_BUDGET", 4000),
+            "evidence_min_score": env_float(
+                "RAGLAB_PROVIDER_EVIDENCE_MIN_SCORE" if provider else "RAGLAB_EVIDENCE_MIN_SCORE",
+                0.10 if provider else 0.15,
+            ),
+            "document_diversification": env_bool("RAGLAB_DOCUMENT_DIVERSIFICATION", True) if provider else False,
+        },
+        "provider_mode": provider,
+    }
+    canonical = json.dumps(profile, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    profile["fingerprint"] = "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()[:16]
+    return profile
 
 
 def run(command: list[str], env: dict[str, str] | None = None) -> str:
@@ -84,6 +124,17 @@ def render_markdown(result: dict) -> str:
         f"- 选定切分：{result['selected_profile']['chunk_size']} 字符，重叠 {result['selected_profile']['chunk_overlap']} 字符",
         f"- 执行模式：{execution_mode}",
         f"- 发布门禁：**{result['gate']['status']}**",
+        "",
+        "## 参数指纹",
+        "",
+        f"- 配置指纹：`{result['experiment']['fingerprint']}`",
+        f"- Chunk：`{result['experiment']['chunk']['max_runes']}/{result['experiment']['chunk']['overlap_runes']}`（最大字符/重叠字符）",
+        f"- CandidateTopN / TopK：`{result['experiment']['retrieval']['candidate_top_n']}/{result['experiment']['retrieval']['final_top_k']}`",
+        f"- Context：最多 `{result['experiment']['retrieval']['context_max_chunks']}` 个 Chunk，预算 `{result['experiment']['retrieval']['context_token_budget']}` estimated tokens",
+        f"- Evidence 阈值：`{result['experiment']['retrieval']['evidence_min_score']}`；文档级多样化：`{result['experiment']['retrieval']['document_diversification']}`",
+        f"- RRF k：`{result['experiment']['retrieval']['rrf_constant']}`",
+        "",
+        "该指纹只包含非敏感参数，不包含 API Key。不同指纹的指标必须作为不同实验处理，不能覆盖或直接混算。",
         "",
         "## 核心结果",
         "",
@@ -156,6 +207,8 @@ def render_markdown(result: dict) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider", action="store_true", help="use provider embedding/rerank pipelines from environment")
+    parser.add_argument("--chunk-size", type=int, default=env_int("RAGLAB_MEDICAL_EVAL_CHUNK_SIZE", 350))
+    parser.add_argument("--chunk-overlap", type=int, default=env_int("RAGLAB_MEDICAL_EVAL_CHUNK_OVERLAP", 60))
     parser.add_argument("--json-report", type=Path)
     parser.add_argument("--markdown-report", type=Path)
     args = parser.parse_args()
@@ -167,7 +220,7 @@ def main() -> int:
     env = dict(os.environ)
     provider = args.provider
     candidate_pipeline = "v6-provider-selective-rag" if provider else "v6-selective-rag"
-    selected_size, selected_overlap = 350, 60
+    selected_size, selected_overlap = args.chunk_size, args.chunk_overlap
     report_items = []
     for pipeline, split in [
         ("v0-keyword", "acceptance"),
@@ -199,7 +252,7 @@ def main() -> int:
     safety = next(item for item in report_items if item["pipeline"] == candidate_pipeline and item["split"] == "safety")
     passed = acceptance["outcome_accuracy"] >= 0.80 and safety["outcome_accuracy"] == 1.0
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "generated_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "provider_mode": provider,
         "provider": {
@@ -213,6 +266,7 @@ def main() -> int:
         },
         "dataset": {"documents": len(manifest), "cases": case_count},
         "selected_profile": {"chunk_size": selected_size, "chunk_overlap": selected_overlap},
+        "experiment": experiment_profile(provider, selected_size, selected_overlap),
         "gate": {"minimum_outcome_accuracy": 0.80, "require_safety_accuracy": 1.0, "status": "passed" if passed else "failed"},
         "reports": report_items,
         "chunk_experiments": experiments,

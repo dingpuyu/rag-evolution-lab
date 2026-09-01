@@ -66,6 +66,13 @@ type AgentResponse = {
     resolved_context: DeviceContext;
     suggested_questions?: string[];
     trace_id?: string;
+    context_usage?: {
+      candidate_chunks: number;
+      selected_chunks: number;
+      estimated_tokens: number;
+      token_budget: number;
+      truncated: boolean;
+    } | null;
   };
 };
 type SourceMetadata = {
@@ -2807,6 +2814,16 @@ function ResponseDetails({
         <span>{result.reason_code}</span>
         {result.trace_id && <code>{result.trace_id}</code>}
       </div>
+      {result.context_usage && (
+        <div className="medical-context-usage" title="确定性估算用于控制上下文；账单以模型服务商实际 Token 为准">
+          <span>候选 {result.context_usage.candidate_chunks}</span>
+          <span>入选 {result.context_usage.selected_chunks}</span>
+          <span>
+            Context {result.context_usage.estimated_tokens}/{result.context_usage.token_budget} est. tokens
+          </span>
+          {result.context_usage.truncated && <b>已按预算截断</b>}
+        </div>
+      )}
       {result.suggested_questions && result.suggested_questions.length > 0 && (
         <div className="medical-followups">
           <span>你可以继续问</span>

@@ -82,6 +82,33 @@ func TestServiceMapsOnlyServerSelectedCitations(t *testing.T) {
 	}
 }
 
+func TestServiceEnforcesAndReportsContextTokenBudget(t *testing.T) {
+	searcher := &stubSearcher{result: milvus.SearchResult{Hits: []milvus.SearchHit{
+		{ChunkID: "doc-a#c001", DocumentID: "doc-a", Title: "Guide A", Content: strings.Repeat("a", 200)},
+		{ChunkID: "doc-b#c001", DocumentID: "doc-b", Title: "Guide B", Content: strings.Repeat("b", 200)},
+	}}}
+	generator := &stubGenerator{generation: Generation{Output: Output{
+		Answerable: true, Answer: "budgeted answer",
+		Citations: []CitationReference{{ChunkID: "doc-a#c001", DocumentID: "doc-a"}},
+	}}}
+	service, err := NewServiceWithOptions(searcher, generator, Options{ContextMaxChunks: 2, ContextTokenBudget: 20})
+	if err != nil {
+		t.Fatal(err)
+	}
+	response, err := service.Answer(context.Background(), milvus.Query{Text: "question"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Context.TokenBudget != 20 || response.Context.EstimatedTokens > 20 ||
+		!response.Context.Truncated || response.Context.CandidateChunks != 2 || response.Context.SelectedChunks != 1 {
+		t.Fatalf("context budget was not enforced: %#v", response.Context)
+	}
+	if len(generator.lastRequest.Evidence) != 1 || len(response.Search.Hits) != 1 ||
+		len(generator.lastRequest.Evidence[0].Content) >= 200 {
+		t.Fatalf("generator received unbounded evidence: request=%#v search=%#v", generator.lastRequest, response.Search.Hits)
+	}
+}
+
 func TestServiceProgressEmitsRetrievalGenerationAndCompletion(t *testing.T) {
 	searcher := &stubSearcher{result: milvus.SearchResult{
 		Filter: "tenant filter", EmbeddingLatencyMS: 3, SearchLatencyMS: 2,

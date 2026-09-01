@@ -125,6 +125,18 @@ def main() -> None:
     assert retrieval.get("bindings") and retrieval.get("result", {}).get("hits"), retrieval
     assert all(hit["dataset_id"] != "tenant-b-medical-runbook" for hit in retrieval["result"]["hits"]), retrieval
 
+    # The Go grounded-answer path must enforce the published application
+    # budget, not merely persist it as control-plane metadata.
+    status, grounded = call("POST", f"{api}/api/v1/apps/{app_id}/answer", alice, {
+        "environment_id": f"{app_id}-dev",
+        "query": "VSM-100 软件 2.6 的 SYS-NET-042 是什么？",
+        "top_k": 5,
+        "device_context": {"model_code": "VSM-100", "software_version": "2.6", "region": "CN"},
+    })
+    context_usage = grounded.get("result", {}).get("context", {})
+    assert status == 200 and context_usage.get("token_budget") == 5000, (status, grounded)
+    assert 0 < context_usage.get("estimated_tokens", 0) <= context_usage["token_budget"], context_usage
+
     for token, tenant, own, forbidden in (
         (alice, "tenant_a", "tenant-a-medical-runbook", "tenant-b-medical-runbook"),
         (bob, "tenant_b", "tenant-b-medical-runbook", "tenant-a-medical-runbook"),
@@ -156,6 +168,11 @@ def main() -> None:
     assert status == 200, (status, body)
     active_bindings = {binding["dataset_id"] for binding in body.get("bindings", []) if binding.get("status") == "active"}
     assert active_bindings == {"public-medical-device-sales"}, body
+    assert all(
+        binding.get("policy", {}).get("candidate_k") == 20
+        for binding in body.get("bindings", [])
+        if binding.get("status") == "active"
+    ), body
 
     status, body = call("GET", f"{agent}/api/v1/evaluations/medical-device/bad-cases?app_id=tenant_a-medical-device-agent", alice)
     assert status == 200 and isinstance(body.get("cases"), list), (status, body)
@@ -170,13 +187,16 @@ def main() -> None:
     result = answer(agent, customer, "tenant_a", "AED", "answer", customer=True)
     assert result["result"]["citations"] and all(item["dataset_id"] == "public-medical-device-sales" for item in result["result"]["citations"]), result
     assert "BeneHeart C Series" in result["result"].get("candidate_entities", []), result
+    agent_context = result["result"].get("context_usage", {})
+    assert agent_context.get("token_budget") == 4500, agent_context
+    assert 0 < agent_context.get("estimated_tokens", 0) <= agent_context["token_budget"], agent_context
     answer(agent, customer, "tenant_a", "设备网络连不上，我应该怎么排障？", "clarify", customer=True)
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
     commercial = answer(agent, customer, "tenant_a", "今天 BeneHeart C 的价格和库存是多少？", "refuse", customer=True)
     assert commercial["result"]["reason_code"] == "dynamic_commercial_data_unavailable", commercial
 
     print(json.dumps({
-        "status": "passed", "checks": 39, "tenants": ["tenant_a", "tenant_b"],
+        "status": "passed", "checks": 44, "tenants": ["tenant_a", "tenant_b"],
         "customer_public_only": True, "bad_case_isolation": True,
         "document_pipeline_visible": True, "document_ir_preview": True,
         "document_revision_diff": True, "authorized_retrieval_probe": True,

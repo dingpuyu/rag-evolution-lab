@@ -20,7 +20,10 @@ settings = get_settings()
 gateway = KnowledgeGatewayClient(settings.raglab_api_url)
 runtime: AgentRuntime = build_runtime(
     gateway,
-    build_llm(settings.model_api_key, settings.deepseek_base_url, settings.deepseek_model),
+    build_llm(
+        settings.model_api_key, settings.deepseek_base_url, settings.deepseek_model,
+        max_tokens=settings.deepseek_max_tokens,
+    ),
     max_steps=settings.agent_max_steps,
 )
 evaluation_store = EvaluationStore(settings.raglab_postgres_url)

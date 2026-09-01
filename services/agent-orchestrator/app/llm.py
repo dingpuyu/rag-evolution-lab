@@ -18,7 +18,7 @@ class Answerer(Protocol):
     async def answer(self, query: str, evidence: list[dict[str, Any]]) -> str: ...
 
 
-def build_llm(api_key: str, base_url: str, model: str) -> ChatOpenAI | None:
+def build_llm(api_key: str, base_url: str, model: str, max_tokens: int = 512) -> ChatOpenAI | None:
     if not api_key.strip():
         return None
     return ChatOpenAI(
@@ -26,6 +26,7 @@ def build_llm(api_key: str, base_url: str, model: str) -> ChatOpenAI | None:
         base_url=base_url,
         model=model,
         temperature=0,
+        max_tokens=max_tokens,
         timeout=45,
         max_retries=2,
     )

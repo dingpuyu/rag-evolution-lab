@@ -355,7 +355,7 @@ func (service *Service) Answer(ctx context.Context, identity auth.Identity, requ
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generation.Options{GeneralGenerator: service.generator})
+	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generationOptions(search, service.generator))
 	if err != nil {
 		return AnswerResponse{}, err
 	}
@@ -383,7 +383,7 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	if err != nil {
 		return AnswerResponse{}, err
 	}
-	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generation.Options{GeneralGenerator: service.generator})
+	answerService, err := generation.NewServiceWithOptions(staticSearcher{result: search.Result}, service.generator, generationOptions(search, service.generator))
 	if err != nil {
 		return AnswerResponse{}, err
 	}
@@ -399,6 +399,22 @@ func (service *Service) AnswerWithProgress(ctx context.Context, identity auth.Id
 	}
 	service.setCostAttributes(span, result)
 	return AnswerResponse{AppID: search.AppID, EnvironmentID: search.EnvironmentID, TraceID: search.TraceID, Bindings: search.Bindings, Result: result}, nil
+}
+
+func generationOptions(search SearchResponse, general generation.Generator) generation.Options {
+	budget := 0
+	for _, binding := range search.Bindings {
+		current := binding.Policy.TokenBudget
+		if current > 0 && (budget == 0 || current < budget) {
+			// Multiple independently managed bindings share one prompt. Use the
+			// smallest published budget so adding a dataset cannot silently
+			// exceed an application's existing cost envelope.
+			budget = current
+		}
+	}
+	return generation.Options{
+		GeneralGenerator: general, ContextMaxChunks: len(search.Result.Hits), ContextTokenBudget: budget,
+	}
 }
 
 func (service *Service) setCostAttributes(span trace.Span, result generation.Response) {

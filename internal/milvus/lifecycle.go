@@ -32,13 +32,14 @@ const (
 type LifecycleObserver func(stage string)
 
 type LifecycleConfig struct {
-	Collection       string
-	Alias            string
-	EmbeddingVersion string
-	StatePath        string
-	ChunkRunes       int
-	HybridSearch     bool
-	Now              func() time.Time
+	Collection        string
+	Alias             string
+	EmbeddingVersion  string
+	StatePath         string
+	ChunkRunes        int
+	ChunkOverlapRunes int
+	HybridSearch      bool
+	Now               func() time.Time
 }
 
 type LifecycleService struct {
@@ -168,11 +169,23 @@ func NewLifecycleService(client *Client, embedder retrieval.Embedder, config Lif
 	if strings.TrimSpace(config.StatePath) == "" {
 		config.StatePath = filepath.Join("data", "lifecycle", "state.json")
 	}
+	if config.ChunkRunes <= 0 {
+		config.ChunkRunes = 700
+	}
+	if config.ChunkOverlapRunes < 0 {
+		return nil, fmt.Errorf("chunk overlap runes must not be negative")
+	}
+	if config.ChunkOverlapRunes == 0 {
+		config.ChunkOverlapRunes = 80
+	}
+	if config.ChunkOverlapRunes >= config.ChunkRunes {
+		return nil, fmt.Errorf("chunk overlap runes must be smaller than chunk runes")
+	}
 	if config.Now == nil {
 		config.Now = time.Now
 	}
 	service := &LifecycleService{
-		client: client, embedder: embedder, chunker: ingest.Chunker{MaxRunes: config.ChunkRunes, OverlapRunes: 80, PageAware: true}, config: config,
+		client: client, embedder: embedder, chunker: ingest.Chunker{MaxRunes: config.ChunkRunes, OverlapRunes: config.ChunkOverlapRunes, PageAware: true}, config: config,
 		state: lifecycleState{SchemaVersion: 1, Events: make(map[string]persistedLifecycleEvent), Documents: make(map[string]DocumentState)},
 	}
 	if err := service.loadState(); err != nil {

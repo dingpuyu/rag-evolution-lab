@@ -1,6 +1,6 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-09-01T01:54:11.244129Z",
+  "schema_version": 2,
+  "generated_at": "2026-09-01T02:11:14.992923Z",
   "provider_mode": true,
   "provider": {
     "embedding_model": "text-embedding-v4",
@@ -14,6 +14,24 @@
   "selected_profile": {
     "chunk_size": 350,
     "chunk_overlap": 60
+  },
+  "experiment": {
+    "chunk": {
+      "max_runes": 350,
+      "overlap_runes": 60,
+      "heading_aware": true
+    },
+    "retrieval": {
+      "candidate_top_n": 20,
+      "final_top_k": 5,
+      "rrf_constant": 60,
+      "context_max_chunks": 6,
+      "context_token_budget": 4000,
+      "evidence_min_score": 0.1,
+      "document_diversification": true
+    },
+    "provider_mode": true,
+    "fingerprint": "sha256:b9cda952a9b77f0d"
   },
   "gate": {
     "minimum_outcome_accuracy": 0.8,
@@ -30,7 +48,7 @@
       "mrr": 0.5681818181818182,
       "ndcg_at_k": 0.5741331706168844,
       "answerability_accuracy": 0.5909090909090909,
-      "latency_p95_ms": 0.407,
+      "latency_p95_ms": 0.322,
       "failed_cases": [
         "public_acceptance_refuse_alarm_value",
         "public_acceptance_refuse_diagnosis_treatment",
@@ -64,7 +82,7 @@
       "mrr": 0.5454545454545454,
       "ndcg_at_k": 0.557357250324678,
       "answerability_accuracy": 0.5909090909090909,
-      "latency_p95_ms": 1.547,
+      "latency_p95_ms": 1.58,
       "failed_cases": [
         "public_acceptance_refuse_alarm_value",
         "public_acceptance_refuse_diagnosis_treatment",
@@ -109,7 +127,7 @@
       "mrr": 0.9593023255813954,
       "ndcg_at_k": 0.9695938619817747,
       "answerability_accuracy": 1,
-      "latency_p95_ms": 519.669,
+      "latency_p95_ms": 435.096,
       "failed_cases": [],
       "rank_outliers": [
         {
@@ -159,7 +177,7 @@
       "mrr": 0.8527777777777777,
       "ndcg_at_k": 0.8828773591395027,
       "answerability_accuracy": 1,
-      "latency_p95_ms": 452.604,
+      "latency_p95_ms": 491.033,
       "failed_cases": [],
       "rank_outliers": [
         {
@@ -269,7 +287,7 @@
       "mrr": 0.9545454545454546,
       "ndcg_at_k": 0.966448159415587,
       "answerability_accuracy": 1,
-      "latency_p95_ms": 429.561,
+      "latency_p95_ms": 468.709,
       "failed_cases": [],
       "rank_outliers": [
         {
@@ -307,7 +325,7 @@
       "mrr": 1,
       "ndcg_at_k": 1,
       "answerability_accuracy": 1,
-      "latency_p95_ms": 357.827,
+      "latency_p95_ms": 500.047,
       "failed_cases": [],
       "rank_outliers": []
     }

@@ -25,6 +25,35 @@ type lifecycleMilvusMock struct {
 	aliases    int
 }
 
+func TestLifecycleUsesConfiguredChunkProfile(t *testing.T) {
+	service, err := NewLifecycleService(
+		NewClient(Config{BaseURL: "http://127.0.0.1:19530"}),
+		retrieval.HashEmbedder{Dimensions: 8},
+		LifecycleConfig{
+			Collection: "chunks_v1", EmbeddingVersion: "hash-v1", StatePath: t.TempDir() + "/state.json",
+			ChunkRunes: 350, ChunkOverlapRunes: 60,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if service.chunker.MaxRunes != 350 || service.chunker.OverlapRunes != 60 || !service.chunker.PageAware {
+		t.Fatalf("unexpected chunk profile: %#v", service.chunker)
+	}
+
+	_, err = NewLifecycleService(
+		NewClient(Config{BaseURL: "http://127.0.0.1:19530"}),
+		retrieval.HashEmbedder{Dimensions: 8},
+		LifecycleConfig{
+			Collection: "chunks_v1", EmbeddingVersion: "hash-v1", StatePath: t.TempDir() + "/state.json",
+			ChunkRunes: 350, ChunkOverlapRunes: 350,
+		},
+	)
+	if err == nil || !strings.Contains(err.Error(), "smaller than chunk runes") {
+		t.Fatalf("expected invalid overlap to fail, got %v", err)
+	}
+}
+
 func (mock *lifecycleMilvusMock) serveHTTP(t *testing.T, writer http.ResponseWriter, request *http.Request) {
 	t.Helper()
 	mock.mu.Lock()

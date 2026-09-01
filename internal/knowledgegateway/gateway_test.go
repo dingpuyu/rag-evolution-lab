@@ -275,3 +275,18 @@ func TestMergePreservesPrivateBindingAndDocumentDiversity(t *testing.T) {
 		t.Fatalf("binding coverage or document diversity lost: %#v", merged.Hits)
 	}
 }
+
+func TestGenerationOptionsUseSmallestPublishedContextBudget(t *testing.T) {
+	search := SearchResponse{
+		Result: milvus.SearchResult{Hits: []milvus.SearchHit{{ChunkID: "a"}, {ChunkID: "b"}, {ChunkID: "c"}}},
+		Bindings: []BindingTrace{
+			{Policy: datasetaccess.RetrievalPolicy{TokenBudget: 5_000}},
+			{Policy: datasetaccess.RetrievalPolicy{TokenBudget: 4_500}},
+			{Policy: datasetaccess.RetrievalPolicy{}},
+		},
+	}
+	options := generationOptions(search, generation.ExtractiveGenerator{})
+	if options.ContextTokenBudget != 4_500 || options.ContextMaxChunks != 3 || options.GeneralGenerator == nil {
+		t.Fatalf("unexpected generation options: %#v", options)
+	}
+}

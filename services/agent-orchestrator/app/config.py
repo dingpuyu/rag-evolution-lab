@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     raglab_generation_api_key: str = ""
     deepseek_base_url: str = "https://api.deepseek.com"
     deepseek_model: str = "deepseek-chat"
+    deepseek_max_tokens: int = 512
     agent_host: str = "0.0.0.0"
     agent_port: int = 8090
     agent_max_steps: int = 4

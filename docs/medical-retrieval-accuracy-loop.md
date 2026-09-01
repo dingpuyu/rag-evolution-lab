@@ -109,6 +109,21 @@ BM25、确定性向量和启发式 Rerank 共用受控别名扩展，同时保�
 
 第一次平台全量运行 89/90，唯一失败来自评测批任务命中应用 429，被错误归类为检索失败。平台没有绕过生产限流，而是增加默认 90 RPM 的评测节流和仅针对 429 的有限指数退避；同一套 90 条用例复跑达到 90/90。由此把“模型质量失败”和“运行环境失败”分开归因。
 
+### 4.7 生产参数审计：“存在配置”不等于“配置已生效”
+
+对线上链路逐段核对时发现，Knowledge Binding 已保存 `token_budget`，但该值没有传入生成前的 Context Builder。这类问题不会在小数据 Demo 中报错，却会在长文档或多知识库场景中放大 Prompt、延迟和费用。
+
+修复后，Go Grounded Answer 和 Python LangGraph Agent 都使用所有已授权 Binding 中最小的正数预算打包最终证据。Agent 在型号、版本、来源和权限证据校验完成后再打包，避免无效证据先占用预算；多余 Chunk 不进入 LLM，最后一个 Chunk 可以被确定性截断。响应新增 `candidate_chunks`、`selected_chunks`、`estimated_tokens`、`token_budget` 和 `truncated`，医疗对话页直接展示这些数据，同时继续使用 Provider 返回的 Prompt Tokens 计费。Citation Allowlist 基于打包后的 Context，因此被截掉的证据不能被模型引用。
+
+修复后重新执行 Customer Agent v5 全量 90 条在线用例，结果仍为 90/90：Hit@5 1.0、MRR 0.929、决策准确率 1.0、权限泄漏 0、WrongModelRate 0，P50 延迟约 362ms。这一步用于证明成本治理没有换来可见的质量回退，而不是只证明新增单测能通过。
+
+同时明确分离两类切分参数：
+
+- 在线 Document IR 当前为 `700/80`，已经过 165 Chunk 和 90/90 Agent 回归；
+- 离线短摘要精度实验选出 `350/60`，用于比较检索组合。
+
+两者不能因为“350/60 在一个集合上 MRR 更高”就直接混用。修改在线切分必须生成新的 Collection/Manifest，重跑端到端回归后再通过 Alias 灰度发布。新评测报告会为 Chunk、CandidateTopN、Top-K、Context Budget、Evidence 阈值、RRF 和文档多样化生成不含密钥的 SHA-256 参数指纹，防止不同配置的结果被误当成同一实验。
+
 ## 5. 最终结果
 
 冻结数据的真实演进结果：

@@ -9,6 +9,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import interrupt
 
+from .context_budget import pack_evidence, token_budget_from_gateway
 from .gateway import GatewayError, KnowledgeGatewayClient
 from .llm import Answerer, Planner, RuleAnswerer, RulePlanner, citations_from_hits
 from .medical import (
@@ -143,15 +144,20 @@ class AgentRuntime:
         try:
             payload = await self.gateway.search(context.app_id, context.environment_id, str(state["query"]), context.authorization)
             hits = [hit.model_dump() for hit in self.gateway.hits(payload)]
+            hits, usage = pack_evidence(hits, token_budget_from_gateway([payload]))
             observation = {"tool": "knowledge_search", "status": "ok", "summary": f"授权检索命中 {len(hits)} 条证据"}
         except GatewayError as exc:
             hits = []
+            usage = None
             observation = {"tool": "knowledge_search", "status": "error", "summary": str(exc)}
         steps = list(state.get("steps", []))
         steps[-1]["observation"] = observation
         if observation["status"] == "error":
             return {"evidence": hits, "gateway_error": observation["summary"], "observations": list(state.get("observations", [])) + [observation], "steps": steps}
-        return {"evidence": hits, "gateway_error": "", "observations": list(state.get("observations", [])) + [observation], "steps": steps}
+        return {
+            "evidence": hits, "context_usage": usage.model_dump(), "gateway_error": "",
+            "observations": list(state.get("observations", [])) + [observation], "steps": steps,
+        }
 
     async def _knowledge_answer(self, state: AgentState) -> dict[str, Any]:
         evidence = list(state.get("evidence", []))
@@ -172,6 +178,7 @@ class AgentRuntime:
             answer=answer,
             answer_source="rag",
             citations=citations,
+            context_usage=state.get("context_usage"),
             steps=[AgentStep.model_validate(step) for step in state.get("steps", [])],
             tool_calls=["knowledge_search"],
         )
@@ -305,6 +312,7 @@ class AgentRuntime:
                     )
                     for model in comparison_models[:4]
                 ])
+                context_token_budget = token_budget_from_gateway(payloads)
                 trace_ids = [str(payload.get("trace_id", "")) for payload in payloads if payload.get("trace_id")]
                 per_model_hits = [[hit.model_dump() for hit in self.gateway.hits(payload)] for payload in payloads]
                 hits = []
@@ -334,17 +342,23 @@ class AgentRuntime:
                     context.authorization,
                     device_context=gateway_context,
                 )
+                context_token_budget = token_budget_from_gateway([payload])
                 hits = [hit.model_dump() for hit in self.gateway.hits(payload)]
                 trace_id = str(payload.get("trace_id", ""))
                 observation = {"tool": "knowledge_search", "status": "ok", "summary": f"授权检索命中 {len(hits)} 条医疗设备证据"}
         except GatewayError as exc:
             hits, trace_id = [], ""
+            context_token_budget = 0
             observation = {"tool": "knowledge_search", "status": "error", "summary": str(exc)}
         action_arguments = {**gateway_context, "retrieval_query": retrieval_query}
         if len(comparison_models) >= 2:
             action_arguments["comparison_models"] = comparison_models[:4]
         step = AgentStep(step=1, action={"type": "knowledge_search", "arguments": action_arguments}, observation=observation).model_dump(exclude_none=True)
-        return {"evidence": hits, "trace_id": trace_id, "gateway_error": "" if observation["status"] == "ok" else observation["summary"], "steps": [step], "observations": [observation]}
+        return {
+            "evidence": hits, "trace_id": trace_id, "context_token_budget": context_token_budget,
+            "gateway_error": "" if observation["status"] == "ok" else observation["summary"],
+            "steps": [step], "observations": [observation],
+        }
 
     async def _medical_answer(self, state: AgentState) -> dict[str, Any]:
         evidence = list(state.get("evidence", []))
@@ -385,6 +399,7 @@ class AgentRuntime:
                 decision=decision, reason_code=f"field_correction_{outcome}", answer=answer,
                 answer_source="tool", resolved_context=resolved, citations=citations, steps=steps,
                 tool_calls=["knowledge_search", "assess_field_correction"], trace_id=str(state.get("trace_id", "")),
+                context_usage=state.get("context_usage"),
             )
             return {"response": result.model_dump()}
         customer = bool(state.get("is_customer"))
@@ -397,6 +412,7 @@ class AgentRuntime:
         result = AgentResult(
             status="completed", decision="answer", reason_code="grounded_customer_answer" if customer else "grounded_medical_answer", answer=answer,
             answer_source="rag", resolved_context=resolved, citations=citations, steps=steps,
+            context_usage=state.get("context_usage"),
             candidate_entities=list(state.get("candidate_entities", [])),
             tool_calls=["resolve_device_context", "knowledge_search", "verify_evidence"], trace_id=str(state.get("trace_id", "")),
             suggested_questions=(
@@ -415,13 +431,20 @@ class AgentRuntime:
             evidence, reason = verify_customer_evidence(str(state.get("medical_intent", "knowledge")), resolved, list(state.get("evidence", [])))
         else:
             evidence, reason = verify_medical_evidence(resolved, list(state.get("evidence", [])))
+        evidence, context_usage = pack_evidence(evidence, int(state.get("context_token_budget", 0) or 0))
         steps = list(state.get("steps", []))
         steps.append(AgentStep(
             step=len(steps) + 1,
             action={"type": "verify_evidence", "arguments": resolved.model_dump()},
-            observation={"tool": "verify_evidence", "status": "ok" if evidence else "rejected", "summary": reason},
+            observation={
+                "tool": "verify_evidence", "status": "ok" if evidence else "rejected", "summary": reason,
+                "context_usage": context_usage.model_dump(),
+            },
         ).model_dump(exclude_none=True))
-        return {"evidence": evidence, "evidence_verification": reason, "steps": steps}
+        return {
+            "evidence": evidence, "context_usage": context_usage.model_dump(),
+            "evidence_verification": reason, "steps": steps,
+        }
 
     async def _service_status(self, state: AgentState) -> dict[str, Any]:
         action = Action.model_validate(state["action"])

@@ -576,7 +576,10 @@ func (store *PostgresStore) seed(ctx context.Context) error {
 			ON CONFLICT (environment_id) DO UPDATE SET config_version=EXCLUDED.config_version,status='active'`, environmentID, application.id); err != nil {
 			return err
 		}
-		policy, _ := json.Marshal(RetrievalPolicy{TopK: 6, CandidateK: 24, Rerank: true, QueryRewrite: true, TokenBudget: 4500, AllowFallback: true})
+		// CandidateK=20 matches the Gateway's enforced upper bound. Keeping the
+		// stored policy equal to the effective runtime value avoids misleading
+		// operators and makes experiment reports reproducible.
+		policy, _ := json.Marshal(RetrievalPolicy{TopK: 6, CandidateK: 20, Rerank: true, QueryRewrite: true, TokenBudget: 4500, AllowFallback: true})
 		if _, err := tx.ExecContext(ctx, `
 			UPDATE knowledge_bindings SET status='disabled'
 			WHERE app_id=$1 AND environment_id=$2 AND dataset_id='public-medical-device' AND created_by='system'`, application.id, environmentID); err != nil {

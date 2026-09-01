@@ -34,6 +34,47 @@ make medical-smoke
 
 医疗销售公开语料现包含 39 份受审事实摘要和 197 条分层 Golden Cases。`make medical-dataset-audit` 会先检查跨集合问题泄漏、证据与答案事实一致性、拒答结构和覆盖下限；`make medical-retrieval-eval` 会自动执行该门禁后再生成确定性 CI 基线，`make medical-retrieval-qwen` 则使用 `text-embedding-v4 + qwen3-rerank` 验证真实 Provider。当前 39 份语料的远端 Qwen 四组发布集 Outcome Accuracy 均为 1.0；针对重复 Chunk 挤占 Top-K 的单变量优化，将 Regression MRR 从 0.830 提升到 0.853、NDCG@5 从 0.850 提升到 0.883。在线 Customer Agent v5 全链路评测为 90/90，权限泄漏与错型号均为 0。这些数字只代表当前受控数据集，不宣称为真实生产准确率；完整实验、失败样本和边界见 [医疗检索精度优化闭环](docs/medical-retrieval-accuracy-loop.md)。
 
+## 生产 RAG 质量闭环：解决过的真实问题
+
+这个项目不把“接上向量库”当成完成。每次改动都保留数据快照、失败 Case、参数指纹和修复前后指标，当前真实经历包括：
+
+| 现象 | 如何定位 | 修复 | 量化结果 |
+| --- | --- | --- | --- |
+| 检索到相似资料就硬答临床、价格、库存和未知型号问题 | Blind Outcome Accuracy 首跑只有 0.560；Hit@5 不能反映该拒答的问题 | 在 LLM 前增加确定性 Selective RAG 门禁，分开临床决策、动态商业数据、私有外部数据、危险绕过和未知强标识符 | 修复后 Safety 12/12，远端 Qwen 四个发布集 Outcome Accuracy 均为 1.0 |
+| 正确文档已召回，但同一错误文档的多个 Chunk 挤占 Top-K | 逐题 Trace 显示 Hit@5=1.0，但正确文档经常只在第 3～5 名 | Qwen Rerank 后做稳定的文档级轮转：先取每份文档的最高分 Chunk，再取第二个，不删除候选证据 | Regression MRR `0.830 → 0.853`，NDCG@5 `0.850 → 0.883`，其他集合无回退 |
+| 回答文字在拒绝价格/库存，结构化 `decision` 却是 `answer` | 端到端 Case 同时校验文本、决策和 reason code，而不是只做文本相似度 | 价格、库存、现货和交期在检索前返回 `refuse / dynamic_commercial_data_unavailable` | Customer Agent v5 决策准确率 1.0 |
+| 评测批任务遇到 429，被误判成检索质量失败 | 首轮平台评测 89/90，唯一失败是 `rate_limit_exceeded` | 不绕过生产限流；评测默认 90 RPM，只对 429 做有限指数退避，将运行故障与质量回归分类 | 同一套 Case 复跑 90/90 |
+| 重复 Bootstrap 仍发生解析、Embedding 和 Milvus 写入 | 发现历史失败 Job 污染本轮发布，且 `openpyxl` 每次改写 XLSX 修改时间导致 SHA 漂移 | Bootstrap 输出本批精确 Job ID；固定 Office Core Properties；用内容指纹和修订号实现幂等 | 66 个上传版本全部 completed，再次 Bootstrap 为 0 个待处理任务 |
+| Binding 中存了 `token_budget`，但生成链路过去没有真正执行 | 代码审计发现策略值只被序列化；Go 直答和 Python LangGraph 又是两条独立生成链路 | 两条链路都在证据校验后按 Binding 最小预算打包 Context，最后一段可截断；返回 candidate/selected/estimated/truncated 并在对话页展示 | 单测覆盖 Go 与 LangGraph 超预算输入；`medical-smoke` 同时断言 5000/4500 两个应用预算；Customer Agent v5 复跑仍为 90/90，P50 约 362ms |
+
+### 当前已验证参数
+
+| 层级 | 当前值 | 设置依据与生产注意事项 |
+| --- | --- | --- |
+| 远端 Embedding | `text-embedding-v4`，1024 维 | 维度与 Collection Schema 绑定；换模型或维度必须新建版本化 Collection 并全量重建，不能在原索引上混写 |
+| 在线 Document IR 切分 | `700/80` runes，页码/标题感知 | 现有在线 39 份资料产生 165 个 Chunk，并通过 90/90 端到端评测。可用 `RAGLAB_DOCUMENT_CHUNK_RUNES` / `RAGLAB_DOCUMENT_CHUNK_OVERLAP_RUNES` 调整，修改后必须发布新索引版本 |
+| 离线精度候选切分 | `350/60` runes | 在 `350/60、500/80、700/0、900/120` 中通过 Development/Regression A/B 选出；它适用于当前短事实摘要，不应未评测就直接替换在线长文档配置 |
+| Milvus 混合召回 | Dense + BM25，RRF `k=60` | 应用 Binding 先取 20 个候选；Milvus 内部每路最多取 80 个再 RRF，不直接比较 BM25 与 Cosine 原始分数 |
+| Rerank | `qwen3-rerank`，输入 Top 20 | Candidate 太少会丢召回，太多会增加延迟和费用；当前使用文档级多样化防止单文档占满结果 |
+| 最终 Top-K | 客户 Agent `6`，专业运维 Agent `5` | Top-K 是应用 Binding 策略，不是全局常量；多知识库合并时先保留每个已授权 Binding 的至少一条证据，再按文档多样性填充 |
+| Context 预算 | 客户 Agent `4500`，专业运维 Agent `5000` estimated tokens | Go Grounded Answer 与 Python LangGraph Agent 均执行；页面展示候选/入选/预算/截断，供应商返回的 prompt tokens 仍是计费与成本审计真值 |
+| Selective RAG 阈值 | 真实 Provider `0.10`，确定性 CI `0.15` | 阈值来自 Development 集校准；跨 Reranker 不能共用，不能用一个“通用相似度”掩盖临床/权限等确定性拒答规则 |
+| Rerank 失败策略 | 当前 `strict=false` | 实验环境优先可用性，回退到确定性 Rerank 并记录 Trace；若真实业务要求“无重排不回答”，应设为 `true` 并由上层降级/拒答 |
+| 生成 | DeepSeek `deepseek-chat`，最多 512 output tokens | 模型只解释服务端选定的证据，Citation Allowlist 不允许引用最终 Context 之外的 Chunk |
+| 限流/评测节流 | 在线 `120 RPM + burst 30`，评测 `90 RPM` | 评测不绕过生产限流；429 单独标记为运行失败，不纳入 RAG 准确率分母 |
+
+每份新评测报告都保存非敏感参数指纹，包含 Chunk、CandidateTopN、Top-K、Context Budget、Evidence 阈值、RRF 与文档多样化。指纹不同的结果必须视为不同实验，不能直接覆盖历史报告。一次只改一类变量，依次跑 Development → Regression → Acceptance → Safety；只有准确率不回退、安全/越权为 0，才能新建 Collection、灰度切换 Alias，并保留回滚指针。
+
+可复现顺序：
+
+```bash
+make medical-dataset-audit       # 先检查标注、证据和数据泄漏
+make medical-retrieval-eval      # 确定性 CI 基线与切分消融
+make medical-retrieval-qwen      # 真实 Qwen Embedding + Rerank 验收
+make medical-bootstrap-plan      # 入库前依赖、指纹、修订和权限预检
+make medical-smoke               # 登录、跨租户、检索、问答、澄清、拒答和引用回归
+```
+
 复杂 PDF、DOCX、XLSX 不再只转成纯文本：Document IR v2 会把页码、标题路径、工作表和单元格范围贯穿到 Chunk、Milvus 引用与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
 
 管理员可以在医疗页面上传真实格式文件，并查看从 MinIO 原件、Document IR、Qwen Embedding、Milvus 写入验证到最终可检索的七阶段持久化状态；权限边界、接口和复现步骤见 [真实文档上传与知识状态工作台](docs/document-ingestion-workbench.md)。
