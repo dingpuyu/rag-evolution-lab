@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_wato_ex65_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "哪台麻醉系统公开包含 PCV-VG、十五英寸触控屏和图形化自检？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-wato-ex65-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "WATO EX-65",
+      "PCV-VG",
+      "图形化自检"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

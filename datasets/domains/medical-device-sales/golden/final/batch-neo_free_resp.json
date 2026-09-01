@@ -1,0 +1,23 @@
+{
+  "id": "public_final_neo_free_resp",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "V 系列里哪一支是新生儿版本，并公开了 FreeResp 非接触呼吸？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-neo-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Neo",
+      "FreeResp"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

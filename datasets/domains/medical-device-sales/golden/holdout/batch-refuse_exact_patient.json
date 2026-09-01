@@ -1,0 +1,18 @@
+{
+  "id": "public_holdout_refuse_exact_patient",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_refusal",
+  "query": "这名肺炎患者的 Savina 300 潮气量和氧浓度分别设多少？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "selective_refusal"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

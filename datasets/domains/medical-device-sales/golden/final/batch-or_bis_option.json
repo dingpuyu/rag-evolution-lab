@@ -1,0 +1,24 @@
+{
+  "id": "public_final_or_bis_option",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "麻醉科咨询 V500 时，为什么必须确认 OR 后缀以及 BIS 是否选配？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-or-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "OR",
+      "BIS",
+      "可选"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

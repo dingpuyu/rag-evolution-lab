@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/answerability"
 	"github.com/dingpuyu/rag-evolution-lab/internal/contextbuilder"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/rerank"
@@ -20,6 +21,8 @@ type Pipeline struct {
 	reranker       rerank.Reranker
 	candidateTopN  int
 	contextBuilder contextbuilder.Packer
+	evidenceGate   answerability.Gate
+	diversifyDocs  bool
 }
 
 func New(name string, retriever retrieval.Retriever) *Pipeline {
@@ -31,6 +34,8 @@ type Options struct {
 	CandidateTopN      int
 	ContextMaxChunks   int
 	ContextTokenBudget int
+	EvidenceGate       answerability.Gate
+	DiversifyDocuments bool
 }
 
 func NewWithOptions(name string, retriever retrieval.Retriever, options Options) *Pipeline {
@@ -43,6 +48,8 @@ func NewWithOptions(name string, retriever retrieval.Retriever, options Options)
 			MaxChunks:   options.ContextMaxChunks,
 			TokenBudget: options.ContextTokenBudget,
 		},
+		evidenceGate:  options.EvidenceGate,
+		diversifyDocs: options.DiversifyDocuments,
 	}
 }
 
@@ -99,6 +106,41 @@ func (p *Pipeline) Query(ctx context.Context, request domain.QueryRequest) (*dom
 			return nil, fmt.Errorf("rerank results: %w", err)
 		}
 	}
+	if p.diversifyDocs {
+		started = time.Now()
+		before := append([]domain.RetrievedChunk(nil), results...)
+		results = diversifyByDocument(results)
+		uniqueDocuments := make(map[string]struct{}, len(results))
+		for _, result := range results {
+			uniqueDocuments[result.Chunk.DocumentID] = struct{}{}
+		}
+		moved := false
+		for index := range results {
+			if index >= len(before) || results[index].Chunk.ID != before[index].Chunk.ID {
+				moved = true
+				break
+			}
+		}
+		recorder.Add("document_diversified", started, map[string]any{
+			"candidate_chunks": len(results),
+			"unique_documents": len(uniqueDocuments),
+			"reordered":        moved,
+		})
+	}
+	refusalReason := ""
+	if p.evidenceGate != nil {
+		started = time.Now()
+		decision := p.evidenceGate.Assess(request, results)
+		recorder.Add("answerability_gate", started, map[string]any{
+			"answerable": decision.Answerable,
+			"reason":     decision.Reason,
+			"top_score":  decision.TopScore,
+		})
+		if !decision.Answerable {
+			results = nil
+			refusalReason = decision.Reason
+		}
+	}
 	if len(results) > request.TopK {
 		results = results[:request.TopK]
 	}
@@ -115,9 +157,10 @@ func (p *Pipeline) Query(ctx context.Context, request domain.QueryRequest) (*dom
 	})
 
 	response := &domain.QueryResponse{
-		Answerable: len(results) > 0,
-		Retrieval:  results,
-		Context:    selectedContext,
+		Answerable:    len(results) > 0,
+		RefusalReason: refusalReason,
+		Retrieval:     results,
+		Context:       selectedContext,
 	}
 	started = time.Now()
 	if len(selectedContext) == 0 {
@@ -146,4 +189,40 @@ func (p *Pipeline) Query(ctx context.Context, request domain.QueryRequest) (*dom
 	})
 	response.Trace = recorder.Finish()
 	return response, nil
+}
+
+// diversifyByDocument performs stable round-robin interleaving after rerank.
+// Cross-encoders score passages independently, so several passages from one
+// superficially similar document can otherwise occupy the entire Top-K and
+// hide a correct document that was successfully recalled. No candidate is
+// dropped: the best passage from every document is emitted first, followed by
+// each document's second passage, and so on.
+func diversifyByDocument(results []domain.RetrievedChunk) []domain.RetrievedChunk {
+	if len(results) < 2 {
+		return append([]domain.RetrievedChunk(nil), results...)
+	}
+	order := make([]string, 0, len(results))
+	groups := make(map[string][]domain.RetrievedChunk, len(results))
+	for _, result := range results {
+		key := strings.TrimSpace(result.Chunk.DocumentID)
+		if key == "" {
+			key = "chunk:" + result.Chunk.ID
+		}
+		if _, exists := groups[key]; !exists {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], result)
+	}
+	diversified := make([]domain.RetrievedChunk, 0, len(results))
+	for depth := 0; len(diversified) < len(results); depth++ {
+		for _, key := range order {
+			if depth < len(groups[key]) {
+				diversified = append(diversified, groups[key][depth])
+			}
+		}
+	}
+	for index := range diversified {
+		diversified[index].Rank = index + 1
+	}
+	return diversified
 }

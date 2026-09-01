@@ -1,0 +1,24 @@
+{
+  "id": "public_holdout_consona_workflow",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "想找带 iWorks 扫查流程和 iScanHelper 教学的超声系列。",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-consona-n-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Consona N",
+      "iWorks",
+      "iScanHelper"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

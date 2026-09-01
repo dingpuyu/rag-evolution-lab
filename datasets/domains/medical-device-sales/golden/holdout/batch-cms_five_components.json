@@ -1,0 +1,24 @@
+{
+  "id": "public_holdout_cms_five_components",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "中央站、工作站、查看站和两个 Viewer 组成的是哪套系统？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-cms-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "BeneVision",
+      "CMS Viewer",
+      "Mobile Viewer"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_atlan_models",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "Atlan 麻醉工作站家族公开的两个具体型号是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-atlan-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A350",
+      "A350 XL"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

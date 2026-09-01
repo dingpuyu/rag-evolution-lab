@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import re
 import zipfile
 
 import fitz
@@ -30,7 +31,19 @@ def normalize_zip(path: Path) -> None:
             info.create_system = original.create_system
             info.external_attr = original.external_attr
             info.flag_bits = original.flag_bits
-            target.writestr(info, source.read(original.filename))
+            content = source.read(original.filename)
+            # openpyxl overwrites the workbook's modified property with the
+            # wall clock during save(), even when callers set it explicitly.
+            # That made every bootstrap look like a new document revision and
+            # triggered needless parsing, embedding calls and Milvus writes.
+            if original.filename == "docProps/core.xml":
+                content = re.sub(
+                    rb"(<dcterms:modified\b[^>]*>).*?(</dcterms:modified>)",
+                    rb"\g<1>2026-01-01T00:00:00Z\g<2>",
+                    content,
+                    flags=re.DOTALL,
+                )
+            target.writestr(info, content)
     temporary.replace(path)
 
 

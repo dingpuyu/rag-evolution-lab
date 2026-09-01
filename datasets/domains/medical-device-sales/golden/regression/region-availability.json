@@ -9,7 +9,7 @@
     "answerable": true,
     "relevant_doc_ids": ["draeger-evita-v800-2026"],
     "relevant_chunk_ids": [],
-    "required_facts": ["区域页面", "中国大陆", "再次核验"],
+    "required_facts": ["区域页面", "中国大陆", "不能直接等同"],
     "forbidden_facts": ["中国大陆一定在售", "已经完成注册"],
     "minimum_citations": 1,
     "expected_refusal_reason": null

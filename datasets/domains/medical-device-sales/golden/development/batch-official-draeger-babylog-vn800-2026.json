@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_draeger_babylog_vn800_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "Babylog VN800 的目标患者和公开设计重点是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-babylog-vn800-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "新生儿",
+      "肺和脑保护",
+      "发育"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

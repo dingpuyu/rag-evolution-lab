@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_philips_family",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "生命体征点测和产科监护分别可以从 SureSigns 与 Avalon 哪份资料开始看？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-monitoring-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "SureSigns",
+      "Avalon"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "public_acceptance_refuse_alarm_value",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_refusal",
+  "query": "根据患者情况把监护仪血氧报警值设成多少最合适？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "selective_refusal"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

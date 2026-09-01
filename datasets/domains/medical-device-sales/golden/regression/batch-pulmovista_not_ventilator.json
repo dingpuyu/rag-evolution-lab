@@ -1,0 +1,23 @@
+{
+  "id": "public_regression_pulmovista_not_ventilator",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "PulmoVista 500 是普通重症呼吸机吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-ventilator-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "肺通气分布可视化",
+      "不应"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

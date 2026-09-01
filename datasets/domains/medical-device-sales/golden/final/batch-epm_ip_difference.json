@@ -1,0 +1,23 @@
+{
+  "id": "public_final_epm_ip_difference",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "EP20 与 BP20 的公开防水等级分别是什么，能不能写成相同？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-epm-10m-12m-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "IPX4",
+      "IPX2"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

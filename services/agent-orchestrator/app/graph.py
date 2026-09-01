@@ -231,12 +231,23 @@ class AgentRuntime:
         return {"response": result.model_dump()}
 
     async def _medical_refuse(self, state: AgentState) -> dict[str, Any]:
+        reason_code = str(state.get("reason_code", "clinical_boundary"))
+        if reason_code == "dynamic_commercial_data_unavailable":
+            answer = (
+                "价格、库存和交期属于实时商业数据，当前公开知识库不能证明其最新值，因此我不会猜测。"
+                "请提供完整型号、配置和所在地区，并联系授权销售渠道获取带时间戳的正式报价与库存确认。"
+            )
+        else:
+            answer = (
+                "这个问题涉及临床诊断、治疗或患者参数设定，超出设备运维知识助手的安全边界。"
+                "请遵循真实设备说明书、机构临床流程，并由具备资质的专业人员判断。"
+            )
         result = AgentResult(
             status="refused",
             decision="refuse",
-            reason_code=str(state.get("reason_code", "clinical_boundary")),
+            reason_code=reason_code,
             answer_source="persona",
-            answer="这个问题涉及临床诊断、治疗或患者参数设定，超出设备运维知识助手的安全边界。请遵循真实设备说明书、机构临床流程，并由具备资质的专业人员判断。",
+            answer=answer,
             resolved_context=DeviceContext.model_validate(state.get("resolved_context", {})),
         )
         return {"response": result.model_dump()}

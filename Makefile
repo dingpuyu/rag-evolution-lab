@@ -1,4 +1,4 @@
-.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-smoke medical-source-audit medical-source-lock ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
+.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-bootstrap-plan medical-smoke medical-source-audit medical-source-lock medical-public-build medical-dataset-audit medical-retrieval-eval medical-retrieval-local-qwen medical-retrieval-qwen ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
 DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then echo 'docker compose'; elif command -v docker-compose >/dev/null 2>&1; then echo 'docker-compose'; else echo 'docker compose'; fi)
 RAGLAB_ENV_FILE ?= .env
@@ -33,8 +33,8 @@ deploy-up: deploy-check
 
 deploy-bootstrap:
 	$(WITH_ENV) python3 scripts/medical_source_audit.py
-	$(WITH_ENV) python3 scripts/medical_bootstrap.py --skip-derived --source-revision $${MEDICAL_SOURCE_REVISION:-1}
-	$(WITH_ENV) python3 scripts/wait_ingestion.py
+	$(WITH_ENV) python3 scripts/medical_bootstrap.py --skip-derived --job-report tmp/medical-bootstrap/jobs-deploy-latest.json --source-revision $${MEDICAL_SOURCE_REVISION:-1}
+	$(WITH_ENV) python3 scripts/wait_ingestion.py --job-report tmp/medical-bootstrap/jobs-deploy-latest.json
 
 deploy-verify:
 	$(WITH_ENV) ./scripts/stack_smoke.sh
@@ -71,12 +71,19 @@ medical-up: stack-up
 	@echo "医疗设备销售顾问与运维 Agent: http://localhost:$${RAGLAB_WEB_PORT:-3000}/medical"
 
 medical-bootstrap:
+	$(WITH_ENV) python3 scripts/medical_source_audit.py
+	$(WITH_ENV) sh -c 'cd services/document-parser && uv run python ../../scripts/generate_medical_formats.py'
+	$(WITH_ENV) python3 scripts/medical_bootstrap.py --plan --plan-report tmp/medical-bootstrap/import-plan-latest.json --source-revision $${MEDICAL_SOURCE_REVISION:-1}
+	$(WITH_ENV) python3 scripts/medical_bootstrap.py --job-report tmp/medical-bootstrap/jobs-latest.json --source-revision $${MEDICAL_SOURCE_REVISION:-1}
+	$(WITH_ENV) python3 scripts/wait_ingestion.py --job-report tmp/medical-bootstrap/jobs-latest.json
+
+medical-bootstrap-plan:
 	python3 scripts/medical_source_audit.py
 	cd services/document-parser && uv run python ../../scripts/generate_medical_formats.py
-	python3 scripts/medical_bootstrap.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080} --source-revision $${MEDICAL_SOURCE_REVISION:-1}
+	python3 scripts/medical_bootstrap.py --plan --plan-report tmp/medical-bootstrap/import-plan-latest.json --source-revision $${MEDICAL_SOURCE_REVISION:-1}
 
 medical-smoke:
-	python3 scripts/medical_smoke.py --api $${RAGLAB_API_URL:-http://127.0.0.1:8080} --agent $${RAGLAB_AGENT_URL:-http://127.0.0.1:8090}
+	$(WITH_ENV) python3 scripts/medical_smoke.py
 
 medical-source-audit:
 	python3 scripts/medical_source_audit.py --online --json-report tmp/medical-source-audit/latest.json --markdown-report tmp/medical-source-audit/latest.md
@@ -84,6 +91,22 @@ medical-source-audit:
 medical-source-lock:
 	@test -n "$${REVIEWED_BY}" || (echo "REVIEWED_BY is required" && exit 1)
 	python3 scripts/medical_source_audit.py --update-lock --reviewed-by "$${REVIEWED_BY}"
+
+medical-public-build:
+	python3 scripts/build_medical_public_corpus.py
+	python3 scripts/medical_source_audit.py
+
+medical-dataset-audit:
+	python3 scripts/validate_medical_retrieval_dataset.py
+
+medical-retrieval-eval:
+	python3 scripts/run_medical_retrieval_eval.py
+
+medical-retrieval-local-qwen:
+	./scripts/run_medical_local_qwen_eval.sh
+
+medical-retrieval-qwen:
+	./scripts/run_with_env.sh python3 scripts/run_medical_retrieval_eval.py --provider
 
 ingest:
 	go run ./cmd/raglab ingest

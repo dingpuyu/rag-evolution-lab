@@ -1,0 +1,23 @@
+{
+  "id": "public_regression_a9_not_atlan",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "目标控制麻醉 ACA 是 Atlan A350 的公开功能吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-anesthesia-a9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A9",
+      "ACA"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

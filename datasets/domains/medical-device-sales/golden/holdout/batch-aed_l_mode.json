@@ -1,0 +1,24 @@
+{
+  "id": "public_holdout_aed_l_mode",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "BeneHeart 哪个 AED 系列公开包含半自动和全自动版本？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-aed-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "L 系列",
+      "半自动",
+      "全自动"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

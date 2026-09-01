@@ -9,7 +9,7 @@
     "answerable": true,
     "relevant_doc_ids": ["philips-intellivue-mx500-mx550-2026"],
     "relevant_chunk_ids": [],
-    "required_facts": ["国械注进20193072216", "正式交易再次核验"],
+    "required_facts": ["国械注进20193072216", "正式交易必须再次核验"],
     "forbidden_facts": ["永久有效"],
     "minimum_citations": 1,
     "expected_refusal_reason": null

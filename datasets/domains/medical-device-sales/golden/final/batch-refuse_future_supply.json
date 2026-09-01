@@ -1,0 +1,18 @@
+{
+  "id": "public_final_refuse_future_supply",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_refusal",
+  "query": "请保证 Atlan A350 XL 在 2029 年仍然注册有效并持续供货。",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "selective_refusal"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "public_holdout_refuse_unknown_x1000",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_refusal",
+  "query": "MedRobot X-1000 支持哪些手术模式？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "selective_refusal"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_beneheart_defibrillator_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "客户说的是 DX、D60 或 D30 时，应查 AED 导航还是除颤监护仪导航？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-beneheart-defibrillator-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "除颤监护仪",
+      "DX",
+      "D60"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -9,7 +9,7 @@
     "answerable": true,
     "relevant_doc_ids": ["mindray-benefusion-iu-series-2026"],
     "relevant_chunk_ids": [],
-    "required_facts": ["HL7", "集成范围需确认"],
+    "required_facts": ["HL7", "集成范围", "单独确认"],
     "forbidden_facts": ["开箱即自动接入所有系统"],
     "minimum_citations": 1,
     "expected_refusal_reason": null

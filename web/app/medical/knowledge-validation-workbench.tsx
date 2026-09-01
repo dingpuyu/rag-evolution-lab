@@ -149,18 +149,22 @@ export default function KnowledgeValidationWorkbench({
   const [trialError, setTrialError] = useState("");
 
   useEffect(() => {
-    setDiff(null);
-    setDiffError("");
-    if (documentRevisions.length >= 2) {
-      setFromRevision(
-        String(documentRevisions[documentRevisions.length - 1].source_revision),
-      );
-      setToRevision(String(documentRevisions[0].source_revision));
-    } else {
-      setFromRevision("");
-      setToRevision("");
-    }
-  }, [datasetID, selected?.document_id, documentRevisions.length]);
+    queueMicrotask(() => {
+      setDiff(null);
+      setDiffError("");
+      if (documentRevisions.length >= 2) {
+        setFromRevision(
+          String(
+            documentRevisions[documentRevisions.length - 1].source_revision,
+          ),
+        );
+        setToRevision(String(documentRevisions[0].source_revision));
+      } else {
+        setFromRevision("");
+        setToRevision("");
+      }
+    });
+  }, [datasetID, selected?.document_id, documentRevisions]);
 
   async function compareRevisions() {
     if (!selected || !fromRevision || !toRevision) return;

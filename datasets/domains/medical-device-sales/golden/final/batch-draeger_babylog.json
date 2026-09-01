@@ -1,0 +1,23 @@
+{
+  "id": "public_final_draeger_babylog",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "德尔格呼吸产品导航中面向新生儿通气的型号是哪一个？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-ventilator-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Babylog VN500",
+      "新生儿"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

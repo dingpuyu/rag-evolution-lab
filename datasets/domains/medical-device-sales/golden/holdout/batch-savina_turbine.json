@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_savina_turbine",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "需要确认涡轮驱动和自动设备检查，应查 Savina 还是 Savina 300 的哪份资料？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-savina-300-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Savina 300",
+      "涡轮驱动"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

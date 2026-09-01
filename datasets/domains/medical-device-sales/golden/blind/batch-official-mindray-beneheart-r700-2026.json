@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_beneheart_r700_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "需要十二点一英寸触屏、导联指引和 Wi-Fi 传输的心电图机，应了解哪个型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-beneheart-r700-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "BeneHeart R700",
+      "12.1",
+      "导联"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

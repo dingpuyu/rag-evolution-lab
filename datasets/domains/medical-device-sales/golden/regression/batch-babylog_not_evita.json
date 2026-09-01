@@ -1,0 +1,24 @@
+{
+  "id": "public_regression_babylog_not_evita",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "Babylog VN800 的新生儿资料能否直接作为 Evita V800 成人重症通气说明？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-babylog-vn800-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "新生儿",
+      "Evita",
+      "不能"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

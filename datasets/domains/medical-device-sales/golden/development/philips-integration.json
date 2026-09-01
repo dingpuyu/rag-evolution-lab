@@ -9,7 +9,7 @@
     "answerable": true,
     "relevant_doc_ids": ["philips-intellivue-mx500-mx550-2026"],
     "relevant_chunk_ids": [],
-    "required_facts": ["IntelliBridge", "可选", "接口并非默认包含"],
+    "required_facts": ["IntelliBridge", "可选", "并不等于所有接口默认包含"],
     "forbidden_facts": ["无需接口或许可"],
     "minimum_citations": 1,
     "expected_refusal_reason": null

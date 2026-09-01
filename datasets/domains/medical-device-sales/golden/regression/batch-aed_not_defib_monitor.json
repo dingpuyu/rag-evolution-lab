@@ -1,0 +1,23 @@
+{
+  "id": "public_regression_aed_not_defib_monitor",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "BeneHeart D60 是 AED 的 C 系列配置吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-product-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "除颤监护仪",
+      "不同"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

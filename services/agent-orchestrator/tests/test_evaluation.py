@@ -1,4 +1,4 @@
-from app.evaluation import EvaluationStore, agent_cases_for, bad_case_to_golden, evaluate_case, evaluate_retrieval_case, golden_cases_for, golden_device_context, load_medical_golden, load_medical_sales_golden
+from app.evaluation import EvaluationStore, agent_cases_for, bad_case_to_golden, evaluate_case, evaluate_retrieval_case, evaluation_request_interval_seconds, golden_cases_for, golden_device_context, load_medical_golden, load_medical_sales_golden
 from app.models import AgentResponse, AgentResult, DeviceContext, SearchHit
 
 
@@ -155,7 +155,7 @@ def test_medical_golden_contains_development_and_regression_cases():
 
 def test_medical_sales_golden_is_an_independent_official_source_suite():
     cases = load_medical_sales_golden()
-    assert len(cases) == 17
+    assert len(cases) == 73
     assert {case["split"] for case in cases} == {"development", "regression"}
     assert any(case["id"] == "sales_nmpa_udi" for case in cases)
 
@@ -260,8 +260,18 @@ def test_search_hit_accepts_null_optional_array_metadata():
 
 def test_customer_evaluation_uses_public_only_suite():
     cases = agent_cases_for("tenant_a-medical-device-customer-agent")
-    assert len(cases) == 13
+    assert len(cases) == 17
     assert any(case["id"] == "customer-onboarding" for case in cases)
+    assert any(case["id"] == "customer-savina-intro" for case in cases)
+    assert any(case["id"] == "customer-ventilator-setting-boundary" for case in cases)
+    commercial = next(case for case in cases if case["id"] == "customer-commercial-boundary")
+    assert commercial["expected"] == "refuse"
+    assert commercial["reason"] == "dynamic_commercial_data_unavailable"
     sales_golden = golden_cases_for("tenant_a-medical-device-customer-agent", "tenant_a")
-    assert len(sales_golden) == 17
-    assert all(case["id"].startswith("sales_") for case in sales_golden)
+    assert len(sales_golden) == 73
+    assert all(case["id"].startswith(("sales_", "public_")) for case in sales_golden)
+
+
+def test_evaluation_rate_is_paced_below_application_quota(monkeypatch):
+    monkeypatch.setenv("MEDICAL_EVAL_REQUESTS_PER_MINUTE", "120")
+    assert evaluation_request_interval_seconds() == 0.5

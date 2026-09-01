@@ -1,0 +1,23 @@
+{
+  "id": "public_final_mp5_optional_gas",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "MP5 的气体监测属于基础标配还是选项？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-intellivue-mp5-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "选项",
+      "MP5"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

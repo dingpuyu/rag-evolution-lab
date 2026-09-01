@@ -88,12 +88,13 @@ type Citation struct {
 }
 
 type QueryResponse struct {
-	Answer     string           `json:"answer"`
-	Answerable bool             `json:"answerable"`
-	Citations  []Citation       `json:"citations"`
-	Retrieval  []RetrievedChunk `json:"-"`
-	Context    []RetrievedChunk `json:"-"`
-	Trace      QueryTrace       `json:"trace"`
+	Answer        string           `json:"answer"`
+	Answerable    bool             `json:"answerable"`
+	RefusalReason string           `json:"refusal_reason,omitempty"`
+	Citations     []Citation       `json:"citations"`
+	Retrieval     []RetrievedChunk `json:"-"`
+	Context       []RetrievedChunk `json:"-"`
+	Trace         QueryTrace       `json:"trace"`
 }
 
 type TraceEvent struct {

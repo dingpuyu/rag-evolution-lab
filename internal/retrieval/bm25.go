@@ -33,7 +33,7 @@ func NewBM25WithOptions(chunks []domain.Chunk, options Options) *BM25 {
 	}
 	var totalLength int
 	for i, chunk := range chunks {
-		tokens := textutil.Tokens(chunk.DocumentTitle + " " + chunk.Content)
+		tokens := textutil.Tokens(textutil.ExpandSemantic(chunk.DocumentTitle + " " + chunk.Content))
 		totalLength += len(tokens)
 		frequencies := textutil.TermFrequency(tokens)
 		index.termFreqs[i] = frequencies
@@ -55,7 +55,7 @@ func (b *BM25) Name() string {
 }
 
 func (b *BM25) Search(_ context.Context, request domain.QueryRequest) ([]domain.RetrievedChunk, error) {
-	queryTerms := textutil.TermFrequency(textutil.Tokens(request.Query))
+	queryTerms := textutil.TermFrequency(textutil.Tokens(textutil.ExpandSemantic(request.Query)))
 	results := make([]domain.RetrievedChunk, 0, len(b.chunks))
 	for index, chunk := range b.chunks {
 		if !allowed(chunk, request, b.options) {

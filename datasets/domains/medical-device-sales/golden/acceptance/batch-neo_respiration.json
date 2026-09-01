@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_neo_respiration",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "不接触患儿也要监测微弱呼吸，V 系列新生儿资料里的技术叫什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-neo-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "FreeResp",
+      "Neo"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

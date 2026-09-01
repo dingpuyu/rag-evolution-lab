@@ -1,0 +1,24 @@
+{
+  "id": "public_regression_mx850_not_mp5",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "IntelliVue MP5 能直接按 MX850 的二十二英寸和多显示器规格销售吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-intellivue-mx750-mx850-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "MX850",
+      "22 英寸",
+      "不能"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

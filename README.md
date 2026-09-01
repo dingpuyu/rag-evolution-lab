@@ -21,13 +21,18 @@ make stack-up
 
 ```bash
 make medical-up
+make medical-bootstrap-plan
 make medical-bootstrap
 make medical-smoke
 ```
 
+`medical-bootstrap-plan` 不访问在线 API，也不需要模型密钥；它会先验证资料锁、内容 SHA-256、摄取元数据、目标 Dataset、派生格式和文档修订唯一性。当前计划包含 66 个上传版本，其中 39 个是受审销售资料，预检必须通过后 `medical-bootstrap` 才会真正提交任务。
+
 随后打开 <http://localhost:3000/medical>（若 `.env` 使用 `RAGLAB_WEB_PORT=13000`，则打开 `http://localhost:13000/medical`）。页面提供相互隔离的医疗设备销售顾问和专业运维助手：客户侧使用带官方链接与采集日期的厂商官网/NMPA 公开事实摘要，可从零了解产品线、真实型号、配置边界、售前核验和安全售后分诊；专业侧继续用虚构资料验证型号/版本/错误码与租户 Runbook。系统同时包含 Document IR 多格式接入、知识目录、分应用 Golden Cases、Agent 决策评测和 Bad Case 人工复核。公开摘要不能替代正式说明书、报价、注册核验或临床判断。架构与验收方式见 [医疗设备销售顾问与知识运维 Agent](docs/medical-device-agent.md)。
 
 公开资料在入库前执行来源和内容指纹门禁；可用 `make medical-source-audit` 检查官网可达性，详细设计与可复用经验见 [医疗公开资料来源治理](docs/medical-source-governance.md)。
+
+医疗销售公开语料现包含 39 份受审事实摘要和 197 条分层 Golden Cases。`make medical-dataset-audit` 会先检查跨集合问题泄漏、证据与答案事实一致性、拒答结构和覆盖下限；`make medical-retrieval-eval` 会自动执行该门禁后再生成确定性 CI 基线，`make medical-retrieval-qwen` 则使用 `text-embedding-v4 + qwen3-rerank` 验证真实 Provider。当前 39 份语料的远端 Qwen 四组发布集 Outcome Accuracy 均为 1.0；针对重复 Chunk 挤占 Top-K 的单变量优化，将 Regression MRR 从 0.830 提升到 0.853、NDCG@5 从 0.850 提升到 0.883。在线 Customer Agent v5 全链路评测为 90/90，权限泄漏与错型号均为 0。这些数字只代表当前受控数据集，不宣称为真实生产准确率；完整实验、失败样本和边界见 [医疗检索精度优化闭环](docs/medical-retrieval-accuracy-loop.md)。
 
 复杂 PDF、DOCX、XLSX 不再只转成纯文本：Document IR v2 会把页码、标题路径、工作表和单元格范围贯穿到 Chunk、Milvus 引用与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
 

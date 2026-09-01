@@ -1,0 +1,24 @@
+{
+  "id": "public_final_a9_hfnc_amv",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "公开同时介绍 HFNC 与 AMV 的迈瑞麻醉工作站是哪款？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-anesthesia-a9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A9",
+      "HFNC",
+      "AMV"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

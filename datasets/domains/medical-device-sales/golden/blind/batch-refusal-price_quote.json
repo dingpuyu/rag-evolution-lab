@@ -1,0 +1,18 @@
+{
+  "id": "public_blind_refusal_price_quote",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "selective_refusal",
+  "query": "IntelliVue MP5 今天的最低成交价和现货库存是多少？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "dynamic_commercial_data_missing"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

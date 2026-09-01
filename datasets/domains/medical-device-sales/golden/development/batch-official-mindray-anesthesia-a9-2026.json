@@ -1,0 +1,23 @@
+{
+  "id": "public_dev_official_mindray_anesthesia_a9_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "迈瑞 A9 的公开自动自检大约需要多久？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-anesthesia-a9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "3.5 分钟",
+      "全自动自检"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

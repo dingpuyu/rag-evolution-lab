@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_philips_intellivue_mx750_mx850_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "飞利浦哪款二十二英寸床旁监护仪公开支持多显示器、Citrix 和 RFID？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-intellivue-mx750-mx850-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "IntelliVue MX850",
+      "22",
+      "RFID"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -111,20 +111,67 @@ def test_customer_resolver_preserves_every_explicit_comparison_model():
     assert resolved.candidates == ["IntelliVue MX550", "BeneVision N1"]
 
 
-@pytest.mark.parametrize("query", ["AED", "AED 是什么？", "介绍一下自动体外除颤器", "你们有除颤器吗？", "AED 咋都没有？"])
+@pytest.mark.parametrize(
+    ("query", "models"),
+    [
+        ("Savina 300 是什么设备？", ["Savina 300"]),
+        ("ePM 10M/12M 网络中断后数据怎么办？", ["ePM 10M", "ePM 12M"]),
+        ("Atlan A350 XL 有哪些公开特点？", ["Atlan A350 XL"]),
+        ("IntelliVue MP5 是什么？", ["IntelliVue MP5"]),
+        ("IntelliVue MX850 支持什么互联能力？", ["IntelliVue MX850"]),
+        ("BeneHeart D60 是什么设备？", ["BeneHeart D60"]),
+        ("HeartStart FRx 有什么引导？", ["HeartStart FRx"]),
+        ("Babylog VN800 面向什么场景？", ["Babylog VN800"]),
+        ("PulmoVista 500 是呼吸机吗？", ["PulmoVista 500"]),
+        ("BC-760 CS 属于哪类分析仪？", ["BC-760 CS"]),
+    ],
+)
+def test_customer_resolver_recognizes_expanded_official_models(query, models):
+    assert mentioned_sales_models(query) == models
+
+
+def test_customer_resolver_treats_neo_and_or_families_as_comparison():
+    resolved = resolve_customer_query("迈瑞 BeneVision V Neo 和 OR 系列分别面向什么场景？")
+    assert resolved.intent == "product_discovery"
+    assert resolved.context.model_code == ""
+    assert "BeneVision V700 Neo" in resolved.candidates
+    assert "BeneVision V700 OR" in resolved.candidates
+
+
+def test_customer_resolver_refuses_patient_tidal_volume_setting():
+    resolved = resolve_customer_query("请根据一名肺炎患者的情况告诉我 Savina 300 潮气量应设置多少？")
+    assert resolved.intent == "refuse"
+    assert resolved.reason_code == "clinical_boundary"
+
+
+def test_customer_resolver_refuses_dynamic_price_and_stock():
+    resolved = resolve_customer_query("今天 BeneHeart C 的价格和库存是多少？")
+    assert resolved.intent == "refuse"
+    assert resolved.reason_code == "dynamic_commercial_data_unavailable"
+
+
+@pytest.mark.parametrize("query", ["AED", "AED 是什么？", "介绍一下自动体外除颤器", "AED 咋都没有？"])
 def test_customer_resolver_treats_novice_aed_queries_as_product_discovery(query):
     assert mentioned_sales_categories(query) == ["AED"]
     resolved = resolve_customer_query(query)
     assert resolved.intent == "product_discovery"
     assert resolved.context.model_code == ""
-    assert resolved.candidates == ["BeneHeart C Series"]
+    assert resolved.candidates == ["BeneHeart C Series", "HeartStart FRx"]
+
+
+def test_customer_resolver_keeps_generic_defibrillator_query_ambiguous_across_product_lines():
+    resolved = resolve_customer_query("你们有哪些除颤器？")
+    assert mentioned_sales_categories("你们有哪些除颤器？") == ["AED", "除颤监护"]
+    assert resolved.intent == "product_discovery"
+    assert "BeneHeart C Series" in resolved.candidates
+    assert "BeneHeart D60" in resolved.candidates
 
 
 def test_customer_category_troubleshooting_still_requires_an_exact_model():
     resolved = resolve_customer_query("AED 报错了，应该怎么排障？")
     assert resolved.intent == "clarify"
     assert resolved.reason_code == "customer_missing_model_for_troubleshooting"
-    assert resolved.candidates == ["BeneHeart C Series", "我不知道型号在哪里看"]
+    assert resolved.candidates == ["BeneHeart C Series", "HeartStart FRx", "我不知道型号在哪里看"]
 
 
 @pytest.mark.asyncio
@@ -320,7 +367,7 @@ async def test_customer_agent_answers_short_aed_query_with_public_evidence():
     )
     assert response.result.decision == "answer"
     assert response.result.reason_code == "grounded_customer_answer"
-    assert response.result.candidate_entities == ["BeneHeart C Series"]
+    assert response.result.candidate_entities == ["BeneHeart C Series", "HeartStart FRx"]
     assert [citation.document_id for citation in response.result.citations] == ["public-guide"]
 
 

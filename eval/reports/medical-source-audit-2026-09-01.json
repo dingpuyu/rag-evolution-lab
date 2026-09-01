@@ -1,0 +1,1069 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-08-31T18:33:49.922728Z",
+  "manifest": "datasets/domains/medical-device-sales/corpus/manifest.json",
+  "lock": "datasets/domains/medical-device-sales/corpus/sources.lock.json",
+  "summary": {
+    "overall_status": "passed_with_online_warnings",
+    "documents": 39,
+    "approved": 39,
+    "review_required": 0,
+    "local_drift": 0,
+    "online_checked": 43,
+    "remote_issues": 33
+  },
+  "manifest_errors": [],
+  "documents": [
+    {
+      "doc_id": "draeger-evita-v800-2026",
+      "title": "德尔格 Evita V800 重症呼吸机公开产品摘要",
+      "path": "documents/draeger-evita-v800-2026.md",
+      "content_sha256": "ffbc62bd56bba76257e15ced892e525a55766cd1c3f0e583ddd0bf2e0d97e8ac",
+      "source_type": "official_manufacturer_regional",
+      "source_urls": [
+        "https://www.draeger.com/zh_tw/Products/Evita-V800"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/zh_tw/Products/Evita-V800",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "mindray-benefusion-iu-series-2026",
+      "title": "迈瑞 BeneFusion i/u 系列输注泵公开产品摘要",
+      "path": "documents/mindray-benefusion-iu-series-2026.md",
+      "content_sha256": "9877ff351a2de877994ffc54fbb4920b5ed0c811f6f26ebce89a0a1848d19ae9",
+      "source_type": "official_manufacturer",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"31d0d-65990d5a32549\"",
+          "last_modified": "Fri, 21 Aug 2026 16:07:34 GMT",
+          "response_sha256": "610612fbcb74baa64a28898e1e01fbb0bf108f66732d5529cd8e03c92c76464c",
+          "bytes_hashed": 204045,
+          "truncated": false,
+          "latency_ms": 2578
+        }
+      ]
+    },
+    {
+      "doc_id": "mindray-beneheart-c-series-2026",
+      "title": "迈瑞 BeneHeart C 系列 AED 公开产品摘要",
+      "path": "documents/mindray-beneheart-c-series-2026.md",
+      "content_sha256": "151faa895d04b4afe0d3be1acd03da0ad26292019813018a16b33b85a1e422f3",
+      "source_type": "official_manufacturer",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/aed/beneheart-c-series"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/aed/beneheart-c-series",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/aed/beneheart-c-series",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2ec50-659543ec48965\"",
+          "last_modified": "Tue, 18 Aug 2026 15:50:25 GMT",
+          "response_sha256": "8c98cfd525af4be840b1975855f791602e58e18d78d961a3c02583a88837b13d",
+          "bytes_hashed": 191568,
+          "truncated": false,
+          "latency_ms": 1320
+        }
+      ]
+    },
+    {
+      "doc_id": "mindray-benevision-n1-2026",
+      "title": "迈瑞 BeneVision N1 病人监护仪公开产品摘要",
+      "path": "documents/mindray-benevision-n1-2026.md",
+      "content_sha256": "62cc46ad8262685f86cd6ce9cb99823d3e41f87726f3e1471956722b04d8ce82",
+      "source_type": "official_manufacturer",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"31bd4-65991fac15ca6\"",
+          "last_modified": "Fri, 21 Aug 2026 17:29:32 GMT",
+          "response_sha256": "c1509116aabdfc3b5c960aada1460f3b70d33d7f9ac41e09518d9680303a43f0",
+          "bytes_hashed": 203732,
+          "truncated": false,
+          "latency_ms": 1504
+        }
+      ]
+    },
+    {
+      "doc_id": "mindray-resona-i9-2026",
+      "title": "迈瑞 Resona I9 彩色多普勒超声系统公开产品摘要",
+      "path": "documents/mindray-resona-i9-2026.md",
+      "content_sha256": "f89df039e145374314eb61c8632a1a0d7febd9f4b803311188a7f46c6d91c112",
+      "source_type": "official_manufacturer",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"46675-659541f57e6dd\"",
+          "last_modified": "Tue, 18 Aug 2026 15:41:38 GMT",
+          "response_sha256": "c13ed703eaf962d4f680a7fee2713cd6a48ff8954754f711d56cee7696bd7769",
+          "bytes_hashed": 288373,
+          "truncated": false,
+          "latency_ms": 2128
+        }
+      ]
+    },
+    {
+      "doc_id": "nmpa-udi-verification-guide-2026",
+      "title": "医疗设备销售合规核验：国家药监局 UDI 数据库",
+      "path": "documents/nmpa-udi-verification-guide-2026.md",
+      "content_sha256": "92625244b46bb91a1eab9805acbd3f3ef0cd2cd033e837dfee37032028a7c642",
+      "source_type": "government_regulator",
+      "source_urls": [
+        "https://udi.nmpa.gov.cn/",
+        "https://udi.nmpa.gov.cn/download.html"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://udi.nmpa.gov.cn/",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://udi.nmpa.gov.cn/",
+          "content_type": "text/html;charset=UTF-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "2c977fafaedcde597cede4ffb6125fd2ff5cb0820b9fc2e5f708d015995f1259",
+          "bytes_hashed": 49343,
+          "truncated": false,
+          "latency_ms": 440
+        },
+        {
+          "url": "https://udi.nmpa.gov.cn/download.html",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://udi.nmpa.gov.cn/download.html",
+          "content_type": "text/html;charset=UTF-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "e53198759286474600156cd7ac960535b3d5c305b7e391786f88eefbbcc5efa9",
+          "bytes_hashed": 67228,
+          "truncated": false,
+          "latency_ms": 366
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-atlan-2026",
+      "title": "德尔格 Atlan A350/A350 XL 麻醉工作站公开摘要",
+      "path": "documents/official-draeger-atlan-2026.md",
+      "content_sha256": "a4f1e0ae73d703b82d66390003eb5f79f098515bcad6b4744a26bce991d84bd2",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Hospital/Atlan"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/zh_cn/Hospital/Atlan",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-babylog-vn800-2026",
+      "title": "德尔格 Babylog VN800 新生儿呼吸机公开摘要",
+      "path": "documents/official-draeger-babylog-vn800-2026.md",
+      "content_sha256": "1b922a22e8504bcc5cb6d6dfaafb1990dfd20a6b3eff66fddb40df71b1187567",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-perseus-a500-2026",
+      "title": "德尔格 Perseus A500 麻醉工作站公开摘要",
+      "path": "documents/official-draeger-perseus-a500-2026.md",
+      "content_sha256": "478bc746b81214b647af6747a6edcd81544a7206d25769377eb542db22cb4c49",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-pulmovista-500-2026",
+      "title": "德尔格 PulmoVista 500 床旁肺通气成像公开摘要",
+      "path": "documents/official-draeger-pulmovista-500-2026.md",
+      "content_sha256": "ef293d1fa520f1b787c7a5bdb6ca92b00361c204cf5e85cae5326c90b2130865",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/en-us_ca/Products/PulmoVista-500"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/en-us_ca/Products/PulmoVista-500",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-savina-300-2026",
+      "title": "德尔格 Savina 300 呼吸机公开摘要",
+      "path": "documents/official-draeger-savina-300-2026.md",
+      "content_sha256": "4513834bae49f580dd057af7a0de4cd9d6dee6da9c29b816fc10d30569607f3a",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+        "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        },
+        {
+          "url": "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf",
+          "content_type": "application/pdf",
+          "etag": "0x8DDDE8609A7FA57",
+          "last_modified": "Mon, 18 Aug 2025 18:35:42 GMT",
+          "response_sha256": "901d1d9cd9803cdeb068f70b7b212ca909dafdd6c8884b94d74e8f56b8c57460",
+          "bytes_hashed": 271772,
+          "truncated": false,
+          "latency_ms": 1407
+        }
+      ]
+    },
+    {
+      "doc_id": "official-draeger-ventilator-portfolio-2026",
+      "title": "德尔格呼吸机产品家族公开导航",
+      "path": "documents/official-draeger-ventilator-portfolio-2026.md",
+      "content_sha256": "12a11b5b36523f0321480c1f7b23242c9619653c7a283b8e08859c62a361a131",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Productfinder/Ventilators"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-aed-portfolio-2026",
+      "title": "迈瑞 BeneHeart AED 产品家族公开导航",
+      "path": "documents/official-mindray-aed-portfolio-2026.md",
+      "content_sha256": "f2b7d0b22c081450e08fb92da5783c099d7ab0e0aeef702faaf523a912d9f43e",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/aed",
+        "https://www.mindray.com/en/products/aed"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/aed",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/aed",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2bc07-6595468660ac5\"",
+          "last_modified": "Tue, 18 Aug 2026 16:02:03 GMT",
+          "response_sha256": "e1ef775adf30006fb6d3574b65e1954244268d344562009eaebde2da1e032c60",
+          "bytes_hashed": 179207,
+          "truncated": false,
+          "latency_ms": 1902
+        },
+        {
+          "url": "https://www.mindray.com/en/products/aed",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/en/products/aed",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"46ec9-65a5b9d53c246\"",
+          "last_modified": "Mon, 31 Aug 2026 18:03:08 GMT",
+          "response_sha256": "3bccb8381e4e4f7309fb6bb7a6c3cb0293c91c5ac1a3fc4d6db8cfab0ff6b44e",
+          "bytes_hashed": 290505,
+          "truncated": false,
+          "latency_ms": 2069
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-anesthesia-a9-2026",
+      "title": "迈瑞 A9 麻醉工作站公开摘要",
+      "path": "documents/official-mindray-anesthesia-a9-2026.md",
+      "content_sha256": "c0bec91cc69d673c52b830c4270a93882baaae102dd39f4a8d5ca59369dc4765",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/anesthesia/a9"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/anesthesia/a9",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/anesthesia/a9",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"3144c-659541faf2af8\"",
+          "last_modified": "Tue, 18 Aug 2026 15:41:43 GMT",
+          "response_sha256": "b9c41a1cecbd0cd8a2945c3288777b1c722155e2842f5e26b0494e863597607a",
+          "bytes_hashed": 201804,
+          "truncated": false,
+          "latency_ms": 2220
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-bc760-cs-2026",
+      "title": "迈瑞 BC-760 CS 全自动血液细胞分析仪公开摘要",
+      "path": "documents/official-mindray-bc760-cs-2026.md",
+      "content_sha256": "e9a9d41fe389f9480b0c0d2b695604fdf301c16d8fbe56fbf0e45805d91ba966",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"30898-6595473d2129b\"",
+          "last_modified": "Tue, 18 Aug 2026 16:05:15 GMT",
+          "response_sha256": "a4cf905c0f9a4655d387f42c273fc18dbd79c89d112e7b5723e0e1caeabeeb4e",
+          "bytes_hashed": 198808,
+          "truncated": false,
+          "latency_ms": 1949
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-benefusion-n-2026",
+      "title": "迈瑞 BeneFusion n 系列输注系统公开摘要",
+      "path": "documents/official-mindray-benefusion-n-2026.md",
+      "content_sha256": "546ddad17ba12d88f6f2dea34f819efb996ef8211fb8a39b91826bbb221dbadf",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"32a8d-6599128a01162\"",
+          "last_modified": "Fri, 21 Aug 2026 16:30:46 GMT",
+          "response_sha256": "d6cf5ef85175a1720807225eab371e41d280b3700a127c18ba4e33e898ca32ea",
+          "bytes_hashed": 207501,
+          "truncated": false,
+          "latency_ms": 1348
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-beneheart-defibrillator-2026",
+      "title": "迈瑞 BeneHeart 除颤监护仪产品家族公开导航",
+      "path": "documents/official-mindray-beneheart-defibrillator-2026.md",
+      "content_sha256": "cf017d45b130dc5c5c4641ccbb1f905bd99a2e48b9b5a0b3120d65dc0735cb7b",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/defibrillation-system"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/defibrillation-system",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/defibrillation-system",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2c0fc-65954dbcf1e2c\"",
+          "last_modified": "Tue, 18 Aug 2026 16:34:20 GMT",
+          "response_sha256": "552668672f8f9390cea49ae160b35590648ebf1aff87e411fccba4e90313862a",
+          "bytes_hashed": 180476,
+          "truncated": false,
+          "latency_ms": 1279
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-beneheart-r700-2026",
+      "title": "迈瑞 BeneHeart R700 全数字多道心电图机公开摘要",
+      "path": "documents/official-mindray-beneheart-r700-2026.md",
+      "content_sha256": "839192bcf6d57e5cdc223a441d42261d6d7a0158ea7e23a26a5528d67a8a85dd",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"36b2b-65991020bb029\"",
+          "last_modified": "Fri, 21 Aug 2026 16:19:59 GMT",
+          "response_sha256": "02148ddb08df5e8e87b2f2bcf8f2b3a0c15eaf5e9c86aec8b528933f0555918d",
+          "bytes_hashed": 224043,
+          "truncated": false,
+          "latency_ms": 2093
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-benevision-cms-2026",
+      "title": "迈瑞 BeneVision 中央监护系统公开摘要",
+      "path": "documents/official-mindray-benevision-cms-2026.md",
+      "content_sha256": "8330b82daea96521963a77f02f5b5533ae4a97fc1bbc5eb68d0aca13199b7b21",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2d473-659549344183f\"",
+          "last_modified": "Tue, 18 Aug 2026 16:14:03 GMT",
+          "response_sha256": "35147a1ca878732967526f7c3e0554009e73ecc813d87e0a1084714639e3a7c3",
+          "bytes_hashed": 185459,
+          "truncated": false,
+          "latency_ms": 1327
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-benevision-n22-n19-2026",
+      "title": "迈瑞 BeneVision N22/N19 高端病人监护仪公开摘要",
+      "path": "documents/official-mindray-benevision-n22-n19-2026.md",
+      "content_sha256": "c1822763ef74ab3d3416a8b70bbf6a11f376ecd6aeea5d7e532ce7503a41f24e",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"30c19-65990dcbcf203\"",
+          "last_modified": "Fri, 21 Aug 2026 16:09:33 GMT",
+          "response_sha256": "55046397a0f7043977c15a9ec9868e55167ea43acf3582753104fef30b50037b",
+          "bytes_hashed": 199705,
+          "truncated": false,
+          "latency_ms": 2349
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-benevision-v-neo-2026",
+      "title": "迈瑞 BeneVision V700/V500/V200 Neo 新生儿监护公开摘要",
+      "path": "documents/official-mindray-benevision-v-neo-2026.md",
+      "content_sha256": "d5a2ff3fd818ecd17c9e40289d8ea80d2375e8af668b0cb38201eedce322c822",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2e9e6-65993ca27040f\"",
+          "last_modified": "Fri, 21 Aug 2026 19:39:06 GMT",
+          "response_sha256": "aa941593dc9e3576d5053f3c1281fff8787e305b7a44b56149027b12e8830583",
+          "bytes_hashed": 190950,
+          "truncated": false,
+          "latency_ms": 1866
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-benevision-v-or-2026",
+      "title": "迈瑞 BeneVision VMAX/V700/V500/V200 OR 麻醉监护公开摘要",
+      "path": "documents/official-mindray-benevision-v-or-2026.md",
+      "content_sha256": "fea90887a63de9ff7ae9598e7dffe9b788cb1623812cfa4a6a6c7abbaf6f6d38",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"3750b-659911e832034\"",
+          "last_modified": "Fri, 21 Aug 2026 16:27:57 GMT",
+          "response_sha256": "762f0fbf210201324241b2b1e630e8007cf4eb966861684a3e42129632f23d0b",
+          "bytes_hashed": 226571,
+          "truncated": false,
+          "latency_ms": 1943
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-consona-n-2026",
+      "title": "迈瑞 Consona N 系列彩色多普勒超声公开摘要",
+      "path": "documents/official-mindray-consona-n-2026.md",
+      "content_sha256": "33473eedaba2e10b4bff7ccb1e54e327a115677a3f9ef80ee5a67f46d53446f5",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"33cd8-6595648c18d3d\"",
+          "last_modified": "Tue, 18 Aug 2026 18:16:22 GMT",
+          "response_sha256": "a03aacd38c304ee9051551bdca8a290191744aa81be34c9b34c61ae10591bb38",
+          "bytes_hashed": 212184,
+          "truncated": false,
+          "latency_ms": 2008
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-epm-10m-12m-2026",
+      "title": "迈瑞 ePM 10M/12M 亚重症病人监护公开摘要",
+      "path": "documents/official-mindray-epm-10m-12m-2026.md",
+      "content_sha256": "562fd1ee6c4530e54b4fa7657c5ae2f30987c0348c3ab3959833dbec805750f8",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"347cb-659548ad22c62\"",
+          "last_modified": "Tue, 18 Aug 2026 16:11:41 GMT",
+          "response_sha256": "40506daa9e874821f9c134e10f5a38edbbd9ab04183f9a2cde49159ad4f35b08",
+          "bytes_hashed": 214987,
+          "truncated": false,
+          "latency_ms": 1303
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-product-portfolio-2026",
+      "title": "迈瑞医疗设备公开产品线与型号导航",
+      "path": "documents/official-mindray-product-portfolio-2026.md",
+      "content_sha256": "425464599dc15e2d86a9527e3053df93da2f05e519bd8ba22fdef71221eed005",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2cb5e-659915370ce69\"",
+          "last_modified": "Fri, 21 Aug 2026 16:42:45 GMT",
+          "response_sha256": "5b5b7f622be9c0c50dc6afd9f9c5f9faf26baea87b14e45143c8a06c1d85e573",
+          "bytes_hashed": 183134,
+          "truncated": false,
+          "latency_ms": 1266
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-sv70-sv60-2026",
+      "title": "迈瑞 SV70/SV60 无创呼吸机公开摘要",
+      "path": "documents/official-mindray-sv70-sv60-2026.md",
+      "content_sha256": "a28e0c39c27810b4b1521612e60ad26fe250451a2f21cc4aae4034ab3eae22b6",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ventilators/sv70-sv60"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ventilators/sv70-sv60",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ventilators/sv70-sv60",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"31ae6-65956792e0be1\"",
+          "last_modified": "Tue, 18 Aug 2026 18:29:55 GMT",
+          "response_sha256": "a553dc81bac9b7c312558099c5698b8e6e50ef28ebde875f53698d72815896cb",
+          "bytes_hashed": 203494,
+          "truncated": false,
+          "latency_ms": 1320
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-sv800-sv600-2026",
+      "title": "迈瑞 SV800/SV600 重症呼吸机公开摘要",
+      "path": "documents/official-mindray-sv800-sv600-2026.md",
+      "content_sha256": "35be5429195c54540a978b00f1b018c478c775106d68652690b2f44bdb5f21ac",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ventilators/sv800-sv600"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ventilators/sv800-sv600",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ventilators/sv800-sv600",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2d600-65990ec503df9\"",
+          "last_modified": "Fri, 21 Aug 2026 16:13:55 GMT",
+          "response_sha256": "a17864ae265f5e50a67ef59b6595b517cb3b0adea177c74da50d5be5d0fb2d2d",
+          "bytes_hashed": 185856,
+          "truncated": false,
+          "latency_ms": 1321
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-tms30-2026",
+      "title": "迈瑞 BeneVision TMS30 遥测监护系统公开摘要",
+      "path": "documents/official-mindray-tms30-2026.md",
+      "content_sha256": "85f40738d0a2dc3b20e2affadb692b7c80ef7758f78c66578b7184c7eeb28dbe",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2e4cc-65955d125d499\"",
+          "last_modified": "Tue, 18 Aug 2026 17:42:56 GMT",
+          "response_sha256": "e364a503a59c555aae30ac57efe5f72fc50f8e1cc141d34de574a27e6a0f025b",
+          "bytes_hashed": 189644,
+          "truncated": false,
+          "latency_ms": 1301
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-ultrasound-m9-2026",
+      "title": "迈瑞 M9 便携式彩色多普勒超声公开摘要",
+      "path": "documents/official-mindray-ultrasound-m9-2026.md",
+      "content_sha256": "0896dad331f2ce713ac4d0734d4b1aa59102ec0dbfc2382c77aaf6ff8b577e9f",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9",
+          "status": "healthy",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2f084-65990f87d449b\"",
+          "last_modified": "Fri, 21 Aug 2026 16:17:19 GMT",
+          "response_sha256": "5587c7295c4558fe820336990985871cf0a233d80ac9da8ea3f1cd4a2932c238",
+          "bytes_hashed": 192644,
+          "truncated": false,
+          "latency_ms": 1344
+        }
+      ]
+    },
+    {
+      "doc_id": "official-mindray-wato-ex65-2026",
+      "title": "迈瑞 WATO EX-65 麻醉系统公开摘要",
+      "path": "documents/official-mindray-wato-ex65-2026.md",
+      "content_sha256": "e947f2b5f70bf5c14196dfb1eabd791573b4951d5e09b4025224a032b08ebea3",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/anesthesia/wato-ex-65"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products/anesthesia/wato-ex-65",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products/anesthesia/wato-ex-65",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2f3de-6595523dd2de8\"",
+          "last_modified": "Tue, 18 Aug 2026 16:54:29 GMT",
+          "response_sha256": "67c5f837d83772b734fa1ea5c12df09ea0f8f64eaa19ab8dbc132cc0126b0eea",
+          "bytes_hashed": 193502,
+          "truncated": false,
+          "latency_ms": 2083
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-avalon-fm50-2026",
+      "title": "飞利浦 Avalon FM50 胎儿和孕产妇监护仪公开摘要",
+      "path": "documents/official-philips-avalon-fm50-2026.md",
+      "content_sha256": "eb70fcd0272ee9ba91680cb16d4626e5421a81c1e1d2aeda09a942e301a6c0a1",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "f1765f2b3f9a4986437035e58566ecdd4d3d934c43d3ac75629b0e1de4f747bc",
+          "bytes_hashed": 402731,
+          "truncated": false,
+          "latency_ms": 4007
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-epiq-elite-2026",
+      "title": "飞利浦 EPIQ Elite 高端超声系统公开摘要",
+      "path": "documents/official-philips-epiq-elite-2026.md",
+      "content_sha256": "0379fd7e72432c168a04b520dafbfeaaf0144a9cd99f9d339842695d06d82ce7",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "021d5b2a2d64684d1826cd48f79708f3b3e61b9d6333a8eca5dec933f001f0cf",
+          "bytes_hashed": 507342,
+          "truncated": false,
+          "latency_ms": 2549
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-heartstart-frx-2026",
+      "title": "飞利浦 HeartStart FRx 自动体外除颤器公开摘要",
+      "path": "documents/official-philips-heartstart-frx-2026.md",
+      "content_sha256": "947b020f53688143fc49f47cc20e2b896c53e8e484f8c62d82e2d082362632fc",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "5c9abf708e1a8ca5e623f32aa12beb63b8469530ac4f50c4a82860f3fea27cb4",
+          "bytes_hashed": 407318,
+          "truncated": false,
+          "latency_ms": 2722
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-intellivue-mp5-2026",
+      "title": "飞利浦 IntelliVue MP5 床旁病人监护仪公开摘要",
+      "path": "documents/official-philips-intellivue-mp5-2026.md",
+      "content_sha256": "1c3484ae90e10917a4ba7099ed6a1f06b9b87fe673e2014748517cca9eb9a561",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "2869ffa9b81a0634610d9307605efa932d2a31dc197f39fea599bcabcdd0cb1e",
+          "bytes_hashed": 209219,
+          "truncated": false,
+          "latency_ms": 2551
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-intellivue-mx750-mx850-2026",
+      "title": "飞利浦 IntelliVue MX750/MX850 重症床旁监护仪公开摘要",
+      "path": "documents/official-philips-intellivue-mx750-mx850-2026.md",
+      "content_sha256": "04c8d2981eadddc43dc9e077ab323ec68744c8b4da194a22d6e8d8278162f337",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "8b0d1c2773df2e9af7750aaa1ea51d50437c9318f06a0ecbc7f975524c6bc50e",
+          "bytes_hashed": 400109,
+          "truncated": false,
+          "latency_ms": 2170
+        }
+      ]
+    },
+    {
+      "doc_id": "official-philips-monitoring-portfolio-2026",
+      "title": "飞利浦病人监护产品家族公开导航",
+      "path": "documents/official-philips-monitoring-portfolio-2026.md",
+      "content_sha256": "9f840d4ce6bbd17dcc7bbc233caac1ceb070ad7e3cf32c3935aac0392a5e4d64",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring"
+      ],
+      "collected_at": "2026-09-01",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.philips.com.cn/healthcare/patient-monitoring",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "42d861a7a2d87795f3bd573a408e06b79a3d2101080e7e86bcc807db5fd046fa",
+          "bytes_hashed": 238811,
+          "truncated": false,
+          "latency_ms": 3088
+        }
+      ]
+    },
+    {
+      "doc_id": "philips-intellivue-mx500-mx550-2026",
+      "title": "飞利浦 IntelliVue MX500/MX550 病人监护仪公开产品摘要",
+      "path": "documents/philips-intellivue-mx500-mx550-2026.md",
+      "content_sha256": "a56dfb63bd13da9ee820f355d9115db3aadeec54f69408dd02ea0e856f40ca9c",
+      "source_type": "official_manufacturer",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "583ef82a688b967ca54061f9f1e5fe830a1c9bb4b53588323b3cd2712c954ff5",
+          "bytes_hashed": 218152,
+          "truncated": false,
+          "latency_ms": 3468
+        }
+      ]
+    },
+    {
+      "doc_id": "sales-after-sales-triage-2026",
+      "title": "医疗设备售后问题安全分诊指南",
+      "path": "documents/sales-after-sales-triage-2026.md",
+      "content_sha256": "ea834d2221f3c1f90dd0523743b262115903e2fb324ed30d452d52b24843b447",
+      "source_type": "company_service_policy",
+      "source_urls": [],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": []
+    },
+    {
+      "doc_id": "sales-product-catalog-2026",
+      "title": "医疗设备销售产品线导航（公开资料版）",
+      "path": "documents/sales-product-catalog-2026.md",
+      "content_sha256": "947b637297d3c7609a110ef57afab31c3e689a7acd78322de571f10506b61ed4",
+      "source_type": "official_manufacturer_summary",
+      "source_urls": [
+        "https://www.mindray.com/cn/products",
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+        "https://www.draeger.com/zh_tw/Products/Evita-V800"
+      ],
+      "collected_at": "2026-08-17",
+      "review_status": "approved",
+      "online_sources": [
+        {
+          "url": "https://www.mindray.com/cn/products",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.mindray.com/cn/products",
+          "content_type": "text/html;charset=utf-8",
+          "etag": "\"2cb5e-65954256dc039\"",
+          "last_modified": "Tue, 18 Aug 2026 15:43:20 GMT",
+          "response_sha256": "04412848b9678947c1b45458e8cd9a4e412350bd0e02305c317dd79fdab9e129",
+          "bytes_hashed": 183134,
+          "truncated": false,
+          "latency_ms": 2080
+        },
+        {
+          "url": "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+          "status": "changed",
+          "http_status": 200,
+          "final_url": "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+          "content_type": "text/html; charset=utf-8",
+          "etag": "",
+          "last_modified": "",
+          "response_sha256": "c72f359b9e3d14288a71699cc140ffee728c850c2509975bd1b4d383cc6cb2a1",
+          "bytes_hashed": 217970,
+          "truncated": false,
+          "latency_ms": 1552
+        },
+        {
+          "url": "https://www.draeger.com/zh_tw/Products/Evita-V800",
+          "status": "unavailable",
+          "http_status": 0,
+          "error": "The read operation timed out"
+        }
+      ]
+    }
+  ]
+}

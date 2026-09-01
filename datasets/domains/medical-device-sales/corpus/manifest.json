@@ -1,51 +1,29 @@
 [
   {
-    "doc_id": "sales-product-catalog-2026",
-    "title": "医疗设备销售产品线导航（公开资料版）",
-    "doc_type": "sales_catalog",
-    "manufacturer": "multi-brand",
-    "product_family": "medical-equipment-sales",
-    "model_codes": ["BeneVision N1", "BeneHeart C Series", "BeneFusion i/u", "Resona I9", "IntelliVue MX500", "IntelliVue MX550", "Evita V800"],
-    "version": "web-2026-08-17",
-    "region": "CN",
-    "language": "zh-CN",
-    "authority_level": "official_source_summary",
-    "collected_at": "2026-08-17",
-    "source_type": "official_manufacturer_summary",
-    "source_urls": ["https://www.mindray.com/cn/products", "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550", "https://www.draeger.com/zh_tw/Products/Evita-V800"],
-    "path": "documents/sales-product-catalog-2026.md"
-  },
-  {
-    "doc_id": "mindray-benevision-n1-2026",
-    "title": "迈瑞 BeneVision N1 病人监护仪公开产品摘要",
+    "doc_id": "draeger-evita-v800-2026",
+    "title": "德尔格 Evita V800 重症呼吸机公开产品摘要",
     "doc_type": "official_product_summary",
-    "manufacturer": "迈瑞医疗",
-    "product_family": "patient-monitoring",
-    "model_codes": ["BeneVision N1"],
+    "manufacturer": "德尔格",
+    "product_family": "ventilator",
+    "model_codes": [
+      "Evita V800"
+    ],
     "version": "web-2026-08-17",
     "region": "CN",
-    "language": "zh-CN",
+    "language": "zh-TW",
     "authority_level": "official_source_summary",
     "collected_at": "2026-08-17",
-    "source_type": "official_manufacturer",
-    "source_urls": ["https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"],
-    "path": "documents/mindray-benevision-n1-2026.md"
-  },
-  {
-    "doc_id": "mindray-beneheart-c-series-2026",
-    "title": "迈瑞 BeneHeart C 系列 AED 公开产品摘要",
-    "doc_type": "official_product_summary",
-    "manufacturer": "迈瑞医疗",
-    "product_family": "aed",
-    "model_codes": ["BeneHeart C Series", "BeneHeart C1A", "BeneHeart C2"],
-    "version": "web-2026-08-17",
-    "region": "CN",
-    "language": "zh-CN",
-    "authority_level": "official_source_summary",
-    "collected_at": "2026-08-17",
-    "source_type": "official_manufacturer",
-    "source_urls": ["https://www.mindray.com/cn/products/aed/beneheart-c-series"],
-    "path": "documents/mindray-beneheart-c-series-2026.md"
+    "source_type": "official_manufacturer_regional",
+    "source_urls": [
+      "https://www.draeger.com/zh_tw/Products/Evita-V800"
+    ],
+    "path": "documents/draeger-evita-v800-2026.md",
+    "product": "ventilator",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.draeger.com/zh_tw/Products/Evita-V800",
+    "quality": "curated_official_summary"
   },
   {
     "doc_id": "mindray-benefusion-iu-series-2026",
@@ -53,15 +31,82 @@
     "doc_type": "official_product_summary",
     "manufacturer": "迈瑞医疗",
     "product_family": "infusion-system",
-    "model_codes": ["BeneFusion i/u", "BeneFusion iSP", "BeneFusion uSP", "BeneFusion uDSP"],
+    "model_codes": [
+      "BeneFusion i/u",
+      "BeneFusion iSP",
+      "BeneFusion uSP",
+      "BeneFusion uDSP"
+    ],
     "version": "web-2026-08-17",
     "region": "CN",
     "language": "zh-CN",
     "authority_level": "official_source_summary",
     "collected_at": "2026-08-17",
     "source_type": "official_manufacturer",
-    "source_urls": ["https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series"],
-    "path": "documents/mindray-benefusion-iu-series-2026.md"
+    "source_urls": [
+      "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series"
+    ],
+    "path": "documents/mindray-benefusion-iu-series-2026.md",
+    "product": "infusion-system",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series",
+    "quality": "curated_official_summary"
+  },
+  {
+    "doc_id": "mindray-beneheart-c-series-2026",
+    "title": "迈瑞 BeneHeart C 系列 AED 公开产品摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "aed",
+    "model_codes": [
+      "BeneHeart C Series",
+      "BeneHeart C1A",
+      "BeneHeart C2"
+    ],
+    "version": "web-2026-08-17",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-08-17",
+    "source_type": "official_manufacturer",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/aed/beneheart-c-series"
+    ],
+    "path": "documents/mindray-beneheart-c-series-2026.md",
+    "product": "aed",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/aed/beneheart-c-series",
+    "quality": "curated_official_summary"
+  },
+  {
+    "doc_id": "mindray-benevision-n1-2026",
+    "title": "迈瑞 BeneVision N1 病人监护仪公开产品摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "patient-monitoring",
+    "model_codes": [
+      "BeneVision N1"
+    ],
+    "version": "web-2026-08-17",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-08-17",
+    "source_type": "official_manufacturer",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"
+    ],
+    "path": "documents/mindray-benevision-n1-2026.md",
+    "product": "patient-monitoring",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1",
+    "quality": "curated_official_summary"
   },
   {
     "doc_id": "mindray-resona-i9-2026",
@@ -69,47 +114,25 @@
     "doc_type": "official_product_summary",
     "manufacturer": "迈瑞医疗",
     "product_family": "ultrasound",
-    "model_codes": ["Resona I9"],
+    "model_codes": [
+      "Resona I9"
+    ],
     "version": "web-2026-08-17",
     "region": "CN",
     "language": "zh-CN",
     "authority_level": "official_source_summary",
     "collected_at": "2026-08-17",
     "source_type": "official_manufacturer",
-    "source_urls": ["https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9"],
-    "path": "documents/mindray-resona-i9-2026.md"
-  },
-  {
-    "doc_id": "philips-intellivue-mx500-mx550-2026",
-    "title": "飞利浦 IntelliVue MX500/MX550 病人监护仪公开产品摘要",
-    "doc_type": "official_product_summary",
-    "manufacturer": "飞利浦医疗",
-    "product_family": "patient-monitoring",
-    "model_codes": ["IntelliVue MX500", "IntelliVue MX550"],
-    "version": "web-2026-08-17",
-    "region": "CN",
-    "language": "zh-CN",
-    "authority_level": "official_source_summary",
-    "collected_at": "2026-08-17",
-    "source_type": "official_manufacturer",
-    "source_urls": ["https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"],
-    "path": "documents/philips-intellivue-mx500-mx550-2026.md"
-  },
-  {
-    "doc_id": "draeger-evita-v800-2026",
-    "title": "德尔格 Evita V800 重症呼吸机公开产品摘要",
-    "doc_type": "official_product_summary",
-    "manufacturer": "德尔格",
-    "product_family": "ventilator",
-    "model_codes": ["Evita V800"],
-    "version": "web-2026-08-17",
-    "region": "CN",
-    "language": "zh-TW",
-    "authority_level": "official_source_summary",
-    "collected_at": "2026-08-17",
-    "source_type": "official_manufacturer_regional",
-    "source_urls": ["https://www.draeger.com/zh_tw/Products/Evita-V800"],
-    "path": "documents/draeger-evita-v800-2026.md"
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9"
+    ],
+    "path": "documents/mindray-resona-i9-2026.md",
+    "product": "ultrasound",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9",
+    "quality": "curated_official_summary"
   },
   {
     "doc_id": "nmpa-udi-verification-guide-2026",
@@ -124,8 +147,901 @@
     "authority_level": "regulator",
     "collected_at": "2026-08-17",
     "source_type": "government_regulator",
-    "source_urls": ["https://udi.nmpa.gov.cn/", "https://udi.nmpa.gov.cn/download.html"],
-    "path": "documents/nmpa-udi-verification-guide-2026.md"
+    "source_urls": [
+      "https://udi.nmpa.gov.cn/",
+      "https://udi.nmpa.gov.cn/download.html"
+    ],
+    "path": "documents/nmpa-udi-verification-guide-2026.md",
+    "product": "regulatory-master-data",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://udi.nmpa.gov.cn/",
+    "quality": "curated_official_summary"
+  },
+  {
+    "doc_id": "official-draeger-atlan-2026",
+    "title": "德尔格 Atlan A350/A350 XL 麻醉工作站公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "德尔格",
+    "product_family": "anesthesia-workstation",
+    "model_codes": [
+      "Atlan A350",
+      "Atlan A350 XL"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/zh_cn/Hospital/Atlan",
+    "quality": "curated_official_summary",
+    "product": "anesthesia-workstation",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/zh_cn/Hospital/Atlan"
+    ],
+    "path": "documents/official-draeger-atlan-2026.md"
+  },
+  {
+    "doc_id": "official-draeger-babylog-vn800-2026",
+    "title": "德尔格 Babylog VN800 新生儿呼吸机公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "德尔格",
+    "product_family": "ventilator-neonatal",
+    "model_codes": [
+      "Babylog VN800",
+      "Babylog VN600"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators",
+    "quality": "curated_official_summary",
+    "product": "ventilator-neonatal",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators"
+    ],
+    "path": "documents/official-draeger-babylog-vn800-2026.md"
+  },
+  {
+    "doc_id": "official-draeger-perseus-a500-2026",
+    "title": "德尔格 Perseus A500 麻醉工作站公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "德尔格",
+    "product_family": "anesthesia-workstation",
+    "model_codes": [
+      "Perseus A500"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi",
+    "quality": "curated_official_summary",
+    "product": "anesthesia-workstation",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi"
+    ],
+    "path": "documents/official-draeger-perseus-a500-2026.md"
+  },
+  {
+    "doc_id": "official-draeger-pulmovista-500-2026",
+    "title": "德尔格 PulmoVista 500 床旁肺通气成像公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "德尔格",
+    "product_family": "electrical-impedance-tomography",
+    "model_codes": [
+      "PulmoVista 500"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/en-us_ca/Products/PulmoVista-500",
+    "quality": "curated_official_summary",
+    "product": "electrical-impedance-tomography",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/en-us_ca/Products/PulmoVista-500"
+    ],
+    "path": "documents/official-draeger-pulmovista-500-2026.md"
+  },
+  {
+    "doc_id": "official-draeger-savina-300-2026",
+    "title": "德尔格 Savina 300 呼吸机公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "德尔格",
+    "product_family": "ventilator-critical-care",
+    "model_codes": [
+      "Savina 300"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+    "quality": "curated_official_summary",
+    "product": "ventilator-critical-care",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+      "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf"
+    ],
+    "path": "documents/official-draeger-savina-300-2026.md"
+  },
+  {
+    "doc_id": "official-draeger-ventilator-portfolio-2026",
+    "title": "德尔格呼吸机产品家族公开导航",
+    "doc_type": "official_product_portfolio",
+    "manufacturer": "德尔格",
+    "product_family": "ventilator-portfolio",
+    "model_codes": [
+      "Evita Infinity V500",
+      "Babylog VN500",
+      "Evita V300",
+      "Savina 300",
+      "PulmoVista 500",
+      "Savina"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+    "quality": "curated_official_summary",
+    "product": "ventilator-portfolio",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.draeger.com/zh_cn/Productfinder/Ventilators"
+    ],
+    "path": "documents/official-draeger-ventilator-portfolio-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-aed-portfolio-2026",
+    "title": "迈瑞 BeneHeart AED 产品家族公开导航",
+    "doc_type": "official_product_portfolio",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "aed",
+    "model_codes": [
+      "BeneHeart E Series",
+      "BeneHeart L Series",
+      "BeneHeart C Series",
+      "BeneHeart D1 Pro",
+      "BeneHeart S Series"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/aed",
+    "quality": "curated_official_summary",
+    "product": "aed",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/aed",
+      "https://www.mindray.com/en/products/aed"
+    ],
+    "path": "documents/official-mindray-aed-portfolio-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-anesthesia-a9-2026",
+    "title": "迈瑞 A9 麻醉工作站公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "anesthesia-workstation",
+    "model_codes": [
+      "A9",
+      "ACA",
+      "AMV"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/anesthesia/a9",
+    "quality": "curated_official_summary",
+    "product": "anesthesia-workstation",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/anesthesia/a9"
+    ],
+    "path": "documents/official-mindray-anesthesia-a9-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-bc760-cs-2026",
+    "title": "迈瑞 BC-760 CS 全自动血液细胞分析仪公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "hematology-analyzer",
+    "model_codes": [
+      "BC-760 CS"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs",
+    "quality": "curated_official_summary",
+    "product": "hematology-analyzer",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs"
+    ],
+    "path": "documents/official-mindray-bc760-cs-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-benefusion-n-2026",
+    "title": "迈瑞 BeneFusion n 系列输注系统公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "infusion-system-modular",
+    "model_codes": [
+      "BeneFusion nVP",
+      "BeneFusion nSP",
+      "BeneFusion nDS",
+      "BeneFusion tDS"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series",
+    "quality": "curated_official_summary",
+    "product": "infusion-system-modular",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series"
+    ],
+    "path": "documents/official-mindray-benefusion-n-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-beneheart-defibrillator-2026",
+    "title": "迈瑞 BeneHeart 除颤监护仪产品家族公开导航",
+    "doc_type": "official_product_portfolio",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "monitor-defibrillator",
+    "model_codes": [
+      "BeneHeart DX",
+      "BeneHeart D60",
+      "BeneHeart D30",
+      "BeneHeart D6",
+      "BeneHeart D3",
+      "BeneHeart D2"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/defibrillation-system",
+    "quality": "curated_official_summary",
+    "product": "monitor-defibrillator",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/defibrillation-system"
+    ],
+    "path": "documents/official-mindray-beneheart-defibrillator-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-beneheart-r700-2026",
+    "title": "迈瑞 BeneHeart R700 全数字多道心电图机公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "electrocardiograph",
+    "model_codes": [
+      "BeneHeart R700"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700",
+    "quality": "curated_official_summary",
+    "product": "electrocardiograph",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700"
+    ],
+    "path": "documents/official-mindray-beneheart-r700-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-benevision-cms-2026",
+    "title": "迈瑞 BeneVision 中央监护系统公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "central-monitoring",
+    "model_codes": [
+      "BeneVision CMS",
+      "CMS Viewer",
+      "Mobile Viewer",
+      "BeneLink"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms",
+    "quality": "curated_official_summary",
+    "product": "central-monitoring",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms"
+    ],
+    "path": "documents/official-mindray-benevision-cms-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-benevision-n22-n19-2026",
+    "title": "迈瑞 BeneVision N22/N19 高端病人监护仪公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "patient-monitoring-high-acuity",
+    "model_codes": [
+      "BeneVision N22",
+      "BeneVision N19"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-high-acuity",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19"
+    ],
+    "path": "documents/official-mindray-benevision-n22-n19-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-benevision-v-neo-2026",
+    "title": "迈瑞 BeneVision V700/V500/V200 Neo 新生儿监护公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "patient-monitoring-neonatal",
+    "model_codes": [
+      "BeneVision V700 Neo",
+      "BeneVision V500 Neo",
+      "BeneVision V200 Neo"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-neonatal",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo"
+    ],
+    "path": "documents/official-mindray-benevision-v-neo-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-benevision-v-or-2026",
+    "title": "迈瑞 BeneVision VMAX/V700/V500/V200 OR 麻醉监护公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "patient-monitoring-operating-room",
+    "model_codes": [
+      "BeneVision VMAX OR",
+      "BeneVision V700 OR",
+      "BeneVision V500 OR",
+      "BeneVision V200 OR"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-operating-room",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or"
+    ],
+    "path": "documents/official-mindray-benevision-v-or-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-consona-n-2026",
+    "title": "迈瑞 Consona N 系列彩色多普勒超声公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "ultrasound-primary-care",
+    "model_codes": [
+      "Consona N9",
+      "Consona N8",
+      "Consona N7",
+      "Consona N6",
+      "Consona N5"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series",
+    "quality": "curated_official_summary",
+    "product": "ultrasound-primary-care",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series"
+    ],
+    "path": "documents/official-mindray-consona-n-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-epm-10m-12m-2026",
+    "title": "迈瑞 ePM 10M/12M 亚重症病人监护公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "patient-monitoring-sub-intensive",
+    "model_codes": [
+      "ePM 10M",
+      "ePM 12M",
+      "EP20",
+      "BP20"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-sub-intensive",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m"
+    ],
+    "path": "documents/official-mindray-epm-10m-12m-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-product-portfolio-2026",
+    "title": "迈瑞医疗设备公开产品线与型号导航",
+    "doc_type": "official_product_portfolio",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "multi-product-portfolio",
+    "model_codes": [
+      "BeneVision VMAX",
+      "BeneVision V700",
+      "BeneVision V500",
+      "BeneVision V200",
+      "ePM 10M",
+      "ePM 12M",
+      "uMEC10",
+      "uMEC12",
+      "BeneHeart E",
+      "BeneHeart L",
+      "BeneHeart C",
+      "BeneHeart D1 Pro",
+      "BeneHeart S",
+      "BeneHeart DX",
+      "BeneHeart D60",
+      "BeneHeart D30",
+      "BeneHeart R900",
+      "BeneHeart R700",
+      "BeneFusion n",
+      "BeneFusion e",
+      "BeneFusion i/u",
+      "HyBase V9",
+      "HyLED X",
+      "HyPort P",
+      "BC-760 CS",
+      "BC-7500"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products",
+    "quality": "curated_official_summary",
+    "product": "multi-product-portfolio",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products"
+    ],
+    "path": "documents/official-mindray-product-portfolio-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-sv70-sv60-2026",
+    "title": "迈瑞 SV70/SV60 无创呼吸机公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "ventilator-noninvasive",
+    "model_codes": [
+      "SV70",
+      "SV60"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ventilators/sv70-sv60",
+    "quality": "curated_official_summary",
+    "product": "ventilator-noninvasive",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ventilators/sv70-sv60"
+    ],
+    "path": "documents/official-mindray-sv70-sv60-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-sv800-sv600-2026",
+    "title": "迈瑞 SV800/SV600 重症呼吸机公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "ventilator-critical-care",
+    "model_codes": [
+      "SV800",
+      "SV600"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ventilators/sv800-sv600",
+    "quality": "curated_official_summary",
+    "product": "ventilator-critical-care",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ventilators/sv800-sv600"
+    ],
+    "path": "documents/official-mindray-sv800-sv600-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-tms30-2026",
+    "title": "迈瑞 BeneVision TMS30 遥测监护系统公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "telemetry-monitoring",
+    "model_codes": [
+      "BeneVision TMS30"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30",
+    "quality": "curated_official_summary",
+    "product": "telemetry-monitoring",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30"
+    ],
+    "path": "documents/official-mindray-tms30-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-ultrasound-m9-2026",
+    "title": "迈瑞 M9 便携式彩色多普勒超声公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "ultrasound-point-of-care",
+    "model_codes": [
+      "M9",
+      "mQuadro"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9",
+    "quality": "curated_official_summary",
+    "product": "ultrasound-point-of-care",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9"
+    ],
+    "path": "documents/official-mindray-ultrasound-m9-2026.md"
+  },
+  {
+    "doc_id": "official-mindray-wato-ex65-2026",
+    "title": "迈瑞 WATO EX-65 麻醉系统公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "迈瑞医疗",
+    "product_family": "anesthesia-system",
+    "model_codes": [
+      "WATO EX-65"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products/anesthesia/wato-ex-65",
+    "quality": "curated_official_summary",
+    "product": "anesthesia-system",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products/anesthesia/wato-ex-65"
+    ],
+    "path": "documents/official-mindray-wato-ex65-2026.md"
+  },
+  {
+    "doc_id": "official-philips-avalon-fm50-2026",
+    "title": "飞利浦 Avalon FM50 胎儿和孕产妇监护仪公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "fetal-maternal-monitoring",
+    "model_codes": [
+      "Avalon FM50",
+      "Avalon FM40"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor",
+    "quality": "curated_official_summary",
+    "product": "fetal-maternal-monitoring",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor"
+    ],
+    "path": "documents/official-philips-avalon-fm50-2026.md"
+  },
+  {
+    "doc_id": "official-philips-epiq-elite-2026",
+    "title": "飞利浦 EPIQ Elite 高端超声系统公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "ultrasound-premium-cart",
+    "model_codes": [
+      "EPIQ Elite",
+      "EPIQ Elite Elevate Plus"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived",
+    "quality": "curated_official_summary",
+    "product": "ultrasound-premium-cart",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived"
+    ],
+    "path": "documents/official-philips-epiq-elite-2026.md"
+  },
+  {
+    "doc_id": "official-philips-heartstart-frx-2026",
+    "title": "飞利浦 HeartStart FRx 自动体外除颤器公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "aed",
+    "model_codes": [
+      "HeartStart FRx",
+      "SMART Pads II"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator",
+    "quality": "curated_official_summary",
+    "product": "aed",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator"
+    ],
+    "path": "documents/official-philips-heartstart-frx-2026.md"
+  },
+  {
+    "doc_id": "official-philips-intellivue-mp5-2026",
+    "title": "飞利浦 IntelliVue MP5 床旁病人监护仪公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "patient-monitoring-bedside",
+    "model_codes": [
+      "IntelliVue MP5"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-bedside",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------"
+    ],
+    "path": "documents/official-philips-intellivue-mp5-2026.md"
+  },
+  {
+    "doc_id": "official-philips-intellivue-mx750-mx850-2026",
+    "title": "飞利浦 IntelliVue MX750/MX850 重症床旁监护仪公开摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "patient-monitoring-high-acuity",
+    "model_codes": [
+      "IntelliVue MX750",
+      "IntelliVue MX850"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-high-acuity",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor"
+    ],
+    "path": "documents/official-philips-intellivue-mx750-mx850-2026.md"
+  },
+  {
+    "doc_id": "official-philips-monitoring-portfolio-2026",
+    "title": "飞利浦病人监护产品家族公开导航",
+    "doc_type": "official_product_portfolio",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "patient-monitoring-portfolio",
+    "model_codes": [
+      "IntelliVue MX450",
+      "IntelliVue MX400",
+      "IntelliVue MP5",
+      "Efficia CM",
+      "SureSigns VS2+",
+      "Avalon CL",
+      "Avalon FM50"
+    ],
+    "version": "web-2026-09-01",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-09-01",
+    "effective_at": "2026-09-01",
+    "status": "active",
+    "visibility": "public",
+    "source": "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring",
+    "quality": "curated_official_summary",
+    "product": "patient-monitoring-portfolio",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring"
+    ],
+    "path": "documents/official-philips-monitoring-portfolio-2026.md"
+  },
+  {
+    "doc_id": "philips-intellivue-mx500-mx550-2026",
+    "title": "飞利浦 IntelliVue MX500/MX550 病人监护仪公开产品摘要",
+    "doc_type": "official_product_summary",
+    "manufacturer": "飞利浦医疗",
+    "product_family": "patient-monitoring",
+    "model_codes": [
+      "IntelliVue MX500",
+      "IntelliVue MX550"
+    ],
+    "version": "web-2026-08-17",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-08-17",
+    "source_type": "official_manufacturer",
+    "source_urls": [
+      "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"
+    ],
+    "path": "documents/philips-intellivue-mx500-mx550-2026.md",
+    "product": "patient-monitoring",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+    "quality": "curated_official_summary"
   },
   {
     "doc_id": "sales-after-sales-triage-2026",
@@ -141,6 +1057,46 @@
     "collected_at": "2026-08-17",
     "source_type": "company_service_policy",
     "source_urls": [],
-    "path": "documents/sales-after-sales-triage-2026.md"
+    "path": "documents/sales-after-sales-triage-2026.md",
+    "product": "after-sales-service",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "company-reviewed",
+    "quality": "curated_official_summary"
+  },
+  {
+    "doc_id": "sales-product-catalog-2026",
+    "title": "医疗设备销售产品线导航（公开资料版）",
+    "doc_type": "sales_catalog",
+    "manufacturer": "multi-brand",
+    "product_family": "medical-equipment-sales",
+    "model_codes": [
+      "BeneVision N1",
+      "BeneHeart C Series",
+      "BeneFusion i/u",
+      "Resona I9",
+      "IntelliVue MX500",
+      "IntelliVue MX550",
+      "Evita V800"
+    ],
+    "version": "web-2026-08-17",
+    "region": "CN",
+    "language": "zh-CN",
+    "authority_level": "official_source_summary",
+    "collected_at": "2026-08-17",
+    "source_type": "official_manufacturer_summary",
+    "source_urls": [
+      "https://www.mindray.com/cn/products",
+      "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+      "https://www.draeger.com/zh_tw/Products/Evita-V800"
+    ],
+    "path": "documents/sales-product-catalog-2026.md",
+    "product": "medical-equipment-sales",
+    "status": "active",
+    "effective_at": "2026-08-17",
+    "visibility": "public",
+    "source": "https://www.mindray.com/cn/products",
+    "quality": "curated_official_summary"
   }
 ]

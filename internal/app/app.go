@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/dingpuyu/rag-evolution-lab/internal/answerability"
 	"github.com/dingpuyu/rag-evolution-lab/internal/dataset"
 	"github.com/dingpuyu/rag-evolution-lab/internal/domain"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ingest"
@@ -32,6 +33,10 @@ type Options struct {
 	MilvusCollection  string
 	MilvusSearchEF    int
 	SkipOllamaMemory  bool
+	ChunkMaxRunes     int
+	ChunkOverlapRunes int
+	ProviderEmbedder  retrieval.Embedder
+	ProviderReranker  rerank.Reranker
 }
 
 func Build(corpusRoot string) (*Runtime, error) {
@@ -43,7 +48,11 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 	if err != nil {
 		return nil, err
 	}
-	chunker := ingest.Chunker{MaxRunes: 700}
+	chunkMaxRunes := options.ChunkMaxRunes
+	if chunkMaxRunes <= 0 {
+		chunkMaxRunes = 700
+	}
+	chunker := ingest.Chunker{MaxRunes: chunkMaxRunes, OverlapRunes: options.ChunkOverlapRunes}
 	var chunks []domain.Chunk
 	for _, document := range documents {
 		chunks = append(chunks, chunker.Chunk(document)...)
@@ -75,15 +84,35 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		ContextMaxChunks:   6,
 		ContextTokenBudget: 4000,
 	})
+	selectivePipeline := pipeline.NewWithOptions("v6-selective-rag", newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex), pipeline.Options{
+		Reranker:           rerank.Heuristic{},
+		CandidateTopN:      20,
+		ContextMaxChunks:   6,
+		ContextTokenBudget: 4000,
+		// Calibrated on the development split: the weakest supported support
+		// workflow scores 0.158, while safety/dynamic/unknown-model questions
+		// are rejected by deterministic policies rather than this threshold.
+		EvidenceGate: answerability.SelectiveGate{MinTopScore: 0.15},
+	})
 	pipelines := map[string]*pipeline.Pipeline{
-		keyword.Name():         keyword,
-		vector.Name():          vector,
-		metadata.Name():        metadata,
-		hybrid.Name():          hybrid,
-		hybridMetadata.Name():  hybridMetadata,
-		hybridConsensus.Name(): hybridConsensus,
-		router.Name():          router,
-		rerankPipeline.Name():  rerankPipeline,
+		keyword.Name():           keyword,
+		vector.Name():            vector,
+		metadata.Name():          metadata,
+		hybrid.Name():            hybrid,
+		hybridMetadata.Name():    hybridMetadata,
+		hybridConsensus.Name():   hybridConsensus,
+		router.Name():            router,
+		rerankPipeline.Name():    rerankPipeline,
+		selectivePipeline.Name(): selectivePipeline,
+	}
+	if options.ProviderEmbedder != nil {
+		embedder := options.ProviderEmbedder
+		if options.EmbeddingCacheDir != "" {
+			embedder = retrieval.CachedEmbedder{Inner: embedder, Dir: options.EmbeddingCacheDir}
+		}
+		if err := registerProviderMemoryPipelines(ctx, chunks, keywordIndex, metadataIndex, embedder, options.ProviderReranker, pipelines); err != nil {
+			return nil, err
+		}
 	}
 	if options.OllamaModel != "" {
 		var embedder retrieval.Embedder = retrieval.OllamaEmbedder{
@@ -113,6 +142,36 @@ func BuildWithOptions(ctx context.Context, corpusRoot string, options Options) (
 		Chunks:    chunks,
 		Pipelines: pipelines,
 	}, nil
+}
+
+func registerProviderMemoryPipelines(ctx context.Context, chunks []domain.Chunk, keywordIndex, metadataIndex retrieval.Retriever, embedder retrieval.Embedder, providerReranker rerank.Reranker, pipelines map[string]*pipeline.Pipeline) error {
+	vectorIndex, err := retrieval.NewVector(ctx, chunks, embedder)
+	if err != nil {
+		return err
+	}
+	vector := pipeline.New("v1-provider", vectorIndex)
+	pipelines[vector.Name()] = vector
+	vectorMetadata := vectorIndex.WithOptions(retrieval.Options{UseMetadata: true})
+	hybridMetadataIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{AllowPartialResults: true, SearchTimeout: 2 * time.Second}, metadataIndex, vectorMetadata)
+	hybridConsensusIndex := retrieval.NewRRFWithOptions(retrieval.RRFOptions{MinSourceMatches: 2}, metadataIndex, vectorMetadata)
+	hybrid := pipeline.New("v3-provider-hybrid", hybridMetadataIndex)
+	pipelines[hybrid.Name()] = hybrid
+	if providerReranker == nil {
+		providerReranker = rerank.Heuristic{}
+	}
+	router := newQueryRouter(metadataIndex, hybridMetadataIndex, hybridConsensusIndex)
+	reranked := pipeline.NewWithOptions("v5-provider-rerank", router, pipeline.Options{
+		Reranker: providerReranker, CandidateTopN: 20, ContextMaxChunks: 6, ContextTokenBudget: 4000,
+		DiversifyDocuments: true,
+	})
+	pipelines[reranked.Name()] = reranked
+	selective := pipeline.NewWithOptions("v6-provider-selective-rag", router, pipeline.Options{
+		Reranker: providerReranker, CandidateTopN: 20, ContextMaxChunks: 6, ContextTokenBudget: 4000,
+		EvidenceGate:       answerability.SelectiveGate{MinTopScore: 0.10},
+		DiversifyDocuments: true,
+	})
+	pipelines[selective.Name()] = selective
+	return nil
 }
 
 func registerOllamaMemoryPipelines(ctx context.Context, chunks []domain.Chunk, keywordIndex, metadataIndex retrieval.Retriever, embedder retrieval.Embedder, pipelines map[string]*pipeline.Pipeline) error {

@@ -44,6 +44,7 @@ type Report struct {
 	Precision              float64                    `json:"precision_at_k"`
 	NDCG                   float64                    `json:"ndcg_at_k"`
 	AnswerabilityAccuracy  float64                    `json:"answerability_accuracy"`
+	OutcomeAccuracy        float64                    `json:"outcome_accuracy"`
 	LatencyP50MS           float64                    `json:"latency_p50_ms"`
 	LatencyP95MS           float64                    `json:"latency_p95_ms"`
 	CitationViolations     int                        `json:"citation_violations"`
@@ -69,6 +70,7 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 		precision     float64
 		ndcg          float64
 		answerability int
+		outcomes      int
 	}
 	categorySums := make(map[string]sums)
 	var total sums
@@ -131,6 +133,10 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 			value.answerability++
 			total.answerability++
 		}
+		if result.Hit && result.AnswerableMatch {
+			value.outcomes++
+			total.outcomes++
+		}
 		categorySums[golden.Category] = value
 	}
 
@@ -142,6 +148,7 @@ func Run(ctx context.Context, target *pipeline.Pipeline, split string, cases []d
 		report.Precision = total.precision / float64(total.cases)
 		report.NDCG = total.ndcg / float64(total.cases)
 		report.AnswerabilityAccuracy = float64(total.answerability) / float64(total.cases)
+		report.OutcomeAccuracy = float64(total.outcomes) / float64(total.cases)
 	}
 	latencies := make([]float64, 0, len(report.Results))
 	for _, result := range report.Results {

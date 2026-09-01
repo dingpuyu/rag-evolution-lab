@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_a9_self_test",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "麻醉机准备时间紧，哪款公开支持预约自检且自检约三分半？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-anesthesia-a9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A9",
+      "3.5 分钟"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

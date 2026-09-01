@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_draeger_product_types",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "Babylog VN500 和 PulmoVista 500 一个做什么、另一个做什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-ventilator-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "新生儿通气",
+      "肺通气分布可视化"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

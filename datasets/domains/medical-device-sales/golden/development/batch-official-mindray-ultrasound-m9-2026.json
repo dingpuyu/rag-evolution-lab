@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_ultrasound_m9_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "迈瑞 M9 属于什么类型的超声系统，公开应用场景有哪些？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-ultrasound-m9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "便携式",
+      "ICU",
+      "急诊"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

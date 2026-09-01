@@ -1,0 +1,18 @@
+{
+  "id": "public_blind_refusal_unknown_model",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "selective_refusal",
+  "query": "请介绍完全不在资料库里的 UltraMonitor ZX-9999 的全部参数。",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "insufficient_evidence"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

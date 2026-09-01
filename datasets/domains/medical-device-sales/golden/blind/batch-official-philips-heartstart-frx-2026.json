@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_philips_heartstart_frx_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "哪款飞利浦 AED 使用 SMART Pads II，并公开提供 CPR 节拍提示？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-heartstart-frx-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "HeartStart FRx",
+      "SMART Pads II"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

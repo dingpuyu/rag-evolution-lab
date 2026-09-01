@@ -1,0 +1,24 @@
+{
+  "id": "public_holdout_neo_aeeeg",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "需要 aEEG 和双血氧的新生儿方案，不要给我手术室 OR 版本。",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-neo-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Neo",
+      "aEEG",
+      "双血氧"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

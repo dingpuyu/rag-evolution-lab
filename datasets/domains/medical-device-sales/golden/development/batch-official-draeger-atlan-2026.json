@@ -1,0 +1,23 @@
+{
+  "id": "public_dev_official_draeger_atlan_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "德尔格 Atlan 页面公开提到哪些型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-atlan-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A350",
+      "A350 XL"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_beneheart_r700_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "BeneHeart R700 如何采集和传输心电图数据？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-beneheart-r700-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "10 秒",
+      "HL7",
+      "DICOM"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

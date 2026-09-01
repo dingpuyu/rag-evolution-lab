@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_mindray_ultrasound_m9_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "急诊和介入科需要便携彩超，资料里提到 mQuadro 平台的是哪个型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-ultrasound-m9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "M9",
+      "mQuadro"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_draeger_ventilator_portfolio_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "我想区分德尔格的重症呼吸机、新生儿呼吸机和肺功能可视化设备，应看哪份导航？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-ventilator-portfolio-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Evita",
+      "Babylog",
+      "PulmoVista"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

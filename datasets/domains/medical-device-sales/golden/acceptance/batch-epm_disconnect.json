@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_epm_disconnect",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "监护设备掉线时先缓存、重新联网后补发数据，哪款公开资料这样描述？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-epm-10m-12m-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "ePM 10M/12M",
+      "复网续传"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

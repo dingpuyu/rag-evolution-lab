@@ -1,0 +1,23 @@
+{
+  "id": "public_dev_official_draeger_savina_300_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "Savina 300 公开资料强调了什么驱动方式和准备特性？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-savina-300-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "涡轮驱动",
+      "自动设备检查"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

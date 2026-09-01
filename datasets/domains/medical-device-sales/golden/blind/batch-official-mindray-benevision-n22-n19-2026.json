@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_benevision_n22_n19_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "需要旋转大屏、床旁访问 PACS 并整合其他设备数据，应查看迈瑞哪组监护仪？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-n22-n19-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "BeneVision N22/N19",
+      "iView",
+      "BeneLink"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

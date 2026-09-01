@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_draeger_perseus_a500_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "Perseus A500 在感染控制和维护方面公开了什么设计？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-perseus-a500-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "可高压灭菌",
+      "易清洁",
+      "组件架构"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

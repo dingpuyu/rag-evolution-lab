@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_benevision_v_or_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "BeneVision V500 OR 的 BIS/ESI 是不是所有配置默认都有？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-or-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "可选",
+      "OR",
+      "BIS"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

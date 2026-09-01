@@ -1,0 +1,23 @@
+{
+  "id": "public_dev_official_mindray_tms30_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "BeneVision TMS30 是否支持患者定位和电子围栏？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-tms30-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "实时定位",
+      "电子围栏"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

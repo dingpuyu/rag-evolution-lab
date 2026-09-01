@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_savina_check",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "Savina 系列里哪款资料同时出现涡轮驱动与自动设备检查？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-savina-300-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Savina 300",
+      "自动设备检查"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

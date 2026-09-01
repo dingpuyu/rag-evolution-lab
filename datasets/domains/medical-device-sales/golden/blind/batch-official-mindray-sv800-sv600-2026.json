@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_sv800_sv600_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "需要重症呼吸机支持 PulmoSight、备用空气气源和远程预防维护，应查看哪组型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-sv800-sv600-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "SV800/SV600",
+      "PulmoSight",
+      "预防维护"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

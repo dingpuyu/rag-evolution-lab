@@ -1,0 +1,24 @@
+{
+  "id": "public_acceptance_or_eeg",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "围术期需要 BIS/ESI 脑电麻醉深度监测，应核对 BeneVision 哪个配置分支？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-v-or-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "OR",
+      "BIS",
+      "ESI"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

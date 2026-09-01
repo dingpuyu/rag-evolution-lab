@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_benefusion_n_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "BeneFusion nDS 和 tDS 的定位有什么区别？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benefusion-n-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "2 个",
+      "24 个",
+      "转运"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

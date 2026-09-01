@@ -25,7 +25,15 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "datasets/domains/medical-device-sales/corpus"
 DEFAULT_MANIFEST = CORPUS / "manifest.json"
 DEFAULT_LOCK = CORPUS / "sources.lock.json"
-ALLOWED_SOURCE_DOMAINS = ("mindray.com", "philips.com.cn", "draeger.com", "nmpa.gov.cn")
+
+
+def display_path(path: Path) -> str:
+    """Keep committed reports portable while still accepting external paths."""
+    try:
+        return path.resolve().relative_to(ROOT).as_posix()
+    except ValueError:
+        return path.name
+ALLOWED_SOURCE_DOMAINS = ("mindray.com", "philips.com", "philips.com.cn", "draeger.com", "nmpa.gov.cn")
 MAX_REMOTE_BYTES = 2 * 1024 * 1024
 
 
@@ -224,8 +232,8 @@ def main() -> int:
     report = {
         "schema_version": 1,
         "checked_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "manifest": str(args.manifest),
-        "lock": str(args.lock),
+        "manifest": display_path(args.manifest),
+        "lock": display_path(args.lock),
         "summary": {
             "overall_status": overall_status,
             "documents": len(documents),

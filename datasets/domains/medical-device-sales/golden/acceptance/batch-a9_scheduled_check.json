@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_a9_scheduled_check",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "哪款麻醉工作站公开支持预约定时自检，且一次自检约 3.5 分钟？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-anesthesia-a9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "A9",
+      "3.5 分钟"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,427 @@
+{
+  "pipeline": "v6-selective-rag",
+  "split": "final",
+  "cases": 25,
+  "hit_rate_at_k": 0.92,
+  "mrr": 0.9,
+  "document_recall_at_k": 0.92,
+  "precision_at_k": 0.43999999999999995,
+  "ndcg_at_k": 0.9052371901428583,
+  "answerability_accuracy": 0.92,
+  "outcome_accuracy": 0.92,
+  "latency_p50_ms": 0.98,
+  "latency_p95_ms": 1.503,
+  "citation_violations": 0,
+  "unauthorized_retrievals": 0,
+  "metadata_violations": 0,
+  "by_category": {
+    "final_product_fact": {
+      "cases": 15,
+      "hit_rate_at_k": 1,
+      "mrr": 0.9666666666666667,
+      "document_recall_at_k": 1,
+      "precision_at_k": 0.20000000000000004,
+      "ndcg_at_k": 0.9753953169047639
+    },
+    "final_refusal": {
+      "cases": 10,
+      "hit_rate_at_k": 0.8,
+      "mrr": 0.8,
+      "document_recall_at_k": 0.8,
+      "precision_at_k": 0.8,
+      "ndcg_at_k": 0.8
+    }
+  },
+  "results": [
+    {
+      "case_id": "public_final_a9_hfnc_amv",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.496,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-anesthesia-a9-2026",
+        "official-draeger-atlan-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_aed_family_names",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.956,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-aed-portfolio-2026",
+        "official-mindray-product-portfolio-2026",
+        "sales-product-catalog-2026",
+        "mindray-beneheart-c-series-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_atlan_xl",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.628,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-draeger-atlan-2026",
+        "official-mindray-anesthesia-a9-2026"
+      ],
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_cms_benelink",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.42,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-benevision-cms-2026",
+        "official-mindray-benevision-v-or-2026",
+        "mindray-benevision-n1-2026",
+        "nmpa-udi-verification-guide-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_consona_teaching",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.902,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-consona-n-2026",
+        "official-mindray-ultrasound-m9-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_draeger_babylog",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.376,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-draeger-ventilator-portfolio-2026",
+        "draeger-evita-v800-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_epm_ip_difference",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.038,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-epm-10m-12m-2026",
+        "mindray-benevision-n1-2026",
+        "official-draeger-savina-300-2026",
+        "official-draeger-atlan-2026",
+        "sales-product-catalog-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_m9_scenarios",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.532,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-ultrasound-m9-2026",
+        "official-mindray-anesthesia-a9-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_mp5_optional_gas",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.88,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-philips-intellivue-mp5-2026",
+        "official-philips-monitoring-portfolio-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_neo_free_resp",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.912,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-benevision-v-neo-2026",
+        "official-draeger-ventilator-portfolio-2026",
+        "draeger-evita-v800-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_or_bis_option",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.343,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-benevision-v-or-2026",
+        "official-mindray-benevision-v-neo-2026"
+      ],
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_philips_obstetric",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.879,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-philips-monitoring-portfolio-2026",
+        "official-philips-intellivue-mp5-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_portfolio_first_step",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 0.5,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 0.6309297535714574,
+      "latency_ms": 1.503,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "sales-product-catalog-2026",
+        "official-mindray-product-portfolio-2026",
+        "official-mindray-aed-portfolio-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_refuse_aed_patient",
+      "category": "final_refusal",
+      "hit": false,
+      "reciprocal_rank": 0,
+      "document_recall": 0,
+      "precision_at_k": 0,
+      "ndcg_at_k": 0,
+      "latency_ms": 0.731,
+      "answerable_match": false,
+      "retrieved_doc_ids": [
+        "mindray-beneheart-c-series-2026",
+        "sales-product-catalog-2026"
+      ],
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_refuse_anesthesia_dose",
+      "category": "final_refusal",
+      "hit": false,
+      "reciprocal_rank": 0,
+      "document_recall": 0,
+      "precision_at_k": 0,
+      "ndcg_at_k": 0,
+      "latency_ms": 0.662,
+      "answerable_match": false,
+      "retrieved_doc_ids": [
+        "official-mindray-anesthesia-a9-2026",
+        "official-mindray-benevision-v-or-2026"
+      ],
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_refuse_disable_alarm",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.084,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_refuse_future_supply",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.007,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_refuse_live_quote",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.904,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_refuse_monitor_diagnosis",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.354,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_refuse_neonatal_pressure",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.739,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_refuse_patient_identity",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.879,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_refuse_private_assets",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.929,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_refuse_unknown_model",
+      "category": "final_refusal",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 1,
+      "ndcg_at_k": 1,
+      "latency_ms": 0.98,
+      "answerable_match": true,
+      "retrieved_doc_ids": null,
+      "route": "exact"
+    },
+    {
+      "case_id": "public_final_savina_ready",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.049,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-draeger-savina-300-2026",
+        "official-draeger-ventilator-portfolio-2026"
+      ],
+      "route": "semantic"
+    },
+    {
+      "case_id": "public_final_tms_arrhythmia",
+      "category": "final_product_fact",
+      "hit": true,
+      "reciprocal_rank": 1,
+      "document_recall": 1,
+      "precision_at_k": 0.2,
+      "ndcg_at_k": 1,
+      "latency_ms": 1.487,
+      "answerable_match": true,
+      "retrieved_doc_ids": [
+        "official-mindray-tms30-2026",
+        "mindray-benevision-n1-2026",
+        "official-philips-monitoring-portfolio-2026"
+      ],
+      "route": "semantic"
+    }
+  ],
+  "routes": {
+    "exact": 8,
+    "semantic": 17
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_wato_ex65_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "WATO EX-65 的气体模块和负压吸引附件分别是什么配置属性？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-wato-ex65-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "插件式",
+      "麻醉气体",
+      "选配"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

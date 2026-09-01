@@ -1,0 +1,337 @@
+{
+  "schema_version": 1,
+  "collected_at": "2026-09-01",
+  "sources": [
+    {
+      "doc_id": "official-mindray-benevision-n22-n19-2026",
+      "title": "迈瑞 BeneVision N22/N19 高端病人监护仪公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "patient-monitoring-high-acuity",
+      "model_codes": ["BeneVision N22", "BeneVision N19"],
+      "source_urls": ["https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19"],
+      "sections": [
+        ["定位与显示", [
+          "BeneVision N22/N19 是重症病人监护仪；其屏幕可在横屏和竖屏之间旋转，不应与紧凑型转运监护仪 N1 混为同一定位。",
+          "公开页面列出 HemoSight、ST Graphic 和 QTView 等临床辅助应用；具体应用和参数模块取决于配置。"
+        ]],
+        ["互联能力", [
+          "模块化 iView 可在监护仪上访问 CIS、PACS 等信息系统。",
+          "BeneLink 和 eGateway 构成设备互连能力，用于床旁设备与信息系统的数据连接，项目接口范围仍需逐项核验。"
+        ]]
+      ],
+      "dev": ["BeneVision N22/N19 的 iView 和 BeneLink 分别解决什么问题？", ["iView", "CIS", "BeneLink"]],
+      "blind": ["需要旋转大屏、床旁访问 PACS 并整合其他设备数据，应查看迈瑞哪组监护仪？", ["BeneVision N22/N19", "iView", "BeneLink"]]
+    },
+    {
+      "doc_id": "official-mindray-beneheart-defibrillator-2026",
+      "title": "迈瑞 BeneHeart 除颤监护仪产品家族公开导航",
+      "doc_type": "official_product_portfolio",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "monitor-defibrillator",
+      "model_codes": ["BeneHeart DX", "BeneHeart D60", "BeneHeart D30", "BeneHeart D6", "BeneHeart D3", "BeneHeart D2"],
+      "source_urls": ["https://www.mindray.com/cn/products/defibrillation-system"],
+      "sections": [
+        ["产品家族", [
+          "迈瑞除颤监护仪公开导航列出 BeneHeart DX、D60、D30、D6、D3 和 D2。",
+          "除颤监护仪与 BeneHeart E、L、C、D1 Pro、S 等 AED 产品线不同，不能仅凭 BeneHeart 前缀判断产品类型。"
+        ]],
+        ["核验边界", [
+          "型号之间的监护参数、除颤模式、屏幕、数据传输和附件配置不同，销售答复必须落到完整型号和区域配置。",
+          "患者是否需要除颤以及能量选择属于临床决策，本公开导航不能用于回答。"
+        ]]
+      ],
+      "dev": ["迈瑞 BeneHeart D60 和 BeneHeart C 属于同一种产品线吗？", ["除颤监护仪", "AED", "不同"]],
+      "blind": ["客户说的是 DX、D60 或 D30 时，应查 AED 导航还是除颤监护仪导航？", ["除颤监护仪", "DX", "D60"]]
+    },
+    {
+      "doc_id": "official-mindray-benefusion-n-2026",
+      "title": "迈瑞 BeneFusion n 系列输注系统公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "infusion-system-modular",
+      "model_codes": ["BeneFusion nVP", "BeneFusion nSP", "BeneFusion nDS", "BeneFusion tDS"],
+      "source_urls": ["https://www.mindray.com/cn/products/infusion-system/benefusion-n-series"],
+      "sections": [
+        ["泵与工作站", [
+          "BeneFusion nVP 集成输血、输液和输营养等常用输液功能；nSP 是该系列注射泵。",
+          "nDS 采用免工具模块化设计，可从 2 个插槽扩展到 24 个；tDS 面向转运输液管理。"
+        ]],
+        ["安全与互联", [
+          "公开功能包含 SafeDose 药物库、SmartRapid 快速启动、SmartAIR 气泡监测和 DPS 阻塞管理。",
+          "输液信息可集中管理，并公开支持通过 HL7 接入 HIS、CIS 或 EMR；实际接口和授权需项目核验。"
+        ]]
+      ],
+      "dev": ["BeneFusion nDS 和 tDS 的定位有什么区别？", ["2 个", "24 个", "转运"]],
+      "blind": ["想把输液工作站从两个插槽扩展到二十四个，并另配转运工作站，应了解哪个系列？", ["BeneFusion n", "nDS", "tDS"]]
+    },
+    {
+      "doc_id": "official-mindray-sv800-sv600-2026",
+      "title": "迈瑞 SV800/SV600 重症呼吸机公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "ventilator-critical-care",
+      "model_codes": ["SV800", "SV600"],
+      "source_urls": ["https://www.mindray.com/cn/products/ventilators/sv800-sv600"],
+      "sections": [
+        ["公开定位", [
+          "SV800/SV600 属于重症呼吸机，公开页面介绍 PulmoSight 呼吸力学趋势、可定制界面和扁平化操作设计。",
+          "公开能力还包含备用空气气源，以及可在监护仪和呼吸机之间使用的血氧、二氧化碳兼容模块。"
+        ]],
+        ["连接与边界", [
+          "设备可通过迈瑞互联模块或标准医疗信息交换协议接入院内网络，并可通过 4G 模块支持远程预防维护。",
+          "页面中的 AMV、CPRV 和肺保护工具不能用于为具体患者推荐通气参数。"
+        ]]
+      ],
+      "dev": ["SV800/SV600 在中央气源和院内互联方面公开了什么能力？", ["备用空气气源", "院内网络", "4G"]],
+      "blind": ["需要重症呼吸机支持 PulmoSight、备用空气气源和远程预防维护，应查看哪组型号？", ["SV800/SV600", "PulmoSight", "预防维护"]]
+    },
+    {
+      "doc_id": "official-mindray-sv70-sv60-2026",
+      "title": "迈瑞 SV70/SV60 无创呼吸机公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "ventilator-noninvasive",
+      "model_codes": ["SV70", "SV60"],
+      "source_urls": ["https://www.mindray.com/cn/products/ventilators/sv70-sv60"],
+      "sections": [
+        ["产品定位", [
+          "SV70/SV60 公开定位为专业无创通气设备，采用 EasySync 同步增强技术。",
+          "它们与 SV800/SV600 的重症呼吸机定位不同，不能用系列相近作为配置互换依据。"
+        ]],
+        ["网络能力", [
+          "公开资料描述设备可以通过有线或无线方式接入中心监护系统，实现多床呼吸机集中监测。",
+          "可融合床旁设备信息，但具体接口、容量和软件授权仍需按项目核验。"
+        ]]
+      ],
+      "dev": ["SV70/SV60 的产品定位和集中监测方式是什么？", ["无创通气", "EasySync", "有线或无线"]],
+      "blind": ["要找支持 EasySync 且能接入中心监护系统的无创呼吸机，应查什么型号？", ["SV70/SV60", "EasySync"]]
+    },
+    {
+      "doc_id": "official-mindray-wato-ex65-2026",
+      "title": "迈瑞 WATO EX-65 麻醉系统公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "anesthesia-system",
+      "model_codes": ["WATO EX-65"],
+      "source_urls": ["https://www.mindray.com/cn/products/anesthesia/wato-ex-65"],
+      "sections": [
+        ["通气与监测", [
+          "WATO EX-65 公开列出 PCV-VG、SIMV-VG 和 CPAP/PS 等通气模式，并提供肺复张工具。",
+          "插件式气体模块可监测多种麻醉气体浓度和 MAC，并可与部分迈瑞监护仪通用。"
+        ]],
+        ["操作与配置边界", [
+          "产品采用 15 英寸触控屏和图形化自检；负压吸引附件属于选配，不能表述为所有配置标配。",
+          "本摘要只支持产品识别和配置核验，不提供患者通气或麻醉浓度建议。"
+        ]]
+      ],
+      "dev": ["WATO EX-65 的气体模块和负压吸引附件分别是什么配置属性？", ["插件式", "麻醉气体", "选配"]],
+      "blind": ["哪台麻醉系统公开包含 PCV-VG、十五英寸触控屏和图形化自检？", ["WATO EX-65", "PCV-VG", "图形化自检"]]
+    },
+    {
+      "doc_id": "official-mindray-beneheart-r700-2026",
+      "title": "迈瑞 BeneHeart R700 全数字多道心电图机公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "electrocardiograph",
+      "model_codes": ["BeneHeart R700"],
+      "source_urls": ["https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700"],
+      "sections": [
+        ["采集与显示", [
+          "BeneHeart R700 是全数字多道心电图机，采用 12.1 英寸触控屏，并公开提供电极状态和加做导联操作指引。",
+          "设备可在信号良好且稳定时自动开始 10 秒心电图采集。"
+        ]],
+        ["互联能力", [
+          "公开支持 U 盘、有线和无线数据传输，可通过 HL7 或 DICOM 对接 EMR、HIS、PACS、CIS。",
+          "R700 是心电图机，不是 BeneHeart D 系列除颤监护仪，也不是病人监护仪。"
+        ]]
+      ],
+      "dev": ["BeneHeart R700 如何采集和传输心电图数据？", ["10 秒", "HL7", "DICOM"]],
+      "blind": ["需要十二点一英寸触屏、导联指引和 Wi-Fi 传输的心电图机，应了解哪个型号？", ["BeneHeart R700", "12.1", "导联"]]
+    },
+    {
+      "doc_id": "official-mindray-bc760-cs-2026",
+      "title": "迈瑞 BC-760 CS 全自动血液细胞分析仪公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "迈瑞医疗",
+      "product_family": "hematology-analyzer",
+      "model_codes": ["BC-760 CS"],
+      "source_urls": ["https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs"],
+      "sections": [
+        ["检测定位", [
+          "BC-760 CS 是全自动血液细胞分析仪，采用三维荧光分析平台，可分类计数 IMG、RET 和 IPF 等细胞。",
+          "公开页面描述针对低值 WBC 的三倍统计和低值 PLT 的五倍统计技术。"
+        ]],
+        ["组合与管理", [
+          "公开组合能力包含 CBC、CRP、SAA 和 ESR 相关检测，并标配 Image labXpert 数据管理软件。",
+          "BC-760 CS 属于体外诊断血液分析设备，不应被检索为超声、监护或输注设备。"
+        ]]
+      ],
+      "dev": ["BC-760 CS 属于哪类设备，公开的低值 WBC/PLT 统计倍数是多少？", ["血液细胞分析仪", "三倍", "五倍"]],
+      "blind": ["要找带 Image labXpert 且支持 CBC、CRP、SAA、ESR 组合的设备，应查哪个型号？", ["BC-760 CS", "Image labXpert"]]
+    },
+    {
+      "doc_id": "official-philips-intellivue-mx750-mx850-2026",
+      "title": "飞利浦 IntelliVue MX750/MX850 重症床旁监护仪公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "飞利浦医疗",
+      "product_family": "patient-monitoring-high-acuity",
+      "model_codes": ["IntelliVue MX750", "IntelliVue MX850"],
+      "source_urls": ["https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor"],
+      "sections": [
+        ["型号差异", [
+          "IntelliVue MX750 和 MX850 面向重症和麻醉床旁监护；MX750 采用 19 英寸宽屏，MX850 采用 22 英寸宽屏。",
+          "MX850 公开支持多显示器和多用户能力，不能把其全部规格直接套用到 MX750 或紧凑型 MP5。"
+        ]],
+        ["互联与安全", [
+          "公开能力包括通过 HTML5 和 Citrix 访问医院应用，并包含 RFID/NFC 读卡器。",
+          "安全能力包含证书节点认证以及网络数据、打印报告、文件系统和远程控制命令加密。"
+        ]]
+      ],
+      "dev": ["IntelliVue MX750 与 MX850 的屏幕尺寸和使用定位有什么差异？", ["19 英寸", "22 英寸", "重症"]],
+      "blind": ["飞利浦哪款二十二英寸床旁监护仪公开支持多显示器、Citrix 和 RFID？", ["IntelliVue MX850", "22", "RFID"]]
+    },
+    {
+      "doc_id": "official-philips-avalon-fm50-2026",
+      "title": "飞利浦 Avalon FM50 胎儿和孕产妇监护仪公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "飞利浦医疗",
+      "product_family": "fetal-maternal-monitoring",
+      "model_codes": ["Avalon FM50", "Avalon FM40"],
+      "source_urls": ["https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor"],
+      "sections": [
+        ["监护对象", [
+          "Avalon FM50 面向胎儿和孕产妇监护，支持外部与内部胎儿参数；三胎监护属于可选能力。",
+          "孕产妇参数可包含血压、脉率、血氧和心电；它不是 IntelliVue 重症床旁监护仪型号。"
+        ]],
+        ["系统连接", [
+          "Avalon FM40/FM50 可连接 IntelliSpace Perinatal 围产信息管理系统。",
+          "具体接口、内外部传感器和选配参数需要按地区销售配置核验。"
+        ]]
+      ],
+      "dev": ["Avalon FM50 的监护对象、三胎能力和信息系统连接分别是什么？", ["胎儿和孕产妇", "可选", "IntelliSpace Perinatal"]],
+      "blind": ["需要外部和内部胎儿参数并接入围产信息系统，应了解飞利浦哪个监护仪？", ["Avalon FM50", "围产"]]
+    },
+    {
+      "doc_id": "official-philips-heartstart-frx-2026",
+      "title": "飞利浦 HeartStart FRx 自动体外除颤器公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "飞利浦医疗",
+      "product_family": "aed",
+      "model_codes": ["HeartStart FRx", "SMART Pads II"],
+      "source_urls": ["https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator"],
+      "sections": [
+        ["产品定位", [
+          "HeartStart FRx 是自动体外除颤器，公开提供分步语音、CPR 指导和节拍器提示。",
+          "预连接 SMART Pads II 可用于成人和儿童；儿童使用还涉及可选婴儿/儿童钥匙。"
+        ]],
+        ["耐用与区分", [
+          "公开规格描述设备轻便、适应粗暴搬运，并给出 IPX5 防水和防尘信息。",
+          "HeartStart FRx Trainer 是训练器，不是实施治疗的 FRx AED，资料必须分开检索。"
+        ]]
+      ],
+      "dev": ["HeartStart FRx 提供哪些施救引导，儿童使用需要注意什么配置？", ["语音", "CPR", "儿童钥匙"]],
+      "blind": ["哪款飞利浦 AED 使用 SMART Pads II，并公开提供 CPR 节拍提示？", ["HeartStart FRx", "SMART Pads II"]]
+    },
+    {
+      "doc_id": "official-philips-epiq-elite-2026",
+      "title": "飞利浦 EPIQ Elite 高端超声系统公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "飞利浦医疗",
+      "product_family": "ultrasound-premium-cart",
+      "model_codes": ["EPIQ Elite", "EPIQ Elite Elevate Plus"],
+      "source_urls": ["https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived"],
+      "sections": [
+        ["产品定位", [
+          "EPIQ Elite 是高端推车式超声平台，公开强调图像质量、面向临床场景的工具和智能工作流。",
+          "公开功能包含 Auto Strain LV 和 Smart View Select 等自动化能力，具体应用包和探头取决于配置。"
+        ]],
+        ["与便携设备区分", [
+          "公开规格给出的主机重量约 104.3 千克且不含外设，不能将其描述为 M9 或 Compact 5000 一类便携超声。",
+          "型号、软件、探头和区域可用性必须在售前重新确认。"
+        ]]
+      ],
+      "dev": ["EPIQ Elite 是便携超声吗，公开的主机重量约是多少？", ["推车式", "104.3", "不含外设"]],
+      "blind": ["需要飞利浦高端推车式超声并关注 Auto Strain LV，应查哪个产品？", ["EPIQ Elite", "Auto Strain"]]
+    },
+    {
+      "doc_id": "official-draeger-babylog-vn800-2026",
+      "title": "德尔格 Babylog VN800 新生儿呼吸机公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "德尔格",
+      "product_family": "ventilator-neonatal",
+      "model_codes": ["Babylog VN800", "Babylog VN600"],
+      "source_urls": ["https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators"],
+      "sections": [
+        ["产品定位", [
+          "Babylog VN800 是高级新生儿呼吸机，公开强调肺和脑保护通气以及有利于发育护理的工作环境。",
+          "VN800 采用约 18.3 英寸显示界面；VN600 公开页面列出较小的 15.6 英寸界面，二者不能只按 Babylog 名称合并规格。"
+        ]],
+        ["安全边界", [
+          "设备支持新生儿通气相关模式和监测，但具体患儿模式、压力、氧浓度等参数必须由专业人员决定。",
+          "Babylog 新生儿产品与 Evita 重症通气、Savina 300 和 PulmoVista 肺成像设备定位不同。"
+        ]]
+      ],
+      "dev": ["Babylog VN800 的目标患者和公开设计重点是什么？", ["新生儿", "肺和脑保护", "发育"]],
+      "blind": ["德尔格哪款设备采用大屏界面并强调新生儿肺脑保护通气？", ["Babylog VN800", "新生儿"]]
+    },
+    {
+      "doc_id": "official-draeger-pulmovista-500-2026",
+      "title": "德尔格 PulmoVista 500 床旁肺通气成像公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "德尔格",
+      "product_family": "electrical-impedance-tomography",
+      "model_codes": ["PulmoVista 500"],
+      "source_urls": ["https://www.draeger.com/en-us_ca/Products/PulmoVista-500"],
+      "sections": [
+        ["产品定位", [
+          "PulmoVista 500 使用电阻抗断层成像 EIT，在床旁实时显示肺内区域通气分布。",
+          "公开资料强调无创和无辐射，并可观察治疗操作带来的通气变化。"
+        ]],
+        ["检索边界", [
+          "PulmoVista 500 提供肺通气分布可视化，不是负责向患者送气的普通呼吸机。",
+          "它与 Evita、Savina、Babylog 等通气设备可能同时出现在呼吸产品资料中，必须按设备角色区分。"
+        ]]
+      ],
+      "dev": ["PulmoVista 500 使用什么技术，是否属于普通呼吸机？", ["EIT", "无创", "不是"]],
+      "blind": ["要在床旁无辐射观察肺内区域通气分布，应查德尔格什么设备？", ["PulmoVista 500", "电阻抗"]]
+    },
+    {
+      "doc_id": "official-draeger-perseus-a500-2026",
+      "title": "德尔格 Perseus A500 麻醉工作站公开摘要",
+      "doc_type": "official_product_summary",
+      "manufacturer": "德尔格",
+      "product_family": "anesthesia-workstation",
+      "model_codes": ["Perseus A500"],
+      "source_urls": ["https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi"],
+      "sections": [
+        ["工作站定位", [
+          "Perseus A500 是集成式麻醉工作站，公开强调通气能力、监护和决策支持功能，以及围术期工作流。",
+          "其控制布局、集成线缆和组件架构用于改善操作、准备和维护体验。"
+        ]],
+        ["感染控制设计", [
+          "公开资料描述可高压灭菌的呼吸系统以及平滑易清洁表面等感染控制设计。",
+          "Perseus A500 与 Atlan A350/A350 XL、迈瑞 A9 或 WATO EX-65 属于不同厂商和型号，功能不能互相套用。"
+        ]]
+      ],
+      "dev": ["Perseus A500 在感染控制和维护方面公开了什么设计？", ["可高压灭菌", "易清洁", "组件架构"]],
+      "blind": ["哪台德尔格麻醉工作站强调集成线缆、可高压灭菌呼吸系统和易清洁表面？", ["Perseus A500", "感染控制"]]
+    }
+  ],
+  "hard_negatives": [
+    ["n22_not_n1", "BeneVision N22 的旋转大屏资料能直接套用到转运监护仪 N1 吗？", "official-mindray-benevision-n22-n19-2026", ["N22/N19", "N1", "不能"]],
+    ["d60_not_aed", "BeneHeart D60 是 BeneHeart C 系列 AED 的一个配置吗？", ["official-mindray-beneheart-defibrillator-2026", "official-mindray-product-portfolio-2026"], ["除颤监护仪", "AED", "不同"]],
+    ["nseries_not_iu", "需要 SmartAIR 气泡监测和二十四插槽扩展时应查 BeneFusion n 还是 i/u？", "official-mindray-benefusion-n-2026", ["BeneFusion n", "SmartAIR", "24"]],
+    ["sv800_not_sv70", "SV70 无创呼吸机能否直接按 SV800 重症呼吸机的 PulmoSight 资料配置？", "official-mindray-sv70-sv60-2026", ["无创", "SV70/SV60", "不同"]],
+    ["wato_not_a9", "WATO EX-65 是否就是带 ACA 目标控制麻醉的 A9？", ["official-mindray-wato-ex65-2026", "official-mindray-anesthesia-a9-2026"], ["WATO EX-65", "A9", "目标控制麻醉 ACA"]],
+    ["r700_not_d700", "BeneHeart R700 是除颤监护仪还是心电图机？", "official-mindray-beneheart-r700-2026", ["心电图机", "不是"]],
+    ["bc760_not_ultrasound", "BC-760 CS 的三维荧光平台是不是彩色多普勒超声成像？", "official-mindray-bc760-cs-2026", ["血液分析设备", "不应"]],
+    ["mx850_not_mp5", "IntelliVue MP5 能直接按 MX850 的二十二英寸和多显示器规格销售吗？", "official-philips-intellivue-mx750-mx850-2026", ["MX850", "22 英寸", "不能"]],
+    ["fm50_not_intellivue", "Avalon FM50 是 IntelliVue MX 系列重症床旁监护仪吗？", "official-philips-avalon-fm50-2026", ["胎儿和孕产妇", "不是"]],
+    ["frx_not_trainer", "HeartStart FRx Trainer 能否当作真正的 FRx AED 用于救治？", "official-philips-heartstart-frx-2026", ["训练器", "不是"]],
+    ["epiq_not_m9", "EPIQ Elite 和迈瑞 M9 都是便携式超声吗？", ["official-philips-epiq-elite-2026", "official-mindray-ultrasound-m9-2026"], ["推车式", "M9", "便携"]],
+    ["babylog_not_evita", "Babylog VN800 的新生儿资料能否直接作为 Evita V800 成人重症通气说明？", "official-draeger-babylog-vn800-2026", ["新生儿", "Evita", "不能"]],
+    ["pulmovista_not_babylog", "PulmoVista 500 与 Babylog VN800 都是负责给新生儿送气的呼吸机吗？", "official-draeger-pulmovista-500-2026", ["通气分布", "不是"]],
+    ["perseus_not_atlan", "Perseus A500 的感染控制设计可以直接当作 Atlan A350 XL 的官方规格吗？", "official-draeger-perseus-a500-2026", ["不同厂商", "不同", "不能"]]
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_regression_avalon_not_intellivue",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "Avalon FM50 是 IntelliVue 床旁监护仪型号吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-monitoring-portfolio-2026",
+      "official-philips-avalon-fm50-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "产科监护",
+      "不是"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

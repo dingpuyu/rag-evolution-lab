@@ -1,0 +1,24 @@
+{
+  "id": "public_blind_official_mindray_benevision_cms_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "想在办公室或走廊集中看监护仪以及 BeneLink 接入设备的数据，应了解什么系统？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-cms-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "BeneVision",
+      "中央监护",
+      "BeneLink"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

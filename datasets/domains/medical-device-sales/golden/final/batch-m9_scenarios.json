@@ -1,0 +1,24 @@
+{
+  "id": "public_final_m9_scenarios",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "M9 的公开应用是否包括重症、介入、术中和急诊？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-ultrasound-m9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "ICU",
+      "介入",
+      "急诊"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,24 @@
+{
+  "id": "public_acceptance_consona_zst",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "采用 ZST+ 域光平台并提供 iWorks 的彩超系列是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-consona-n-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Consona N",
+      "ZST+",
+      "iWorks"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

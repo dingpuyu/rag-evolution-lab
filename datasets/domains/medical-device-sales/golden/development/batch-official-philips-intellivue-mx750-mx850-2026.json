@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_philips_intellivue_mx750_mx850_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "IntelliVue MX750 与 MX850 的屏幕尺寸和使用定位有什么差异？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-intellivue-mx750-mx850-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "19 英寸",
+      "22 英寸",
+      "重症"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

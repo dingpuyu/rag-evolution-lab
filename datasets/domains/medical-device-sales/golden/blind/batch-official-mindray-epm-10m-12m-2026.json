@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_mindray_epm_10m_12m_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "需要病人在科室内活动，并希望网络恢复后补传监护数据，应了解哪套产品？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-epm-10m-12m-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "ePM 10M/12M",
+      "复网续传"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

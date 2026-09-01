@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_draeger_pulmovista_500_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "PulmoVista 500 使用什么技术，是否属于普通呼吸机？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-pulmovista-500-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "EIT",
+      "无创",
+      "不是"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

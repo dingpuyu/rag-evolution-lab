@@ -26,14 +26,14 @@ type Heuristic struct{}
 func (Heuristic) Name() string { return "heuristic-evidence-reranker" }
 
 func (Heuristic) Rerank(_ context.Context, request domain.QueryRequest, candidates []domain.RetrievedChunk) ([]domain.RetrievedChunk, error) {
-	queryTokens := unique(textutil.Tokens(textutil.NormalizeSemantic(request.Query)))
+	queryTokens := unique(textutil.Tokens(textutil.ExpandSemantic(request.Query)))
 	queryIdentifiers := identifiers(queryTokens)
 	results := append([]domain.RetrievedChunk(nil), candidates...)
 	for index := range results {
-		candidateTokens := tokenSet(textutil.Tokens(textutil.NormalizeSemantic(
+		candidateTokens := tokenSet(textutil.Tokens(textutil.ExpandSemantic(
 			results[index].Chunk.DocumentTitle + " " + strings.Join(results[index].Chunk.HeadingPath, " ") + " " + results[index].Chunk.Content,
 		)))
-		titleTokens := tokenSet(textutil.Tokens(textutil.NormalizeSemantic(
+		titleTokens := tokenSet(textutil.Tokens(textutil.ExpandSemantic(
 			results[index].Chunk.DocumentTitle + " " + strings.Join(results[index].Chunk.HeadingPath, " "),
 		)))
 		coverage := overlap(queryTokens, candidateTokens)

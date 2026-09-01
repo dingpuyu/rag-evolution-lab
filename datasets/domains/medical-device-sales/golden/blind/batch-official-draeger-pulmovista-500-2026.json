@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_draeger_pulmovista_500_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "要在床旁无辐射观察肺内区域通气分布，应查德尔格什么设备？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-pulmovista-500-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "PulmoVista 500",
+      "电阻抗"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

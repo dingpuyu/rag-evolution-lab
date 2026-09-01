@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_philips_heartstart_frx_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "HeartStart FRx 提供哪些施救引导，儿童使用需要注意什么配置？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-heartstart-frx-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "语音",
+      "CPR",
+      "儿童钥匙"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

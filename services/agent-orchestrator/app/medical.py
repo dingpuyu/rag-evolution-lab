@@ -10,21 +10,86 @@ MODEL_PATTERN = re.compile(r"\bVSM[\s-]?(100\s*PRO|100|200)\b", re.IGNORECASE)
 VERSION_PATTERN = re.compile(r"(?:软件|固件|版本|FW)\s*[Vv]?\s*(\d+\.\d+(?:\.\d+)?)", re.IGNORECASE)
 LOT_PATTERN = re.compile(r"\b(L26A\d{2})\b", re.IGNORECASE)
 SALES_MODEL_ALIASES = (
+    ("BeneVision N22", ("benevision n22", "n22监护仪", "n22 监护仪")),
+    ("BeneVision N19", ("benevision n19", "n19监护仪", "n19 监护仪")),
+    ("IntelliVue MX850", ("intellivue mx850", "mx850")),
+    ("IntelliVue MX750", ("intellivue mx750", "mx750")),
     ("IntelliVue MX550", ("intellivue mx550", "mx550")),
     ("IntelliVue MX500", ("intellivue mx500", "mx500")),
+    ("IntelliVue MP5", ("intellivue mp5", "mp5监护仪", "mp5 监护仪")),
     ("BeneVision N1", ("benevision n1", "n1监护仪", "n1 监护仪")),
+    ("BeneVision TMS30", ("benevision tms30", "tms30")),
+    ("BeneVision CMS", ("benevision cms", "cms中央监护", "cms 中央监护")),
     ("BeneHeart C Series", ("beneheart c series", "beneheart c系列", "beneheart c 系列", "beneheart c")),
+    ("BeneHeart D60", ("beneheart d60", "d60除颤", "d60 除颤")),
+    ("BeneHeart D30", ("beneheart d30", "d30除颤", "d30 除颤")),
+    ("BeneHeart DX", ("beneheart dx",)),
+    ("HeartStart FRx", ("heartstart frx", "frx aed")),
+    ("BeneFusion nVP", ("benefusion nvp", "nvp输液", "nvp 输液")),
+    ("BeneFusion nSP", ("benefusion nsp", "nsp注射", "nsp 注射")),
+    ("BeneFusion nDS", ("benefusion nds", "nds工作站", "nds 工作站")),
+    ("BeneFusion tDS", ("benefusion tds", "tds工作站", "tds 工作站")),
     ("BeneFusion i/u", ("benefusion i/u", "benefusion i系列", "benefusion u系列", "benefusion i/u系列")),
+    ("EPIQ Elite", ("epiq elite",)),
     ("Resona I9", ("resona i9", "resona i 9")),
+    ("SV800", ("mindray sv800", "sv800呼吸机", "sv800 呼吸机")),
+    ("SV600", ("mindray sv600", "sv600呼吸机", "sv600 呼吸机")),
+    ("SV70", ("mindray sv70", "sv70呼吸机", "sv70 呼吸机")),
+    ("SV60", ("mindray sv60", "sv60呼吸机", "sv60 呼吸机")),
     ("Evita V800", ("evita v800", "v800呼吸机", "v800 呼吸机")),
+    ("Babylog VN800", ("babylog vn800", "vn800")),
+    ("Babylog VN600", ("babylog vn600", "vn600")),
+    ("Savina 300", ("savina 300",)),
+    ("PulmoVista 500", ("pulmovista 500",)),
+    ("Atlan A350 XL", ("atlan a350 xl",)),
+    ("Atlan A350", ("atlan a350",)),
+    ("Perseus A500", ("perseus a500",)),
+    ("WATO EX-65", ("wato ex-65", "wato ex65")),
+    ("BeneHeart R700", ("beneheart r700", "r700心电", "r700 心电")),
+    ("BC-760 CS", ("bc-760 cs", "bc760 cs", "bc760cs")),
+    ("Avalon FM50", ("avalon fm50", "fm50胎儿", "fm50 胎儿")),
+    ("ePM 10M", ("epm 10m", "epm 10m/12m", "epm10m")),
+    ("ePM 12M", ("epm 12m", "epm 10m/12m", "epm12m")),
+    ("M9", ("mindray m9", "迈瑞 m9", "m9超声", "m9 超声")),
+    ("Consona N9", ("consona n9",)),
+    ("Consona N8", ("consona n8",)),
+    ("Consona N7", ("consona n7",)),
+    ("Consona N6", ("consona n6",)),
+    ("Consona N5", ("consona n5",)),
+    ("BeneVision V700 Neo", ("benevision v700 neo", "v700 neo")),
+    ("BeneVision V500 Neo", ("benevision v500 neo", "v500 neo")),
+    ("BeneVision V200 Neo", ("benevision v200 neo", "v200 neo")),
+    ("BeneVision VMAX OR", ("benevision vmax or", "vmax or")),
+    ("BeneVision V700 OR", ("benevision v700 or", "v700 or")),
+    ("BeneVision V500 OR", ("benevision v500 or", "v500 or")),
+    ("BeneVision V200 OR", ("benevision v200 or", "v200 or")),
 )
 SALES_MODEL_CANDIDATES = [name for name, _ in SALES_MODEL_ALIASES]
 SALES_CATEGORY_ALIASES = (
-    ("病人监护", ("监护仪", "病人监护", "患者监护", "生命体征监护"), ("BeneVision N1", "IntelliVue MX500", "IntelliVue MX550")),
-    ("AED", ("aed", "自动体外除颤器", "自动除颤器", "除颤器"), ("BeneHeart C Series",)),
-    ("输注系统", ("输注系统", "输注泵", "输液泵", "注射泵"), ("BeneFusion i/u",)),
-    ("超声", ("超声", "彩超"), ("Resona I9",)),
-    ("呼吸机", ("呼吸机", "通气设备"), ("Evita V800",)),
+    ("病人监护", ("监护仪", "病人监护", "患者监护", "生命体征监护"), ("BeneVision N1", "BeneVision N22", "BeneVision N19", "IntelliVue MX500", "IntelliVue MX550", "IntelliVue MX750", "IntelliVue MX850")),
+    ("AED", ("aed", "自动体外除颤器", "自动除颤器", "除颤器"), ("BeneHeart C Series", "HeartStart FRx")),
+    ("除颤监护", ("除颤监护仪", "监护除颤仪", "除颤器"), ("BeneHeart DX", "BeneHeart D60", "BeneHeart D30")),
+    ("输注系统", ("输注系统", "输注泵", "输液泵", "注射泵", "输液工作站"), ("BeneFusion nVP", "BeneFusion nSP", "BeneFusion nDS", "BeneFusion tDS", "BeneFusion i/u")),
+    ("超声", ("超声", "彩超"), ("Resona I9", "EPIQ Elite")),
+    ("呼吸机", ("呼吸机", "通气设备"), ("Evita V800", "Savina 300", "SV800", "SV600", "SV70", "SV60", "Babylog VN800")),
+    ("肺通气成像", ("肺通气成像", "电阻抗断层", "eit"), ("PulmoVista 500",)),
+    ("遥测监护", ("遥测监护", "tms30"), ("BeneVision TMS30",)),
+    ("中央监护", ("中央监护", "集中监护", "benevision cms"), ("BeneVision CMS",)),
+    ("亚重症监护", ("epm 10m/12m", "亚重症监护"), ("ePM 10M", "ePM 12M")),
+    (
+        "新生儿监护",
+        ("benevision v neo", "v neo系列", "v neo 系列", "新生儿监护"),
+        ("BeneVision V700 Neo", "BeneVision V500 Neo", "BeneVision V200 Neo"),
+    ),
+    (
+        "手术室监护",
+        ("benevision v or", "v or系列", "v or 系列", "or系列", "or 系列", "手术室监护", "麻醉监护"),
+        ("BeneVision VMAX OR", "BeneVision V700 OR", "BeneVision V500 OR", "BeneVision V200 OR"),
+    ),
+    ("麻醉工作站", ("麻醉工作站", "麻醉系统", "atlan", "perseus", "wato"), ("Atlan A350", "Atlan A350 XL", "Perseus A500", "WATO EX-65")),
+    ("心电图机", ("心电图机", "心电图设备", "多道心电"), ("BeneHeart R700",)),
+    ("血液分析", ("血液细胞分析", "血液分析仪", "血球仪"), ("BC-760 CS",)),
+    ("胎儿监护", ("胎儿监护", "孕产妇监护", "产科监护"), ("Avalon FM50",)),
 )
 UNTRUSTED_QUERY_DIRECTIVE = re.compile(
     r"(?:忽略|无视|绕过|覆盖)(?:此前|之前|上面|系统|资料|证据|规则|限制|提示词|指令)?[^，,。；;]{0,36}[，,。；;]\s*",
@@ -43,7 +108,23 @@ class MedicalResolution:
 def mentioned_sales_models(query: str) -> list[str]:
     """Return every explicitly mentioned sales model in stable catalog order."""
     normalized = query.casefold()
-    return [model for model, aliases in SALES_MODEL_ALIASES if any(alias in normalized for alias in aliases)]
+    matched: list[str] = []
+    for model, aliases in SALES_MODEL_ALIASES:
+        if not any(_alias_matches(normalized, alias) for alias in aliases):
+            continue
+        # Longer catalog names are ordered first. If "Atlan A350 XL" was
+        # matched, do not also interpret its prefix as a second A350 model.
+        if any(existing.casefold().startswith(model.casefold() + " ") for existing in matched):
+            continue
+        matched.append(model)
+    return matched
+
+
+def _alias_matches(normalized: str, alias: str) -> bool:
+    normalized_alias = alias.casefold()
+    if normalized_alias.isascii():
+        return bool(re.search(rf"(?<![a-z0-9]){re.escape(normalized_alias)}(?![a-z0-9])", normalized))
+    return normalized_alias in normalized
 
 
 def mentioned_sales_categories(query: str) -> list[str]:
@@ -57,10 +138,13 @@ def mentioned_sales_categories(query: str) -> list[str]:
     categories: list[str] = []
     for category, aliases, _ in SALES_CATEGORY_ALIASES:
         matched = any(
-            bool(re.search(rf"(?<![a-z0-9]){re.escape(alias)}(?![a-z0-9])", normalized))
-            if alias.isascii() else alias in normalized
+            _alias_matches(normalized, alias)
             for alias in aliases
         )
+        # “自动体外除颤器/AED”已经是明确产品类别，不能再因为其中
+        # 包含通用词“除颤器”而误扩展成专业除颤监护仪产品线。
+        if category == "除颤监护" and any(term in normalized for term in ("aed", "自动体外除颤器", "自动除颤器")):
+            matched = False
         if matched:
             categories.append(category)
     return categories
@@ -120,6 +204,7 @@ def resolve_medical_query(query: str, supplied: DeviceContext | None = None) -> 
 
     clinical_terms = (
         "诊断", "治疗", "给药", "处方", "患者应该", "病情", "临床决策", "报警阈值", "参数设为多少", "血压阈值", "心率阈值",
+        "潮气量应设置多少", "潮气量应该设置多少", "潮气量设为多少", "氧浓度应设置多少", "麻药浓度应设置多少", "多少焦耳", "何时放电",
     )
     if any(term in text for term in clinical_terms):
         return MedicalResolution("refuse", "clinical_boundary", context, [])
@@ -168,11 +253,18 @@ def resolve_customer_query(query: str, supplied: DeviceContext | None = None) ->
         return base
     text = query.strip()
     lower = text.casefold()
+    # Price, stock and delivery dates are transactional facts, not durable
+    # knowledge. Even a relevant product brochure cannot prove their current
+    # value, so fail closed before retrieval instead of letting the LLM turn a
+    # disclaimer into a semantically misleading "answer" decision.
+    dynamic_commercial_terms = ("价格", "报价", "多少钱", "库存", "现货", "交期", "到货时间", "实时库存")
+    if any(term in lower for term in dynamic_commercial_terms):
+        return MedicalResolution("refuse", "dynamic_commercial_data_unavailable", base.context, [])
     onboarding_terms = ("一窍不通", "完全不了解", "什么都不懂", "从零开始", "怎么开始了解", "第一次了解")
     if base.intent == "persona" or any(term in lower for term in onboarding_terms):
         return MedicalResolution("customer_onboarding", "customer_guided_onboarding", base.context, ["产品线概览", "认识型号", "开始排障"])
 
-    product_terms = ("产品线", "有哪些产品", "有哪些型号", "产品介绍", "型号介绍", "特点", "特色", "区别", "对比", "哪款", "哪个好", "适合")
+    product_terms = ("产品线", "有哪些产品", "有哪些型号", "产品介绍", "型号介绍", "特点", "特色", "区别", "对比", "哪款", "哪个好", "适合", "什么设备", "什么类型", "面向什么场景", "应用场景")
     troubleshooting_terms = ("故障", "排障", "连不上", "连接不上", "失败", "异常", "找不到", "没有菜单", "报错", "错误码", "网络问题")
     category_discovery = bool(mentioned_categories) and not any(term in lower for term in troubleshooting_terms)
     if len(mentioned_models) >= 2 or category_discovery or any(term in lower for term in product_terms):

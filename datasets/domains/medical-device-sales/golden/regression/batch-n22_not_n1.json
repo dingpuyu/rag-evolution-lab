@@ -1,0 +1,24 @@
+{
+  "id": "public_regression_n22_not_n1",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "BeneVision N22 的旋转大屏资料能直接套用到转运监护仪 N1 吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-n22-n19-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "N22/N19",
+      "N1",
+      "不能"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

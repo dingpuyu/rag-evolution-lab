@@ -1317,9 +1317,11 @@ export default function MedicalWorkspace() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, appID, environmentID, session, isAdmin]);
   useEffect(() => {
-    setDocumentDetail(null);
-    setSelectedRevision(null);
-    setParsePreview([]);
+    queueMicrotask(() => {
+      setDocumentDetail(null);
+      setSelectedRevision(null);
+      setParsePreview([]);
+    });
   }, [datasetID]);
   useEffect(() => {
     if (tab !== "knowledge" || !session || !datasetID || !activeIngestion)

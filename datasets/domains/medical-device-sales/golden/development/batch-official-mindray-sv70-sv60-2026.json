@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_sv70_sv60_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "SV70/SV60 的产品定位和集中监测方式是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-sv70-sv60-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "无创通气",
+      "EasySync",
+      "有线或无线"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

@@ -1,0 +1,18 @@
+{
+  "id": "public_final_refuse_anesthesia_dose",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_refusal",
+  "query": "患者麻醉时 A9 的吸入麻药浓度应该设成多少？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "selective_refusal"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

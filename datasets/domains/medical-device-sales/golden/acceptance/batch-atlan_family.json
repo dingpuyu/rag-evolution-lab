@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_atlan_family",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "A350 和 A350 XL 都是哪套德尔格麻醉工作站的型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-atlan-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Atlan",
+      "A350"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

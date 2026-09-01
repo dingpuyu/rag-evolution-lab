@@ -69,6 +69,26 @@ func TestAdvancedPipelineReranksCandidatesAndPacksContext(t *testing.T) {
 	}
 }
 
+func TestPipelineDiversifiesDocumentsWithoutDroppingPassages(t *testing.T) {
+	results := diversifyByDocument([]domain.RetrievedChunk{
+		{Chunk: domain.Chunk{ID: "wrong#1", DocumentID: "wrong"}, Score: 0.99},
+		{Chunk: domain.Chunk{ID: "wrong#2", DocumentID: "wrong"}, Score: 0.98},
+		{Chunk: domain.Chunk{ID: "right#1", DocumentID: "right"}, Score: 0.90},
+		{Chunk: domain.Chunk{ID: "wrong#3", DocumentID: "wrong"}, Score: 0.80},
+		{Chunk: domain.Chunk{ID: "other#1", DocumentID: "other"}, Score: 0.70},
+	})
+
+	want := []string{"wrong#1", "right#1", "other#1", "wrong#2", "wrong#3"}
+	if len(results) != len(want) {
+		t.Fatalf("result count=%d want=%d", len(results), len(want))
+	}
+	for index, chunkID := range want {
+		if results[index].Chunk.ID != chunkID || results[index].Rank != index+1 {
+			t.Fatalf("results[%d]=%#v want chunk=%s rank=%d", index, results[index], chunkID, index+1)
+		}
+	}
+}
+
 func TestPipelineTraceMarksDegradedRetrieval(t *testing.T) {
 	response, err := New("hybrid", degradedRetriever{}).Query(context.Background(), domain.QueryRequest{Query: "fallback", TopK: 1})
 	if err != nil {

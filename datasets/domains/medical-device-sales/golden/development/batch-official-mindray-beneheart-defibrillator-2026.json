@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_beneheart_defibrillator_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "迈瑞 BeneHeart D60 和 BeneHeart C 属于同一种产品线吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-beneheart-defibrillator-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "除颤监护仪",
+      "AED",
+      "不同"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

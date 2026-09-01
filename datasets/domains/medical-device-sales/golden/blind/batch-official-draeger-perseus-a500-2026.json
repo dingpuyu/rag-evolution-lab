@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_draeger_perseus_a500_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "哪台德尔格麻醉工作站强调集成线缆、可高压灭菌呼吸系统和易清洁表面？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-draeger-perseus-a500-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "Perseus A500",
+      "感染控制"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

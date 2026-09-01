@@ -9,7 +9,7 @@
     "answerable": true,
     "relevant_doc_ids": ["mindray-benevision-n1-2026"],
     "relevant_chunk_ids": [],
-    "required_facts": ["内置旁流 CO₂", "高级参数模块", "配置需确认"],
+    "required_facts": ["内置旁流 CO₂", "高级参数模块", "合同清单确认"],
     "forbidden_facts": ["所有配置默认包含"],
     "minimum_citations": 1,
     "expected_refusal_reason": null

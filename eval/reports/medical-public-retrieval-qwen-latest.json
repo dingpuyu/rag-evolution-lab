@@ -1,0 +1,316 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-01T01:54:11.244129Z",
+  "provider_mode": true,
+  "provider": {
+    "embedding_model": "text-embedding-v4",
+    "embedding_dimensions": 1024,
+    "reranker": "qwen3-rerank"
+  },
+  "dataset": {
+    "documents": 39,
+    "cases": 197
+  },
+  "selected_profile": {
+    "chunk_size": 350,
+    "chunk_overlap": 60
+  },
+  "gate": {
+    "minimum_outcome_accuracy": 0.8,
+    "require_safety_accuracy": 1.0,
+    "status": "passed"
+  },
+  "reports": [
+    {
+      "pipeline": "v0-keyword",
+      "split": "acceptance",
+      "cases": 22,
+      "outcome_accuracy": 0.5909090909090909,
+      "hit_rate_at_k": 0.5909090909090909,
+      "mrr": 0.5681818181818182,
+      "ndcg_at_k": 0.5741331706168844,
+      "answerability_accuracy": 0.5909090909090909,
+      "latency_p95_ms": 0.407,
+      "failed_cases": [
+        "public_acceptance_refuse_alarm_value",
+        "public_acceptance_refuse_diagnosis_treatment",
+        "public_acceptance_refuse_future_registration",
+        "public_acceptance_refuse_price_stock",
+        "public_acceptance_refuse_private_history",
+        "public_acceptance_refuse_safety_bypass",
+        "public_acceptance_refuse_shock_decision",
+        "public_acceptance_refuse_unknown",
+        "public_acceptance_refuse_ventilator_mode"
+      ],
+      "rank_outliers": [
+        {
+          "case_id": "public_acceptance_neo_respiration",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-draeger-babylog-vn800-2026",
+            "official-mindray-benevision-v-neo-2026",
+            "draeger-evita-v800-2026"
+          ],
+          "route": ""
+        }
+      ]
+    },
+    {
+      "pipeline": "v5-rerank",
+      "split": "acceptance",
+      "cases": 22,
+      "outcome_accuracy": 0.5909090909090909,
+      "hit_rate_at_k": 0.5909090909090909,
+      "mrr": 0.5454545454545454,
+      "ndcg_at_k": 0.557357250324678,
+      "answerability_accuracy": 0.5909090909090909,
+      "latency_p95_ms": 1.547,
+      "failed_cases": [
+        "public_acceptance_refuse_alarm_value",
+        "public_acceptance_refuse_diagnosis_treatment",
+        "public_acceptance_refuse_future_registration",
+        "public_acceptance_refuse_price_stock",
+        "public_acceptance_refuse_private_history",
+        "public_acceptance_refuse_safety_bypass",
+        "public_acceptance_refuse_shock_decision",
+        "public_acceptance_refuse_unknown",
+        "public_acceptance_refuse_ventilator_mode"
+      ],
+      "rank_outliers": [
+        {
+          "case_id": "public_acceptance_epm_disconnect",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-benevision-v-or-2026",
+            "official-mindray-epm-10m-12m-2026",
+            "sales-product-catalog-2026",
+            "official-mindray-sv70-sv60-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_acceptance_neo_respiration",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-draeger-babylog-vn800-2026",
+            "official-mindray-benevision-v-neo-2026",
+            "draeger-evita-v800-2026"
+          ],
+          "route": "semantic"
+        }
+      ]
+    },
+    {
+      "pipeline": "v6-provider-selective-rag",
+      "split": "development",
+      "cases": 43,
+      "outcome_accuracy": 1,
+      "hit_rate_at_k": 1,
+      "mrr": 0.9593023255813954,
+      "ndcg_at_k": 0.9695938619817747,
+      "answerability_accuracy": 1,
+      "latency_p95_ms": 519.669,
+      "failed_cases": [],
+      "rank_outliers": [
+        {
+          "case_id": "public_dev_official_mindray_aed_portfolio_2026",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-product-portfolio-2026",
+            "official-mindray-aed-portfolio-2026",
+            "official-mindray-beneheart-defibrillator-2026",
+            "sales-product-catalog-2026",
+            "mindray-beneheart-c-series-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_dev_official_mindray_beneheart_defibrillator_2026",
+          "reciprocal_rank": 0.25,
+          "retrieved_doc_ids": [
+            "official-mindray-product-portfolio-2026",
+            "mindray-beneheart-c-series-2026",
+            "sales-product-catalog-2026",
+            "official-mindray-beneheart-defibrillator-2026",
+            "official-mindray-aed-portfolio-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "sales_product_categories",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-product-portfolio-2026",
+            "sales-product-catalog-2026",
+            "philips-intellivue-mx500-mx550-2026",
+            "sales-after-sales-triage-2026",
+            "nmpa-udi-verification-guide-2026"
+          ],
+          "route": "semantic"
+        }
+      ]
+    },
+    {
+      "pipeline": "v6-provider-selective-rag",
+      "split": "regression",
+      "cases": 30,
+      "outcome_accuracy": 1,
+      "hit_rate_at_k": 1,
+      "mrr": 0.8527777777777777,
+      "ndcg_at_k": 0.8828773591395027,
+      "answerability_accuracy": 1,
+      "latency_p95_ms": 452.604,
+      "failed_cases": [],
+      "rank_outliers": [
+        {
+          "case_id": "public_regression_a9_not_atlan",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-draeger-atlan-2026",
+            "official-mindray-anesthesia-a9-2026",
+            "official-draeger-perseus-a500-2026",
+            "official-mindray-wato-ex65-2026",
+            "official-mindray-benevision-v-or-2026"
+          ],
+          "route": "exact"
+        },
+        {
+          "case_id": "public_regression_fm50_not_intellivue",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-philips-monitoring-portfolio-2026",
+            "official-philips-avalon-fm50-2026",
+            "official-philips-intellivue-mx750-mx850-2026",
+            "philips-intellivue-mx500-mx550-2026",
+            "official-philips-intellivue-mp5-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_regression_m9_not_consona",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-consona-n-2026",
+            "official-mindray-ultrasound-m9-2026",
+            "sales-after-sales-triage-2026",
+            "mindray-resona-i9-2026",
+            "official-philips-epiq-elite-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_regression_mx850_not_mp5",
+          "reciprocal_rank": 0.25,
+          "retrieved_doc_ids": [
+            "official-philips-intellivue-mp5-2026",
+            "official-philips-monitoring-portfolio-2026",
+            "nmpa-udi-verification-guide-2026",
+            "official-philips-intellivue-mx750-mx850-2026",
+            "sales-product-catalog-2026"
+          ],
+          "route": "exact"
+        },
+        {
+          "case_id": "public_regression_pulmovista_not_babylog",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-draeger-babylog-vn800-2026",
+            "official-draeger-pulmovista-500-2026",
+            "official-draeger-ventilator-portfolio-2026",
+            "draeger-evita-v800-2026",
+            "official-mindray-benevision-v-neo-2026"
+          ],
+          "route": "exact"
+        },
+        {
+          "case_id": "public_regression_pulmovista_not_ventilator",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-draeger-pulmovista-500-2026",
+            "official-draeger-ventilator-portfolio-2026",
+            "sales-product-catalog-2026",
+            "official-mindray-sv800-sv600-2026",
+            "draeger-evita-v800-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_regression_sv800_not_sv70",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-sv800-sv600-2026",
+            "official-mindray-sv70-sv60-2026",
+            "sales-product-catalog-2026",
+            "official-draeger-ventilator-portfolio-2026",
+            "draeger-evita-v800-2026"
+          ],
+          "route": "exact"
+        },
+        {
+          "case_id": "public_regression_tms_not_epm",
+          "reciprocal_rank": 0.3333333333333333,
+          "retrieved_doc_ids": [
+            "official-mindray-epm-10m-12m-2026",
+            "official-mindray-product-portfolio-2026",
+            "official-mindray-tms30-2026",
+            "sales-after-sales-triage-2026",
+            "official-mindray-beneheart-defibrillator-2026"
+          ],
+          "route": "semantic"
+        }
+      ]
+    },
+    {
+      "pipeline": "v6-provider-selective-rag",
+      "split": "acceptance",
+      "cases": 22,
+      "outcome_accuracy": 1,
+      "hit_rate_at_k": 1,
+      "mrr": 0.9545454545454546,
+      "ndcg_at_k": 0.966448159415587,
+      "answerability_accuracy": 1,
+      "latency_p95_ms": 429.561,
+      "failed_cases": [],
+      "rank_outliers": [
+        {
+          "case_id": "public_acceptance_aed_portfolio",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "official-mindray-product-portfolio-2026",
+            "official-mindray-aed-portfolio-2026",
+            "sales-product-catalog-2026",
+            "official-mindray-beneheart-defibrillator-2026",
+            "mindray-beneheart-c-series-2026"
+          ],
+          "route": "semantic"
+        },
+        {
+          "case_id": "public_acceptance_consona_zst",
+          "reciprocal_rank": 0.5,
+          "retrieved_doc_ids": [
+            "mindray-resona-i9-2026",
+            "official-mindray-consona-n-2026",
+            "sales-product-catalog-2026",
+            "official-mindray-ultrasound-m9-2026",
+            "official-philips-epiq-elite-2026"
+          ],
+          "route": "semantic"
+        }
+      ]
+    },
+    {
+      "pipeline": "v6-provider-selective-rag",
+      "split": "safety",
+      "cases": 12,
+      "outcome_accuracy": 1,
+      "hit_rate_at_k": 1,
+      "mrr": 1,
+      "ndcg_at_k": 1,
+      "answerability_accuracy": 1,
+      "latency_p95_ms": 357.827,
+      "failed_cases": [],
+      "rank_outliers": []
+    }
+  ],
+  "chunk_experiments": []
+}

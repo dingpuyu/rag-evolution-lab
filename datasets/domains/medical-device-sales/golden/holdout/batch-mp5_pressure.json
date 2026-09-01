@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_mp5_pressure",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "哪款飞利浦紧凑床旁监护仪公开提到最多两个有创压力选项？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-intellivue-mp5-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "IntelliVue MP5",
+      "两个有创压力"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

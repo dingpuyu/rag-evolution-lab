@@ -1,0 +1,24 @@
+{
+  "id": "public_regression_m9_not_consona",
+  "dataset_version": "2.0.0",
+  "split": "regression",
+  "category": "hard_negative",
+  "query": "带 iScanHelper 教学软件的 Consona N 和采用 mQuadro 的 M9 是同一产品吗？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-ultrasound-m9-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "M9",
+      "mQuadro",
+      "不同"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

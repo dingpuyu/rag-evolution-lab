@@ -13,6 +13,7 @@ import sys
 import urllib.error
 import urllib.request
 from pathlib import Path
+from collections import Counter
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -248,17 +249,187 @@ def record_metadata_matches(record: dict, desired: dict) -> bool:
     return all(current.get(field, [] if field in {"model_codes", "supersedes", "device_identifiers", "affected_lots"} else "") == desired.get(field, [] if field in {"model_codes", "supersedes", "device_identifiers", "affected_lots"} else "") for field in INGESTION_METADATA_FIELDS)
 
 
+def build_import_plan(
+    manifest: list[dict],
+    sales_manifest: list[dict],
+    sales_lock: dict[str, dict],
+    source_revision: int,
+    skip_derived: bool,
+) -> dict:
+    """Build and validate the exact upload set without contacting the API."""
+    errors: list[str] = []
+    warnings: list[str] = []
+    items: list[dict] = []
+    unique_revisions: set[tuple[str, str, int]] = set()
+
+    def add(dataset: str, path: Path, prepared: dict, kind: str) -> None:
+        document_id = str(prepared.get("document_id", "")).strip()
+        revision = int(prepared.get("source_revision", 0))
+        key = (dataset, document_id, revision)
+        if not document_id or not prepared.get("title") or not prepared.get("domain"):
+            errors.append(f"{kind}: document_id, title and domain are required ({path.name})")
+        if revision < 1:
+            errors.append(f"{kind}: source_revision must be >= 1 ({document_id or path.name})")
+        if key in unique_revisions:
+            errors.append(f"duplicate import revision: dataset={dataset}, document={document_id}, revision={revision}")
+        unique_revisions.add(key)
+        if not path.is_file():
+            errors.append(f"missing import source: {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path.name}")
+            digest = ""
+            size = 0
+        else:
+            content = path.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            size = len(content)
+        items.append({
+            "dataset_id": dataset,
+            "document_id": document_id,
+            "source_revision": revision,
+            "kind": kind,
+            "source_file": str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else path.name,
+            "source_sha256": digest,
+            "bytes": size,
+            "metadata_sha256": ingestion_metadata_hash(prepared),
+            "manufacturer": prepared.get("manufacturer", ""),
+            "product_family": prepared.get("product_family", ""),
+            "model_codes": prepared.get("model_codes", []),
+            "authority_level": prepared.get("authority_level", ""),
+        })
+
+    for entry in manifest:
+        tenants = entry.get("allowed_tenants") or ["platform"]
+        tenant = tenants[0]
+        dataset = {
+            "platform": "public-medical-device",
+            "tenant_a": "tenant-a-medical-runbook",
+            "tenant_b": "tenant-b-medical-runbook",
+        }.get(tenant)
+        if not dataset:
+            errors.append(f"unsupported tenant mapping for {entry.get('doc_id')}: {tenant}")
+            continue
+        add(dataset, CORPUS / entry["path"], metadata(entry, source_revision=source_revision), "medical_fixture")
+
+    sales_ids: set[str] = set()
+    for entry in sales_manifest:
+        doc_id = str(entry.get("doc_id", ""))
+        if doc_id in sales_ids:
+            errors.append(f"duplicate sales manifest document: {doc_id}")
+            continue
+        sales_ids.add(doc_id)
+        review = sales_lock.get(doc_id)
+        if not review:
+            errors.append(f"sales document has no approved source lock: {doc_id}")
+            review = {}
+        path = SALES_CORPUS / entry["path"]
+        if path.is_file() and review:
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            if review.get("content_sha256") != digest:
+                errors.append(f"sales document content drifted after review: {doc_id}")
+            if review.get("path") != entry.get("path"):
+                errors.append(f"sales document path differs from source lock: {doc_id}")
+            if review.get("source_urls") != entry.get("source_urls", []):
+                errors.append(f"sales document source URLs differ from source lock: {doc_id}")
+        add(
+            "public-medical-device-sales",
+            path,
+            sales_metadata(entry, source_revision, review),
+            "reviewed_public_source",
+        )
+    orphaned_locks = sorted(set(sales_lock) - sales_ids)
+    if orphaned_locks:
+        errors.append("source lock contains removed sales documents: " + ", ".join(orphaned_locks))
+
+    if not skip_derived:
+        by_name = {
+            "vsm100-error-codes-fw2.6.docx": next(item for item in manifest if item["doc_id"] == "vsm100-error-codes-fw2.6"),
+            "vsm100-compatibility-fw2.6.xlsx": next(item for item in manifest if item["doc_id"] == "vsm100-compatibility-fw2.6"),
+            "field-correction-fc-2026-04.pdf": next(item for item in manifest if item["doc_id"] == "field-correction-fc-2026-04"),
+            "vsm100-release-notes-fw2.6.html": next(item for item in manifest if item["doc_id"] == "vsm100-family-release-fw2.6"),
+        }
+        for name, entry in by_name.items():
+            suffix = "-" + Path(name).suffix.removeprefix(".")
+            derived = metadata(entry, suffix, source_revision)
+            if name == "vsm100-compatibility-fw2.6.xlsx":
+                derived["model_codes"] = ["VSM-100", "VSM-100 Pro"]
+                derived["product_family"] = "pulsecare-vsm100-family"
+            add("public-medical-device", GENERATED / name, derived, "derived_format_fixture")
+
+        revision_entry = next(item for item in manifest if item["doc_id"] == "vsm100-error-codes-fw2.6")
+        for revision, name in (
+            (1, "vsm100-error-codes-fw2.6.docx"),
+            (2, "vsm100-error-codes-fw2.6-r2.docx"),
+        ):
+            revision_metadata = metadata(revision_entry, source_revision=revision)
+            revision_metadata.update({
+                "document_id": "vsm100-error-codes-fw2.6-revision-demo",
+                "title": "VSM-100 SYS-NET-042 修订演示",
+                "document_revision": f"R{revision}",
+                "source_review_status": "approved",
+                "source_reviewed_at": "2026-08-18T08:00:00Z",
+            })
+            add(
+                "tenant-a-medical-runbook",
+                GENERATED / name,
+                revision_metadata,
+                "revision_fixture",
+            )
+    elif not GENERATED.exists():
+        warnings.append("derived format fixtures were skipped")
+
+    dataset_counts = Counter(item["dataset_id"] for item in items)
+    kind_counts = Counter(item["kind"] for item in items)
+    return {
+        "schema_version": 1,
+        "status": "passed" if not errors else "failed",
+        "summary": {
+            "uploads": len(items),
+            "reviewed_sales_documents": kind_counts["reviewed_public_source"],
+            "datasets": len(dataset_counts),
+            "errors": len(errors),
+            "warnings": len(warnings),
+        },
+        "dataset_counts": dict(sorted(dataset_counts.items())),
+        "kind_counts": dict(sorted(kind_counts.items())),
+        "errors": errors,
+        "warnings": warnings,
+        "items": items,
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api", default=os.getenv("RAGLAB_API_URL", "http://127.0.0.1:8080"))
+    parser.add_argument(
+        "--api",
+        default=os.getenv("RAGLAB_API_URL", f"http://127.0.0.1:{os.getenv('RAGLAB_API_PORT', '8080')}"),
+    )
     parser.add_argument("--skip-derived", action="store_true")
     parser.add_argument("--source-revision", type=int, default=int(os.getenv("MEDICAL_SOURCE_REVISION", "1")))
+    parser.add_argument("--plan", action="store_true", help="validate and print the upload set without contacting the API")
+    parser.add_argument("--plan-report", type=Path, help="optional JSON path for the offline import plan")
+    parser.add_argument("--job-report", type=Path, help="optional JSON path containing the exact submitted job IDs")
     arguments = parser.parse_args()
     api = arguments.api.rstrip("/")
-    tokens = {name: login(api, name) for name in ACCOUNTS}
     manifest = json.loads((CORPUS / "manifest.json").read_text(encoding="utf-8"))
     sales_manifest = json.loads((SALES_CORPUS / "manifest.json").read_text(encoding="utf-8"))
     sales_lock = json.loads((SALES_CORPUS / "sources.lock.json").read_text(encoding="utf-8"))["documents"]
+    if arguments.plan:
+        plan = build_import_plan(
+            manifest,
+            sales_manifest,
+            sales_lock,
+            arguments.source_revision,
+            arguments.skip_derived,
+        )
+        rendered = json.dumps(plan, ensure_ascii=False, indent=2) + "\n"
+        if arguments.plan_report:
+            arguments.plan_report.parent.mkdir(parents=True, exist_ok=True)
+            arguments.plan_report.write_text(rendered, encoding="utf-8")
+        print(rendered, end="")
+        if plan["status"] != "passed":
+            raise RuntimeError("medical import plan failed validation")
+        return
+
+    tokens = {name: login(api, name) for name in ACCOUNTS}
     datasets = ["public-medical-device", "tenant-a-medical-runbook", "tenant-b-medical-runbook", "public-medical-device-sales"]
     revisions: dict[str, dict[str, list[dict]]] = {}
     for dataset_id in datasets:
@@ -352,7 +523,12 @@ def main() -> None:
                 "job_id": result.get("job_id"),
                 "status": result.get("status"),
             })
-    print(json.dumps({"submitted": len(submitted), "documents": submitted}, ensure_ascii=False, indent=2))
+    report = {"schema_version": 1, "submitted": len(submitted), "documents": submitted}
+    rendered = json.dumps(report, ensure_ascii=False, indent=2) + "\n"
+    if arguments.job_report:
+        arguments.job_report.parent.mkdir(parents=True, exist_ok=True)
+        arguments.job_report.write_text(rendered, encoding="utf-8")
+    print(rendered, end="")
 
 
 if __name__ == "__main__":

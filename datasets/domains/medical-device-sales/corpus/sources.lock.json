@@ -1,39 +1,17 @@
 {
   "schema_version": 1,
   "dataset_id": "public-medical-device-sales",
-  "approved_at": "2026-08-17T01:51:23.113174Z",
-  "reviewed_by": "local-corpus-review",
+  "approved_at": "2026-08-31T17:55:11.941134Z",
+  "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
   "documents": {
-    "sales-product-catalog-2026": {
-      "path": "documents/sales-product-catalog-2026.md",
-      "content_sha256": "947b637297d3c7609a110ef57afab31c3e689a7acd78322de571f10506b61ed4",
+    "draeger-evita-v800-2026": {
+      "path": "documents/draeger-evita-v800-2026.md",
+      "content_sha256": "ffbc62bd56bba76257e15ced892e525a55766cd1c3f0e583ddd0bf2e0d97e8ac",
       "source_urls": [
-        "https://www.mindray.com/cn/products",
-        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
         "https://www.draeger.com/zh_tw/Products/Evita-V800"
       ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
-    },
-    "mindray-benevision-n1-2026": {
-      "path": "documents/mindray-benevision-n1-2026.md",
-      "content_sha256": "62cc46ad8262685f86cd6ce9cb99823d3e41f87726f3e1471956722b04d8ce82",
-      "source_urls": [
-        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"
-      ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
-    },
-    "mindray-beneheart-c-series-2026": {
-      "path": "documents/mindray-beneheart-c-series-2026.md",
-      "content_sha256": "151faa895d04b4afe0d3be1acd03da0ad26292019813018a16b33b85a1e422f3",
-      "source_urls": [
-        "https://www.mindray.com/cn/products/aed/beneheart-c-series"
-      ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
       "remote_fingerprints": {}
     },
     "mindray-benefusion-iu-series-2026": {
@@ -42,9 +20,35 @@
       "source_urls": [
         "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series"
       ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-i-u-series": "e0d7bf4ec9c13eda439bc20023f62e054919bdfaff2dc24fc52148a4274a97be"
+      }
+    },
+    "mindray-beneheart-c-series-2026": {
+      "path": "documents/mindray-beneheart-c-series-2026.md",
+      "content_sha256": "151faa895d04b4afe0d3be1acd03da0ad26292019813018a16b33b85a1e422f3",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/aed/beneheart-c-series"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/aed/beneheart-c-series": "951722d4c094b42f2afb60fde512ac632dbb0072dd45c6b229a89e63f5dfe4d5"
+      }
+    },
+    "mindray-benevision-n1-2026": {
+      "path": "documents/mindray-benevision-n1-2026.md",
+      "content_sha256": "62cc46ad8262685f86cd6ce9cb99823d3e41f87726f3e1471956722b04d8ce82",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benivision-n1": "56d598429adf4231c7f51e89111ec2a22782a0fa7a226e4ca885d1d6f07627d5"
+      }
     },
     "mindray-resona-i9-2026": {
       "path": "documents/mindray-resona-i9-2026.md",
@@ -52,29 +56,11 @@
       "source_urls": [
         "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9"
       ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
-    },
-    "philips-intellivue-mx500-mx550-2026": {
-      "path": "documents/philips-intellivue-mx500-mx550-2026.md",
-      "content_sha256": "a56dfb63bd13da9ee820f355d9115db3aadeec54f69408dd02ea0e856f40ca9c",
-      "source_urls": [
-        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"
-      ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
-    },
-    "draeger-evita-v800-2026": {
-      "path": "documents/draeger-evita-v800-2026.md",
-      "content_sha256": "ffbc62bd56bba76257e15ced892e525a55766cd1c3f0e583ddd0bf2e0d97e8ac",
-      "source_urls": [
-        "https://www.draeger.com/zh_tw/Products/Evita-V800"
-      ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
-      "remote_fingerprints": {}
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ultrasound/general-imaging/resona-i9": "c13ed703eaf962d4f680a7fee2713cd6a48ff8954754f711d56cee7696bd7769"
+      }
     },
     "nmpa-udi-verification-guide-2026": {
       "path": "documents/nmpa-udi-verification-guide-2026.md",
@@ -83,17 +69,400 @@
         "https://udi.nmpa.gov.cn/",
         "https://udi.nmpa.gov.cn/download.html"
       ],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://udi.nmpa.gov.cn/": "2c977fafaedcde597cede4ffb6125fd2ff5cb0820b9fc2e5f708d015995f1259",
+        "https://udi.nmpa.gov.cn/download.html": "e53198759286474600156cd7ac960535b3d5c305b7e391786f88eefbbcc5efa9"
+      }
+    },
+    "official-draeger-atlan-2026": {
+      "path": "documents/official-draeger-atlan-2026.md",
+      "content_sha256": "a4f1e0ae73d703b82d66390003eb5f79f098515bcad6b4744a26bce991d84bd2",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Hospital/Atlan"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
       "remote_fingerprints": {}
+    },
+    "official-draeger-babylog-vn800-2026": {
+      "path": "documents/official-draeger-babylog-vn800-2026.md",
+      "content_sha256": "1b922a22e8504bcc5cb6d6dfaafb1990dfd20a6b3eff66fddb40df71b1187567",
+      "source_urls": [
+        "https://www.draeger.com/en-us_us/Productfinder/ventilators/neonatal-ventilators"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {}
+    },
+    "official-draeger-perseus-a500-2026": {
+      "path": "documents/official-draeger-perseus-a500-2026.md",
+      "content_sha256": "478bc746b81214b647af6747a6edcd81544a7206d25769377eb542db22cb4c49",
+      "source_urls": [
+        "https://www.draeger.com/en-us_us/Hospital/Operating-Room/ssi"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {}
+    },
+    "official-draeger-pulmovista-500-2026": {
+      "path": "documents/official-draeger-pulmovista-500-2026.md",
+      "content_sha256": "ef293d1fa520f1b787c7a5bdb6ca92b00361c204cf5e85cae5326c90b2130865",
+      "source_urls": [
+        "https://www.draeger.com/en-us_ca/Products/PulmoVista-500"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {}
+    },
+    "official-draeger-savina-300-2026": {
+      "path": "documents/official-draeger-savina-300-2026.md",
+      "content_sha256": "4513834bae49f580dd057af7a0de4cd9d6dee6da9c29b816fc10d30569607f3a",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Productfinder/Ventilators",
+        "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.draeger.com/Content/Documents/Products/savina-300-pi-9067974-zh-cn.pdf": "901d1d9cd9803cdeb068f70b7b212ca909dafdd6c8884b94d74e8f56b8c57460"
+      }
+    },
+    "official-draeger-ventilator-portfolio-2026": {
+      "path": "documents/official-draeger-ventilator-portfolio-2026.md",
+      "content_sha256": "12a11b5b36523f0321480c1f7b23242c9619653c7a283b8e08859c62a361a131",
+      "source_urls": [
+        "https://www.draeger.com/zh_cn/Productfinder/Ventilators"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {}
+    },
+    "official-mindray-aed-portfolio-2026": {
+      "path": "documents/official-mindray-aed-portfolio-2026.md",
+      "content_sha256": "f2b7d0b22c081450e08fb92da5783c099d7ab0e0aeef702faaf523a912d9f43e",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/aed",
+        "https://www.mindray.com/en/products/aed"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/aed": "ad4869c460db76a46f2f5c9ce3ce32690adbe76635bcd8ea9c1a20ce3f4f90c4",
+        "https://www.mindray.com/en/products/aed": "84cfe5da801c665717781ed782bd6bf57b6336229a5da0e92a3cb67ac6f7c7c3"
+      }
+    },
+    "official-mindray-anesthesia-a9-2026": {
+      "path": "documents/official-mindray-anesthesia-a9-2026.md",
+      "content_sha256": "c0bec91cc69d673c52b830c4270a93882baaae102dd39f4a8d5ca59369dc4765",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/anesthesia/a9"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/anesthesia/a9": "4caaa4bd189e08310fd899f908998f084c3375d4165c69d837920dfd1f3577b3"
+      }
+    },
+    "official-mindray-bc760-cs-2026": {
+      "path": "documents/official-mindray-bc760-cs-2026.md",
+      "content_sha256": "e9a9d41fe389f9480b0c0d2b695604fdf301c16d8fbe56fbf0e45805d91ba966",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/laboratory-diagnostics/hematology/5-part-differential-analyzers/bc-760-cs": "a4cf905c0f9a4655d387f42c273fc18dbd79c89d112e7b5723e0e1caeabeeb4e"
+      }
+    },
+    "official-mindray-benefusion-n-2026": {
+      "path": "documents/official-mindray-benefusion-n-2026.md",
+      "content_sha256": "546ddad17ba12d88f6f2dea34f819efb996ef8211fb8a39b91826bbb221dbadf",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/infusion-system/benefusion-n-series": "6293e34b76665da2e3a935ac171ef8921c5c08b886d2aa2e5f6505f62e7924db"
+      }
+    },
+    "official-mindray-beneheart-defibrillator-2026": {
+      "path": "documents/official-mindray-beneheart-defibrillator-2026.md",
+      "content_sha256": "cf017d45b130dc5c5c4641ccbb1f905bd99a2e48b9b5a0b3120d65dc0735cb7b",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/defibrillation-system"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/defibrillation-system": "11bd2d353cb4b4c0357c40dd6f57912d4e3b29e9785f11e92938746c61e71a8b"
+      }
+    },
+    "official-mindray-beneheart-r700-2026": {
+      "path": "documents/official-mindray-beneheart-r700-2026.md",
+      "content_sha256": "839192bcf6d57e5cdc223a441d42261d6d7a0158ea7e23a26a5528d67a8a85dd",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ecg-electrocardiograph/beneheart-r700": "02148ddb08df5e8e87b2f2bcf8f2b3a0c15eaf5e9c86aec8b528933f0555918d"
+      }
+    },
+    "official-mindray-benevision-cms-2026": {
+      "path": "documents/official-mindray-benevision-cms-2026.md",
+      "content_sha256": "8330b82daea96521963a77f02f5b5533ae4a97fc1bbc5eb68d0aca13199b7b21",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/centralized-mornitoring/benevision-cms": "deb70fae6f56503c548d1c138eb6b8e4b0a9790b18f9b68603e9490302496901"
+      }
+    },
+    "official-mindray-benevision-n22-n19-2026": {
+      "path": "documents/official-mindray-benevision-n22-n19-2026.md",
+      "content_sha256": "c1822763ef74ab3d3416a8b70bbf6a11f376ecd6aeea5d7e532ce7503a41f24e",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-n22-n19": "55046397a0f7043977c15a9ec9868e55167ea43acf3582753104fef30b50037b"
+      }
+    },
+    "official-mindray-benevision-v-neo-2026": {
+      "path": "documents/official-mindray-benevision-v-neo-2026.md",
+      "content_sha256": "d5a2ff3fd818ecd17c9e40289d8ea80d2375e8af668b0cb38201eedce322c822",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-v700-v500-v200-neo": "210ed46b082d389bcd326bc56d066923fbb9495ff17bbb00497c6d9881c7acff"
+      }
+    },
+    "official-mindray-benevision-v-or-2026": {
+      "path": "documents/official-mindray-benevision-v-or-2026.md",
+      "content_sha256": "fea90887a63de9ff7ae9598e7dffe9b788cb1623812cfa4a6a6c7abbaf6f6d38",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/critical-care-monitoring/benevision-vmax-v700-v500-v200-or": "09bf843b23fd3cf588e094e6610b11934093283c32f37846b5b4b3e70716f4e9"
+      }
+    },
+    "official-mindray-consona-n-2026": {
+      "path": "documents/official-mindray-consona-n-2026.md",
+      "content_sha256": "33473eedaba2e10b4bff7ccb1e54e327a115677a3f9ef80ee5a67f46d53446f5",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ultrasound/primary-care/consona-n-series": "b068466e1abecb5e617349c35ad6d0adfe51b078856b90ff33c7f7e8e23fe0a5"
+      }
+    },
+    "official-mindray-epm-10m-12m-2026": {
+      "path": "documents/official-mindray-epm-10m-12m-2026.md",
+      "content_sha256": "562fd1ee6c4530e54b4fa7657c5ae2f30987c0348c3ab3959833dbec805750f8",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/sub-intensive-care-monitoring/epm-10m-12m": "3f042730678d490c95f8265a713df891e00e22981f637ffb2041af40317cd55f"
+      }
+    },
+    "official-mindray-product-portfolio-2026": {
+      "path": "documents/official-mindray-product-portfolio-2026.md",
+      "content_sha256": "425464599dc15e2d86a9527e3053df93da2f05e519bd8ba22fdef71221eed005",
+      "source_urls": [
+        "https://www.mindray.com/cn/products"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products": "04412848b9678947c1b45458e8cd9a4e412350bd0e02305c317dd79fdab9e129"
+      }
+    },
+    "official-mindray-sv70-sv60-2026": {
+      "path": "documents/official-mindray-sv70-sv60-2026.md",
+      "content_sha256": "a28e0c39c27810b4b1521612e60ad26fe250451a2f21cc4aae4034ab3eae22b6",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ventilators/sv70-sv60"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ventilators/sv70-sv60": "65f64ed4713ae83e70de18196f191dbb365047add1c886f76d60b06c22f93a94"
+      }
+    },
+    "official-mindray-sv800-sv600-2026": {
+      "path": "documents/official-mindray-sv800-sv600-2026.md",
+      "content_sha256": "35be5429195c54540a978b00f1b018c478c775106d68652690b2f44bdb5f21ac",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ventilators/sv800-sv600"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ventilators/sv800-sv600": "a17864ae265f5e50a67ef59b6595b517cb3b0adea177c74da50d5be5d0fb2d2d"
+      }
+    },
+    "official-mindray-tms30-2026": {
+      "path": "documents/official-mindray-tms30-2026.md",
+      "content_sha256": "85f40738d0a2dc3b20e2affadb692b7c80ef7758f78c66578b7184c7eeb28dbe",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/patient-monitoring/telemetry-monitoring/benevision-tms30": "e364a503a59c555aae30ac57efe5f72fc50f8e1cc141d34de574a27e6a0f025b"
+      }
+    },
+    "official-mindray-ultrasound-m9-2026": {
+      "path": "documents/official-mindray-ultrasound-m9-2026.md",
+      "content_sha256": "0896dad331f2ce713ac4d0734d4b1aa59102ec0dbfc2382c77aaf6ff8b577e9f",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/ultrasound/point-of-care/m9": "5587c7295c4558fe820336990985871cf0a233d80ac9da8ea3f1cd4a2932c238"
+      }
+    },
+    "official-mindray-wato-ex65-2026": {
+      "path": "documents/official-mindray-wato-ex65-2026.md",
+      "content_sha256": "e947f2b5f70bf5c14196dfb1eabd791573b4951d5e09b4025224a032b08ebea3",
+      "source_urls": [
+        "https://www.mindray.com/cn/products/anesthesia/wato-ex-65"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products/anesthesia/wato-ex-65": "2d3981a195a864393f26a042680b6d5dafc205632925ab11e816b8fb3ff9e6e2"
+      }
+    },
+    "official-philips-avalon-fm50-2026": {
+      "path": "documents/official-philips-avalon-fm50-2026.md",
+      "content_sha256": "eb70fcd0272ee9ba91680cb16d4626e5421a81c1e1d2aeda09a942e301a6c0a1",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.usa.philips.com/healthcare/product/HC865071/avalon-fm50-fetal-monitor": "217d440e716fc7eca206c441353ebd72678cff0fbb7c69db7a046d1eb5c54fc5"
+      }
+    },
+    "official-philips-epiq-elite-2026": {
+      "path": "documents/official-philips-epiq-elite-2026.md",
+      "content_sha256": "0379fd7e72432c168a04b520dafbfeaaf0144a9cd99f9d339842695d06d82ce7",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.usa.philips.com/healthcare/product/HC795098/epiq-elite-a-new-class-of-premium-ultrasound-has-arrived": "eb2b5e59bf6ea1f95d9fe28a46635097dfe4348784bda9bdaa646e177772ab7b"
+      }
+    },
+    "official-philips-heartstart-frx-2026": {
+      "path": "documents/official-philips-heartstart-frx-2026.md",
+      "content_sha256": "947b020f53688143fc49f47cc20e2b896c53e8e484f8c62d82e2d082362632fc",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.usa.philips.com/healthcare/product/HC861304/heartstart-frx-automated-extemal-defibrillator": "d112fc66e81aac070143bf8275189df81abd322eb574264da9d4fd59c3d6933c"
+      }
+    },
+    "official-philips-intellivue-mp5-2026": {
+      "path": "documents/official-philips-intellivue-mp5-2026.md",
+      "content_sha256": "1c3484ae90e10917a4ba7099ed6a1f06b9b87fe673e2014748517cca9eb9a561",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.philips.com.cn/healthcare/product/HC865024/intellivue-mp5----------": "938943b290b098a53166c17e3dc9d737a74a9400022e687d3583a48aef55627a"
+      }
+    },
+    "official-philips-intellivue-mx750-mx850-2026": {
+      "path": "documents/official-philips-intellivue-mx750-mx850-2026.md",
+      "content_sha256": "04c8d2981eadddc43dc9e077ab323ec68744c8b4da194a22d6e8d8278162f337",
+      "source_urls": [
+        "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.usa.philips.com/healthcare/product/HC866470/intellivue-mx850-bedside-patient-monitor": "151477e7f8aa9928eb02bdeb18bcffcb86f206e79a5ad5b1b6b694dae201031c"
+      }
+    },
+    "official-philips-monitoring-portfolio-2026": {
+      "path": "documents/official-philips-monitoring-portfolio-2026.md",
+      "content_sha256": "9f840d4ce6bbd17dcc7bbc233caac1ceb070ad7e3cf32c3935aac0392a5e4d64",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.philips.com.cn/healthcare/solutions/patient-monitoring/patient-monitoring": "bcda396826592aea6b47b61e199ffe263af0ad4316b1441c46ca95a44fffee0f"
+      }
+    },
+    "philips-intellivue-mx500-mx550-2026": {
+      "path": "documents/philips-intellivue-mx500-mx550-2026.md",
+      "content_sha256": "a56dfb63bd13da9ee820f355d9115db3aadeec54f69408dd02ea0e856f40ca9c",
+      "source_urls": [
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550": "cfdc0c398c1865b10030d4300d50d4eba09e55c1427483d6d38201b14749b401"
+      }
     },
     "sales-after-sales-triage-2026": {
       "path": "documents/sales-after-sales-triage-2026.md",
       "content_sha256": "ea834d2221f3c1f90dd0523743b262115903e2fb324ed30d452d52b24843b447",
       "source_urls": [],
-      "reviewed_at": "2026-08-17T01:51:23.113174Z",
-      "reviewed_by": "local-corpus-review",
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
       "remote_fingerprints": {}
+    },
+    "sales-product-catalog-2026": {
+      "path": "documents/sales-product-catalog-2026.md",
+      "content_sha256": "947b637297d3c7609a110ef57afab31c3e689a7acd78322de571f10506b61ed4",
+      "source_urls": [
+        "https://www.mindray.com/cn/products",
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550",
+        "https://www.draeger.com/zh_tw/Products/Evita-V800"
+      ],
+      "reviewed_at": "2026-08-31T17:55:11.941134Z",
+      "reviewed_by": "codex-assisted-official-source-review-2026-09-01",
+      "remote_fingerprints": {
+        "https://www.mindray.com/cn/products": "5b5b7f622be9c0c50dc6afd9f9c5f9faf26baea87b14e45143c8a06c1d85e573",
+        "https://www.philips.com.cn/healthcare/product/HC866066/intellivue-mx500-mx550": "8e2f105f8000b9cd6a130f590cfbfd65fe0d5d67360f3ed8e6d90b9a04ee1332"
+      }
     }
   }
 }

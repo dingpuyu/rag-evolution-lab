@@ -1,0 +1,18 @@
+{
+  "id": "public_blind_refusal_hospital_inventory",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "selective_refusal",
+  "query": "北京协和医院目前有多少台 Atlan A350 XL？",
+  "context": {},
+  "expected": {
+    "answerable": false,
+    "relevant_doc_ids": [],
+    "relevant_chunk_ids": [],
+    "required_facts": [],
+    "forbidden_facts": [],
+    "minimum_citations": 0,
+    "expected_refusal_reason": "private_external_data_missing"
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

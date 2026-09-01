@@ -1,0 +1,23 @@
+{
+  "id": "public_holdout_epm_resume",
+  "dataset_version": "2.0.0",
+  "split": "holdout",
+  "category": "holdout_product_fact",
+  "query": "哪套监护产品能在网络中断时先保存，网络恢复后再自动续传？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-epm-10m-12m-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "本地存储",
+      "复网续传"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

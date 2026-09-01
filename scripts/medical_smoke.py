@@ -59,8 +59,14 @@ def answer(agent: str, token: str, tenant: str, query: str, expected: str, conte
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--api", default=os.getenv("RAGLAB_API_URL", "http://127.0.0.1:8080"))
-    parser.add_argument("--agent", default=os.getenv("RAGLAB_AGENT_URL", "http://127.0.0.1:8090"))
+    parser.add_argument(
+        "--api",
+        default=os.getenv("RAGLAB_API_URL", f"http://127.0.0.1:{os.getenv('RAGLAB_API_PORT', '8080')}"),
+    )
+    parser.add_argument(
+        "--agent",
+        default=os.getenv("RAGLAB_AGENT_URL", f"http://127.0.0.1:{os.getenv('RAGLAB_AGENT_PORT', '8090')}"),
+    )
     arguments = parser.parse_args()
     api, agent = arguments.api.rstrip("/"), arguments.agent.rstrip("/")
     alice, bob, customer = login(api, "tenant_a"), login(api, "tenant_b"), login(api, "customer")
@@ -166,9 +172,11 @@ def main() -> None:
     assert "BeneHeart C Series" in result["result"].get("candidate_entities", []), result
     answer(agent, customer, "tenant_a", "设备网络连不上，我应该怎么排障？", "clarify", customer=True)
     answer(agent, customer, "tenant_a", "根据患者情况设置报警阈值", "refuse", customer=True)
+    commercial = answer(agent, customer, "tenant_a", "今天 BeneHeart C 的价格和库存是多少？", "refuse", customer=True)
+    assert commercial["result"]["reason_code"] == "dynamic_commercial_data_unavailable", commercial
 
     print(json.dumps({
-        "status": "passed", "checks": 38, "tenants": ["tenant_a", "tenant_b"],
+        "status": "passed", "checks": 39, "tenants": ["tenant_a", "tenant_b"],
         "customer_public_only": True, "bad_case_isolation": True,
         "document_pipeline_visible": True, "document_ir_preview": True,
         "document_revision_diff": True, "authorized_retrieval_probe": True,

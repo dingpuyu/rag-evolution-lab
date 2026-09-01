@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_mindray_benevision_cms_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "BeneVision 中央监护系统有哪些公开组件？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-benevision-cms-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "中央站",
+      "CMS Viewer",
+      "Mobile Viewer"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

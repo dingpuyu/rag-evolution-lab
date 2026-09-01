@@ -1,0 +1,23 @@
+{
+  "id": "public_final_consona_teaching",
+  "dataset_version": "2.0.0",
+  "split": "final",
+  "category": "final_product_fact",
+  "query": "超声新手团队关注教学软件和标准化工作流，Consona N 有哪些公开工具？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-consona-n-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "iScanHelper",
+      "iWorks"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

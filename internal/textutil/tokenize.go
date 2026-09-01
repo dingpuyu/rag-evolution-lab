@@ -8,20 +8,37 @@ import (
 )
 
 var semanticAliases = map[string]string{
-	"单点登录":   "sso",
-	"企业登录":   "sso",
-	"登录集成":   "sso",
-	"只登录一次":  "sso",
-	"调用频率":   "限流",
-	"频率限制":   "限流",
-	"请求过多":   "限流",
-	"太频繁":    "限流",
-	"收费":     "计费",
-	"价格":     "计费",
-	"异地备份":   "跨区域备份",
-	"跨区备份":   "跨区域备份",
-	"另一个地区":  "跨区域",
-	"导出所有租户": "跨租户导出",
+	"单点登录":    "sso",
+	"企业登录":    "sso",
+	"登录集成":    "sso",
+	"只登录一次":   "sso",
+	"调用频率":    "限流",
+	"频率限制":    "限流",
+	"请求过多":    "限流",
+	"太频繁":     "限流",
+	"收费":      "计费",
+	"价格":      "计费",
+	"异地备份":    "跨区域备份",
+	"跨区备份":    "跨区域备份",
+	"另一个地区":   "跨区域",
+	"导出所有租户":  "跨租户导出",
+	"网络恢复":    "复网",
+	"恢复网络":    "复网",
+	"网络中断":    "断网",
+	"断线":      "断网",
+	"先保存":     "本地存储",
+	"缓存":      "本地存储",
+	"补传":      "续传",
+	"科室内活动":   "移动监护",
+	"自动体外除颤器": "aed",
+	"除颤器":     "aed",
+	"心电监护仪":   "病人监护仪",
+	"床旁监护":    "病人监护",
+	"集中看监护":   "中央监护",
+	"围栏":      "电子围栏",
+	"呼吸辅助设备":  "呼吸机",
+	"输液设备":    "输注系统",
+	"输液泵":     "输注泵",
 }
 
 func NormalizeSemantic(text string) string {
@@ -30,6 +47,20 @@ func NormalizeSemantic(text string) string {
 		text = strings.ReplaceAll(text, from, to)
 	}
 	return text
+}
+
+// ExpandSemantic preserves the original query terms and appends controlled
+// domain aliases. Keeping both forms avoids the precision loss caused by
+// destructive query rewriting while still making BM25 useful for paraphrases.
+func ExpandSemantic(text string) string {
+	original := strings.ToLower(text)
+	expanded := original
+	for from, to := range semanticAliases {
+		if strings.Contains(original, from) && !strings.Contains(original, to) {
+			expanded += " " + to
+		}
+	}
+	return expanded
 }
 
 func Tokens(text string) []string {
@@ -88,7 +119,7 @@ func HashVector(text string, dimensions int) []float64 {
 		dimensions = 256
 	}
 	vector := make([]float64, dimensions)
-	for token, count := range TermFrequency(Tokens(NormalizeSemantic(text))) {
+	for token, count := range TermFrequency(Tokens(ExpandSemantic(text))) {
 		h := fnv.New64a()
 		_, _ = h.Write([]byte(token))
 		value := h.Sum64()

@@ -1,0 +1,23 @@
+{
+  "id": "public_acceptance_tms_telemetry",
+  "dataset_version": "2.0.0",
+  "split": "acceptance",
+  "category": "acceptance_product_fact",
+  "query": "三或五导 ECG、血氧连续监测再加电子围栏，对应哪个遥测型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-tms30-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "TMS30",
+      "电子围栏"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

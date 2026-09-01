@@ -35,6 +35,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/milvus"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
+	"github.com/dingpuyu/rag-evolution-lab/internal/rerank"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
 	"github.com/dingpuyu/rag-evolution-lab/internal/runtimeharness"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
@@ -82,6 +83,7 @@ func main() {
 		fatal(err)
 	}
 	vectorBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_VECTOR_BACKEND")))
+	embeddingBackend := strings.ToLower(strings.TrimSpace(os.Getenv("RAGLAB_EMBEDDING_BACKEND")))
 	milvusURL := strings.TrimSpace(os.Getenv("RAGLAB_MILVUS_URL"))
 	ollamaModel := strings.TrimSpace(os.Getenv("RAGLAB_OLLAMA_MODEL"))
 	if vectorBackend == "milvus" || vectorBackend == "both" {
@@ -90,6 +92,25 @@ func main() {
 		}
 		if ollamaModel == "" {
 			ollamaModel = "qwen3-embedding:4b-local"
+		}
+	}
+	var providerEmbedder retrieval.Embedder
+	var providerReranker rerank.Reranker
+	if embeddingBackend == "openai" || embeddingBackend == "openai-compatible" || embeddingBackend == "tokenhub" {
+		providerEmbedder, err = newLabEmbedder(labEmbedderConfig{
+			Backend: embeddingBackend, OpenAIBaseURL: os.Getenv("RAGLAB_EMBEDDING_BASE_URL"),
+			OpenAIAPIKey: firstNonEmptyEnv("RAGLAB_EMBEDDING_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY", "TOKENHUB_API_KEY"),
+			OpenAIModel:  os.Getenv("RAGLAB_EMBEDDING_MODEL"), OpenAIDimensions: environmentIntOrZero("RAGLAB_EMBEDDING_DIMENSIONS"),
+			OpenAIBatchSize: environmentIntOrZero("RAGLAB_EMBEDDING_BATCH_SIZE"), QueryInstruction: os.Getenv("RAGLAB_QUERY_INSTRUCTION"),
+		})
+		if err != nil {
+			fatal(err)
+		}
+		if strings.EqualFold(strings.TrimSpace(os.Getenv("RAGLAB_RERANK_BACKEND")), "qwen") {
+			providerReranker = rerank.Qwen{
+				URL: os.Getenv("RAGLAB_RERANK_URL"), APIKey: firstNonEmptyEnv("RAGLAB_RERANK_API_KEY", "QWEN_API_KEY", "DASHSCOPE_API_KEY"),
+				Model: environmentOr("RAGLAB_RERANK_MODEL", "qwen3-rerank"),
+			}
 		}
 	}
 	runtime, err := app.BuildWithOptions(context.Background(), corpusRoot, app.Options{
@@ -103,6 +124,10 @@ func main() {
 		MilvusCollection:  os.Getenv("RAGLAB_MILVUS_COLLECTION"),
 		MilvusSearchEF:    64,
 		SkipOllamaMemory:  vectorBackend == "milvus",
+		ChunkMaxRunes:     environmentInt("RAGLAB_CHUNK_MAX_RUNES", 700),
+		ChunkOverlapRunes: environmentInt("RAGLAB_CHUNK_OVERLAP_RUNES", 0),
+		ProviderEmbedder:  providerEmbedder,
+		ProviderReranker:  providerReranker,
 	})
 	if err != nil {
 		fatal(err)

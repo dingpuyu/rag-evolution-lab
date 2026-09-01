@@ -1,0 +1,24 @@
+{
+  "id": "public_dev_official_philips_avalon_fm50_2026",
+  "dataset_version": "2.0.0",
+  "split": "development",
+  "category": "public_product_fact",
+  "query": "Avalon FM50 的监护对象、三胎能力和信息系统连接分别是什么？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-philips-avalon-fm50-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "胎儿和孕产妇",
+      "可选",
+      "IntelliSpace Perinatal"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}

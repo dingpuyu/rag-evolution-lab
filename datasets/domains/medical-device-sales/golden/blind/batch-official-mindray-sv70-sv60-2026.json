@@ -1,0 +1,23 @@
+{
+  "id": "public_blind_official_mindray_sv70_sv60_2026",
+  "dataset_version": "2.0.0",
+  "split": "blind",
+  "category": "semantic_product_discovery",
+  "query": "要找支持 EasySync 且能接入中心监护系统的无创呼吸机，应查什么型号？",
+  "context": {},
+  "expected": {
+    "answerable": true,
+    "relevant_doc_ids": [
+      "official-mindray-sv70-sv60-2026"
+    ],
+    "relevant_chunk_ids": [],
+    "required_facts": [
+      "SV70/SV60",
+      "EasySync"
+    ],
+    "forbidden_facts": [],
+    "minimum_citations": 1,
+    "expected_refusal_reason": null
+  },
+  "notes": "2026-09-01 public-corpus accuracy expansion; source-grounded and held out by split."
+}
