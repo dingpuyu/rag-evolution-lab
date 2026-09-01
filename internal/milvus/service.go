@@ -429,6 +429,12 @@ func applyExactIdentifierBoost(query string, hits []SearchHit) {
 	})
 }
 
+// ApplyExactIdentifierBoost exposes the production identifier-preservation
+// rule to isolated evaluation sandboxes without duplicating ranking logic.
+func ApplyExactIdentifierBoost(query string, hits []SearchHit) {
+	applyExactIdentifierBoost(query, hits)
+}
+
 func appendUnique(values []string, value string) []string {
 	for _, candidate := range values {
 		if candidate == value {

@@ -101,6 +101,13 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 	mux.Handle("GET /api/v1/milvus/status", milvusStatus)
 	mux.Handle("GET /api/v1/milvus/catalog", catalog)
 	mux.Handle("POST /api/v1/milvus/search", vectorSearch)
+	if enterprise.RetrievalSandbox != nil {
+		if authenticator == nil {
+			return nil, fmt.Errorf("retrieval sandbox API requires enterprise authentication")
+		}
+		sandboxAPI := &RetrievalSandboxAPI{service: enterprise.RetrievalSandbox}
+		mux.Handle("POST /api/v1/evaluation/retrieval-sandbox/runs", authenticator.requireIdentity(http.HandlerFunc(sandboxAPI.run)))
+	}
 	if scaleService != nil {
 		scaleAPI := &ScaleAPI{service: scaleService}
 		scaleStatus := http.Handler(http.HandlerFunc(scaleAPI.status))

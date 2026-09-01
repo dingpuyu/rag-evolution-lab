@@ -48,6 +48,7 @@ make medical-smoke
 | Binding 中存了 `token_budget`，但生成链路过去没有真正执行 | 代码审计发现策略值只被序列化；Go 直答和 Python LangGraph 又是两条独立生成链路 | 两条链路都在证据校验后按 Binding 最小预算打包 Context，最后一段可截断；返回 candidate/selected/estimated/truncated 并在对话页展示 | 单测覆盖 Go 与 LangGraph 超预算输入；`medical-smoke` 同时断言 5000/4500 两个应用预算；Customer Agent v5 复跑仍为 90/90，P50 约 362ms |
 | 扫描 PDF 的文字能识别，但版面模型漏掉整行 | 同一合成扫描页首次 CER `0.3649`；逐 Block 对照发现混合字号和不均匀行距使 PP-DocLayout-S 丢失处理行，不是回答 Prompt 问题 | 固定 OCR 模型，只调整受控测试页的字号与行距；关键字段、整页 CER 和 Block 顺序同时做 Golden 校验 | 稳定版面恢复 5/5 Block，CER `0`，平均 confidence `0.977630`；也证明 confidence 不能单独充当正确性 Oracle |
 | 小 Chunk 看似更精细，却切断完整操作单元 | 在同一真实 Parser 产物上导出两组无索引 Artifact；`400/100` 的长步骤 Case 未被单一 Chunk 完整包含 | 固定 OCR/Cleaner，只把 Chunk 候选改为 `700/80`，由独立评测平台执行同 Snapshot 对比 | Development `3/4 → 4/4`，Answer Span `0.75 → 1.00`，Embedding 放大 `1.0734 → 1.0299`；仅代表这 4 条开发集，不替代 Holdout/Regression |
+| 正确文档排第 1，却没有一个 Chunk 能支持完整回答 | 真实 Qwen+Milvus+Rerank 中两组 Hit@5/MRR 都是 1.0，传统文档级指标形成假阳性 | 新增临时 Retrieval Sandbox 和单 Chunk Evidence Span 硬门禁；同时把随语料膨胀的全量 Rerank 候选限制为 Top 20 | Evidence Span `0 → 1.0`，修复长步骤 Case 且无回退；临时 Collection 全部清理，viewer 403，生产索引零修改 |
 
 ### 当前已验证参数
 
@@ -79,7 +80,7 @@ make medical-smoke               # 登录、跨租户、检索、问答、澄清
 
 复杂 PDF、DOCX、XLSX 不再只转成纯文本：当前 Document IR v4 会把页码、标题路径、工作表、单元格范围、bbox、解析质量和 Cleaner 删除审计贯穿到 Chunk、持久化 IR 与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
 
-扫描 PDF 现在可通过可选的 PaddleOCR PP-StructureV3 Worker 进入同一 Document IR；受鉴权的无索引 Artifact 接口允许独立评测平台比较 OCR、Cleaner 与 Chunk，同时保证实验文件不写入 MinIO、PostgreSQL 或 Milvus。真实 OCR 版面 Bad Case、`400/100 → 700/80` 单变量实验和运行边界见 [扫描文档 OCR、洗料与 Chunk/Overlap 调参实验](docs/ocr-cleaning-chunk-tuning.md)。
+扫描 PDF 现在可通过可选的 PaddleOCR PP-StructureV3 Worker 进入同一 Document IR；受鉴权的无索引 Artifact 接口允许独立评测平台比较 OCR、Cleaner 与 Chunk，同时保证实验文件不写入 MinIO、PostgreSQL 或 Milvus。评测平台还可调用管理员专用 Retrieval Sandbox：服务端为 A/B chunks 建立随机临时 Collection，执行当前真实 Embedding、Milvus Hybrid 与 strict Rerank，返回 Rank Trace 后强制清理。真实 OCR 版面 Bad Case、`400/100 → 700/80` 单变量实验和运行边界见 [扫描文档 OCR、洗料与 Chunk/Overlap 调参实验](docs/ocr-cleaning-chunk-tuning.md)，Sandbox 契约见 [隔离 Retrieval Sandbox](docs/retrieval-sandbox-quality-loop.md)。
 
 管理员可以在医疗页面上传真实格式文件，并查看从 MinIO 原件、Document IR、Qwen Embedding、Milvus 写入验证到最终可检索的七阶段持久化状态；权限边界、接口和复现步骤见 [真实文档上传与知识状态工作台](docs/document-ingestion-workbench.md)。
 

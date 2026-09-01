@@ -22,6 +22,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/knowledgegateway"
 	"github.com/dingpuyu/rag-evolution-lab/internal/querytrace"
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
+	"github.com/dingpuyu/rag-evolution-lab/internal/retrievallab"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -51,6 +52,7 @@ type EnterpriseOptions struct {
 	DocumentParser      *documentparser.Client
 	DocumentStore       documentstore.Store
 	Reranker            knowledgegateway.HitReranker
+	RetrievalSandbox    *retrievallab.Service
 }
 
 type authAPI struct {

@@ -37,6 +37,7 @@ import (
 	"github.com/dingpuyu/rag-evolution-lab/internal/ratelimit"
 	"github.com/dingpuyu/rag-evolution-lab/internal/rerank"
 	"github.com/dingpuyu/rag-evolution-lab/internal/retrieval"
+	"github.com/dingpuyu/rag-evolution-lab/internal/retrievallab"
 	"github.com/dingpuyu/rag-evolution-lab/internal/runtimeharness"
 	"github.com/dingpuyu/rag-evolution-lab/internal/scalebench"
 	"github.com/dingpuyu/rag-evolution-lab/internal/searchharness"
@@ -531,6 +532,22 @@ func runLabServer(args []string) {
 	default:
 		fatal(fmt.Errorf("unknown rerank backend %q", *rerankBackend))
 	}
+	sandboxReranker := gatewayReranker
+	if backend := strings.ToLower(strings.TrimSpace(*rerankBackend)); backend == "qwen" || backend == "qwen3-rerank" {
+		// Production retrieval may deliberately fall back to a deterministic
+		// reranker. Experiments are stricter: provider failure must be visible,
+		// otherwise a report could claim Qwen results that never ran.
+		sandboxReranker, err = knowledgegateway.NewQwenReranker(knowledgegateway.QwenRerankerConfig{
+			URL: *rerankURL, APIKey: *rerankAPIKey, Model: *rerankModel, StrictMode: true,
+		})
+		if err != nil {
+			fatal(err)
+		}
+	}
+	retrievalSandbox, err := retrievallab.New(milvusClient, embedder, sandboxReranker)
+	if err != nil {
+		fatal(err)
+	}
 	scaleGenerator, err := scalebench.NewGenerator(scalebench.DatasetConfig{
 		Chunks: 100_000, Dimensions: 1024, Topics: 1_000, Tenants: 100,
 		Seed: 20260723, Profile: scalebench.ProfileHardV2,
@@ -645,7 +662,7 @@ func runLabServer(args []string) {
 		Tracer: gatewayTracer, Cost: gatewayCost, Limiter: gatewayLimiter,
 		Generator:      generationGenerator,
 		DocumentParser: documentParser, DocumentStore: documentArchive,
-		Reranker: gatewayReranker,
+		Reranker: gatewayReranker, RetrievalSandbox: retrievalSandbox,
 	}, lifecycleService)
 	if err != nil {
 		fatal(err)
