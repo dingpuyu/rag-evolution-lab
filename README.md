@@ -49,6 +49,7 @@ make medical-smoke
 | 扫描 PDF 的文字能识别，但版面模型漏掉整行 | 同一合成扫描页首次 CER `0.3649`；逐 Block 对照发现混合字号和不均匀行距使 PP-DocLayout-S 丢失处理行，不是回答 Prompt 问题 | 固定 OCR 模型，只调整受控测试页的字号与行距；关键字段、整页 CER 和 Block 顺序同时做 Golden 校验 | 稳定版面恢复 5/5 Block，CER `0`，平均 confidence `0.977630`；也证明 confidence 不能单独充当正确性 Oracle |
 | 小 Chunk 看似更精细，却切断完整操作单元 | 在同一真实 Parser 产物上导出两组无索引 Artifact；`400/100` 的长步骤 Case 未被单一 Chunk 完整包含 | 固定 OCR/Cleaner，只把 Chunk 候选改为 `700/80`，由独立评测平台执行同 Snapshot 对比 | Development `3/4 → 4/4`，Answer Span `0.75 → 1.00`，Embedding 放大 `1.0734 → 1.0299`；仅代表这 4 条开发集，不替代 Holdout/Regression |
 | 正确文档排第 1，却没有一个 Chunk 能支持完整回答 | 真实 Qwen+Milvus+Rerank 中两组 Hit@5/MRR 都是 1.0，传统文档级指标形成假阳性 | 新增临时 Retrieval Sandbox 和单 Chunk Evidence Span 硬门禁；同时把随语料膨胀的全量 Rerank 候选限制为 Top 20 | Evidence Span `0 → 1.0`，修复长步骤 Case 且无回退；临时 Collection 全部清理，viewer 403，生产索引零修改 |
+| XLSX Parser 明明保留了 Sheet/Cell Range，检索引用却只剩文档名 | 沿 Document IR → Artifact → Chunk → 临时 Milvus 逐层检查，定位到无索引 Artifact DTO 只复制 `source_page`，结构化来源在实验入口被截断 | Artifact Block/Chunk、Retrieval Sandbox 和评测 Trace 全链路传递 Page、Sheet、Cell Range、Heading Path；错误单元格引用设为硬失败 | 真实 `text-embedding-v4 → Milvus → qwen3-rerank` 复跑 4/4，`retrieval_source_locator_accuracy=1.0`；故意把 `A1:C1,A3:C3` 改成 `A1:C1,A2:C2` 时门禁变为 HOLD |
 
 ### 当前已验证参数
 

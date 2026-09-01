@@ -22,7 +22,8 @@ func TestDocumentQualityArtifactIsAuditableAndDoesNotIndex(t *testing.T) {
 		Quality: documentparser.ParseQuality{Parser: "paddle-ppstructurev3", ParserVersion: "3.7.0", OCRUsed: true},
 		Blocks: []documentparser.Block{{
 			BlockType: "paragraph", Text: "BAT-LOW-021 处理：连接交流电源并检查电池状态", Confidence: &confidence,
-			Provenance: documentparser.Provenance{SourceFile: "manual.pdf", Page: 2},
+			HeadingPath: []string{"维护手册", "故障处理"},
+			Provenance:  documentparser.Provenance{SourceFile: "manual.pdf", Page: 2, Sheet: "兼容矩阵", CellRange: "A1:C1,A3:C3"},
 		}},
 		CleaningRemovals: []documentparser.CleaningRemoval{{
 			Reason: "repeated_margin", Block: documentparser.Block{BlockType: "paragraph", Text: "PulseCare Medical Devices", Provenance: documentparser.Provenance{Page: 2}},
@@ -37,6 +38,10 @@ func TestDocumentQualityArtifactIsAuditableAndDoesNotIndex(t *testing.T) {
 	}
 	if len(artifact.Chunks) != 1 || artifact.Chunks[0].SourcePage != 2 || !strings.Contains(artifact.Chunks[0].Content, "BAT-LOW-021") {
 		t.Fatalf("chunk provenance missing: %#v", artifact.Chunks)
+	}
+	if artifact.Chunks[0].SourceSheet != "兼容矩阵" || artifact.Chunks[0].SourceCellRange != "A1:C1,A3:C3" ||
+		len(artifact.Chunks[0].HeadingPath) != 2 || artifact.Blocks[0].SourceSheet != "兼容矩阵" {
+		t.Fatalf("structured locator provenance missing: chunks=%#v blocks=%#v", artifact.Chunks, artifact.Blocks)
 	}
 	if len(artifact.Retrieval) != 0 {
 		t.Fatalf("no-index artifact unexpectedly contains retrieval output: %#v", artifact.Retrieval)

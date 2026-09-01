@@ -20,11 +20,13 @@ import (
 var documentQualityCaseID = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,199}$`)
 
 type documentQualityArtifactBlock struct {
-	BlockType   string   `json:"block_type"`
-	Text        string   `json:"text"`
-	Page        int      `json:"page,omitempty"`
-	HeadingPath []string `json:"heading_path,omitempty"`
-	Confidence  *float64 `json:"confidence,omitempty"`
+	BlockType       string   `json:"block_type"`
+	Text            string   `json:"text"`
+	Page            int      `json:"page,omitempty"`
+	SourceSheet     string   `json:"source_sheet,omitempty"`
+	SourceCellRange string   `json:"source_cell_range,omitempty"`
+	HeadingPath     []string `json:"heading_path,omitempty"`
+	Confidence      *float64 `json:"confidence,omitempty"`
 }
 
 type documentQualityRemovedBlock struct {
@@ -33,11 +35,14 @@ type documentQualityRemovedBlock struct {
 }
 
 type documentQualityArtifactChunk struct {
-	ChunkID       string `json:"chunk_id"`
-	ParentID      string `json:"parent_id"`
-	Content       string `json:"content"`
-	ParentContent string `json:"parent_content,omitempty"`
-	SourcePage    int    `json:"source_page,omitempty"`
+	ChunkID         string   `json:"chunk_id"`
+	ParentID        string   `json:"parent_id"`
+	Content         string   `json:"content"`
+	ParentContent   string   `json:"parent_content,omitempty"`
+	SourcePage      int      `json:"source_page,omitempty"`
+	SourceSheet     string   `json:"source_sheet,omitempty"`
+	SourceCellRange string   `json:"source_cell_range,omitempty"`
+	HeadingPath     []string `json:"heading_path,omitempty"`
 }
 
 type documentQualityArtifact struct {
@@ -172,6 +177,8 @@ func buildDocumentQualityArtifact(caseID string, maxRunes, overlapRunes int, doc
 		artifact.Chunks = append(artifact.Chunks, documentQualityArtifactChunk{
 			ChunkID: chunk.ID, ParentID: chunk.ParentID, Content: chunk.Content,
 			ParentContent: chunk.ParentContent, SourcePage: chunk.SourcePage,
+			SourceSheet: chunk.SourceSheet, SourceCellRange: chunk.SourceCellRange,
+			HeadingPath: append([]string(nil), chunk.HeadingPath...),
 		})
 	}
 	return artifact
@@ -180,6 +187,7 @@ func buildDocumentQualityArtifact(caseID string, maxRunes, overlapRunes int, doc
 func qualityArtifactBlock(block documentparser.Block) documentQualityArtifactBlock {
 	return documentQualityArtifactBlock{
 		BlockType: block.BlockType, Text: block.Text, Page: block.Provenance.Page,
+		SourceSheet: block.Provenance.Sheet, SourceCellRange: block.Provenance.CellRange,
 		HeadingPath: append([]string(nil), block.HeadingPath...), Confidence: block.Confidence,
 	}
 }

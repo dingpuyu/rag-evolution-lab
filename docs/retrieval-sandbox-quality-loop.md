@@ -48,6 +48,8 @@ trusted identity + bounded chunks/queries
 
 第一轮还发现 Rerank Candidate 误随 Chunk 总量增长到 33/34。收敛到 Top 20 后，所有质量指标保持不回退；网络延迟只作为软指标观察，不能用单次调用包装成稳定性能结论。
 
+第二轮检查引用定位时发现：XLSX Parser 的 Document IR 已保留 `sheet=兼容矩阵` 和 `cell_range=A1:C1,A3:C3`，但无索引 Artifact DTO 只复制了页码，导致来源信息在进入 Sandbox 前丢失。现在 Block、Chunk、Milvus Record、Search Hit 与持久化 Rank Trace 都传递 Page、Sheet、Cell Range 和 Heading Path。评测平台新增 `retrieval_source_locator_accuracy` 硬门禁；冻结数据集 `v1.3.0` 的真实实验 `docqexp_6208de8661b64bf3a75d6f0efe6f4819` 为 `1.0`，单测注入错误行号后正确进入 HOLD。
+
 ## 运维与排障
 
 实验完成后可确认没有残留：
@@ -65,5 +67,5 @@ curl -sS -X POST http://127.0.0.1:19530/v2/vectordb/collections/list \
 
 1. 由评测平台冻结 Candidate，执行一次性 Holdout。
 2. 加入 Regression 发布门禁，继续保持评测平台不直接发布生产。
-3. 为 PDF 与 XLSX 分别增加 Page、Sheet、Cell Range 引用正确性。
+3. 已完成 PDF Page 与 XLSX Sheet/Cell Range/Heading Path 引用正确性硬门禁；下一步扩大到跨页表格和合并单元格。
 4. 增加临时 Collection TTL/启动回收，覆盖宿主机崩溃场景。
