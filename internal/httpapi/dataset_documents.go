@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/dingpuyu/rag-evolution-lab/internal/datasetaccess"
 	"github.com/dingpuyu/rag-evolution-lab/internal/documentparser"
@@ -267,17 +268,18 @@ func (api *DatasetAPI) uploadDocument(writer http.ResponseWriter, request *http.
 			"source_type": metadata.SourceType, "source_urls": metadata.SourceURLs, "collected_at": metadata.CollectedAt,
 			"source_review_status": metadata.SourceReviewStatus, "source_reviewed_at": metadata.SourceReviewedAt,
 			"source_content_sha256": sourceHash, "document_ir_schema_version": documentIR.SchemaVersion,
-			"ingestion_metadata_sha256": metadataHash,
+			"ingestion_metadata_sha256": metadataHash, "parser_quality": documentIR.Quality,
 		}, Warnings: documentIR.Warnings, CreatedBy: identity.Subject,
 	}
-	if documentIR.Status == "ocr_required" {
+	if documentIR.Status != "ready" {
 		registryRecord.IndexStatus = "blocked"
-		registryRecord.LastError = "OCR is required before this revision can be indexed"
+		registryRecord.LastError = "document requires OCR or human quality review before this revision can be indexed"
 		if hasRegistry {
 			_ = registry.UpsertKnowledgeDocument(request.Context(), registryRecord)
 		}
 		writeJSON(writer, http.StatusUnprocessableEntity, map[string]any{
-			"status": "ocr_required", "source_uri": sourceURI, "warnings": documentIR.Warnings, "preview": previewIRBlocks(documentIR.Blocks, 20),
+			"status": documentIR.Status, "source_uri": sourceURI, "warnings": documentIR.Warnings,
+			"quality": documentIR.Quality, "preview": previewIRBlocks(documentIR.Blocks, 20),
 		})
 		return
 	}
@@ -473,11 +475,13 @@ func (api *DatasetAPI) previewDocument(writer http.ResponseWriter, request *http
 	chunks := (ingest.Chunker{MaxRunes: input.MaxRunes, OverlapRunes: input.OverlapRunes, PageAware: true}).Chunk(domain.Document{
 		ID: "preview", Title: input.Title, Content: input.Content,
 	})
-	parents := make(map[string]struct{}, len(chunks))
+	parents := make(map[string]string, len(chunks))
 	pages := make(map[int]struct{}, len(chunks))
 	previewChunks := make([]documentPreviewChunk, 0, len(chunks))
+	indexedRunes := 0
 	for _, chunk := range chunks {
-		parents[chunk.ParentID] = struct{}{}
+		parents[chunk.ParentID] = chunk.ParentContent
+		indexedRunes += utf8.RuneCountInString(chunk.Content)
 		if chunk.SourcePage > 0 {
 			pages[chunk.SourcePage] = struct{}{}
 		}
@@ -488,18 +492,30 @@ func (api *DatasetAPI) previewDocument(writer http.ResponseWriter, request *http
 			ParentContent: chunk.ParentContent,
 		})
 	}
+	parentRunes := 0
+	for _, content := range parents {
+		parentRunes += utf8.RuneCountInString(content)
+	}
+	embeddingAmplification := 1.0
+	if parentRunes > 0 {
+		embeddingAmplification = float64(indexedRunes) / float64(parentRunes)
+	}
 	pageList := make([]int, 0, len(pages))
 	for page := range pages {
 		pageList = append(pageList, page)
 	}
 	sort.Ints(pageList)
 	writeJSON(writer, http.StatusOK, map[string]any{
-		"chunker_version": "document-ir-provenance-v2",
-		"max_runes":       input.MaxRunes,
-		"overlap_runes":   input.OverlapRunes,
-		"parent_count":    len(parents),
-		"child_count":     len(previewChunks),
-		"pages":           pageList,
-		"chunks":          previewChunks,
+		"chunker_version":         "document-ir-provenance-v2",
+		"max_runes":               input.MaxRunes,
+		"overlap_runes":           input.OverlapRunes,
+		"overlap_ratio":           float64(input.OverlapRunes) / float64(input.MaxRunes),
+		"parent_count":            len(parents),
+		"child_count":             len(previewChunks),
+		"parent_runes":            parentRunes,
+		"indexed_runes":           indexedRunes,
+		"embedding_amplification": embeddingAmplification,
+		"pages":                   pageList,
+		"chunks":                  previewChunks,
 	})
 }

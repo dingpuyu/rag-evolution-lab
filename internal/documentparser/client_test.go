@@ -20,7 +20,7 @@ func TestClientParsesDocumentIRAndBuildsPageAwareMarkdown(t *testing.T) {
 		}
 		file.Close()
 		_ = json.NewEncoder(writer).Encode(DocumentIR{
-			SchemaVersion: "document-ir-v2", Status: "ready", SourceFile: "manual.pdf",
+			SchemaVersion: "document-ir-v3", Status: "ready", SourceFile: "manual.pdf",
 			Blocks: []Block{
 				{BlockType: "paragraph", Text: "SYS-NET-042", HeadingPath: []string{"错误码"}, Provenance: Provenance{Page: 7}},
 				{BlockType: "table", Text: "型号 | 版本", HeadingPath: []string{"兼容矩阵"}, Provenance: Provenance{Sheet: "设备矩阵", CellRange: "A1:D8"}},

@@ -17,6 +17,7 @@ import fitz
 from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 
+from .cleaning import clean_blocks
 from .models import DocumentBlock, DocumentIR, Provenance
 
 
@@ -49,7 +50,17 @@ def parse_document(filename: str, content: bytes, content_type: str = "") -> Doc
     if suffix == ".pdf" and not any(block.text.strip() for block in blocks):
         status = "ocr_required"
         warnings.append("PDF contains no extractable text; OCR is required before indexing")
-    return DocumentIR(status=status, source_file=safe_name, mime_type=mime, sha256=digest, blocks=blocks, warnings=warnings)
+    blocks, quality, cleaning_warnings = clean_blocks(blocks)
+    warnings.extend(cleaning_warnings)
+    return DocumentIR(
+        status=status,
+        source_file=safe_name,
+        mime_type=mime,
+        sha256=digest,
+        blocks=blocks,
+        warnings=warnings,
+        quality=quality,
+    )
 
 
 def parse_markdown(filename: str, text: str) -> list[DocumentBlock]:
@@ -125,6 +136,7 @@ def parse_pdf(filename: str, content: bytes) -> list[DocumentBlock]:
     headings: list[str] = []
     try:
         for page_number, page in enumerate(document, start=1):
+            page_width, page_height = float(page.rect.width), float(page.rect.height)
             table_boxes: list[fitz.Rect] = []
             candidates: list[tuple[float, float, str, object]] = []
             try:
@@ -135,7 +147,7 @@ def parse_pdf(filename: str, content: bytes) -> list[DocumentBlock]:
                     if value.strip(" |\n"):
                         bbox = fitz.Rect(table.bbox)
                         table_boxes.append(bbox)
-                        candidates.append((bbox.y0, bbox.x0, "table", value))
+                        candidates.append((bbox.y0, bbox.x0, "table", (value, bbox)))
             except Exception:
                 # Some PDFs do not expose table geometry; text extraction still
                 # provides a safe, page-addressable fallback.
@@ -153,26 +165,39 @@ def parse_pdf(filename: str, content: bytes) -> list[DocumentBlock]:
                     continue
                 max_size = max((float(span.get("size", 0)) for span in spans), default=0)
                 bold = any(int(span.get("flags", 0)) & 16 for span in spans)
-                candidates.append((bbox.y0, bbox.x0, "text", (value, max_size, bold)))
+                candidates.append((bbox.y0, bbox.x0, "text", (value, max_size, bold, bbox)))
 
             # PyMuPDF exposes text and tables through separate APIs. Sorting
             # them back into visual order is essential: otherwise every table
             # loses the section heading that gives its columns meaning.
             for _, _, kind, payload in sorted(candidates, key=lambda item: (item[0], item[1])):
                 if kind == "table":
+                    value, bbox = payload  # type: ignore[misc]
                     blocks.append(DocumentBlock(
-                        block_type="table", text=str(payload), heading_path=list(headings),
-                        provenance=Provenance(source_file=filename, page=page_number),
+                        block_type="table", text=str(value), heading_path=list(headings),
+                        provenance=Provenance(
+                            source_file=filename,
+                            page=page_number,
+                            bbox=(float(bbox.x0), float(bbox.y0), float(bbox.x1), float(bbox.y1)),
+                            page_width=page_width,
+                            page_height=page_height,
+                        ),
                     ))
                     continue
-                value, max_size, bold = payload  # type: ignore[misc]
+                value, max_size, bold, bbox = payload  # type: ignore[misc]
                 is_heading = len(value) <= 120 and (max_size >= 14 or bold)
                 if is_heading:
                     headings = [value]
                 blocks.append(DocumentBlock(
                     block_type="heading" if is_heading else "paragraph",
                     text=value, heading_path=list(headings),
-                    provenance=Provenance(source_file=filename, page=page_number),
+                    provenance=Provenance(
+                        source_file=filename,
+                        page=page_number,
+                        bbox=(float(bbox.x0), float(bbox.y0), float(bbox.x1), float(bbox.y1)),
+                        page_width=page_width,
+                        page_height=page_height,
+                    ),
                 ))
     finally:
         document.close()

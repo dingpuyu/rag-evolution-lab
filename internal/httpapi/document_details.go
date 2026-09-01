@@ -24,13 +24,15 @@ type documentPipelineStage struct {
 }
 
 type documentIRPreview struct {
-	SchemaVersion string                 `json:"schema_version,omitempty"`
-	Status        string                 `json:"status,omitempty"`
-	SourceFile    string                 `json:"source_file,omitempty"`
-	MIMEType      string                 `json:"mime_type,omitempty"`
-	SHA256        string                 `json:"sha256,omitempty"`
-	BlockCount    int                    `json:"block_count"`
-	Blocks        []documentparser.Block `json:"blocks"`
+	SchemaVersion string                      `json:"schema_version,omitempty"`
+	Status        string                      `json:"status,omitempty"`
+	SourceFile    string                      `json:"source_file,omitempty"`
+	MIMEType      string                      `json:"mime_type,omitempty"`
+	SHA256        string                      `json:"sha256,omitempty"`
+	BlockCount    int                         `json:"block_count"`
+	Blocks        []documentparser.Block      `json:"blocks"`
+	Warnings      []string                    `json:"warnings,omitempty"`
+	Quality       documentparser.ParseQuality `json:"quality"`
 }
 
 func canManageDatasetDocuments(dataset datasetaccess.Dataset, identity auth.Identity) bool {
@@ -118,7 +120,7 @@ func (api *DatasetAPI) documentDetail(writer http.ResponseWriter, request *http.
 			preview = documentIRPreview{
 				SchemaVersion: documentIR.SchemaVersion, Status: documentIR.Status, SourceFile: documentIR.SourceFile,
 				MIMEType: documentIR.MIMEType, SHA256: documentIR.SHA256, BlockCount: len(documentIR.Blocks),
-				Blocks: previewIRBlocks(documentIR.Blocks, previewLimit),
+				Blocks: previewIRBlocks(documentIR.Blocks, previewLimit), Warnings: documentIR.Warnings, Quality: documentIR.Quality,
 			}
 		}
 	}

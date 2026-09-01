@@ -1,10 +1,21 @@
 # 医疗设备公开语料检索准确率报告
 
-- 生成时间：2026-08-31T18:26:06.242329Z
+- 生成时间：2026-09-01T15:55:53.940744Z
 - 数据：39 份公开事实摘要，197 条 Golden Cases
 - 选定切分：350 字符，重叠 60 字符
 - 执行模式：确定性 CI：Hash Embedding + Heuristic Rerank
 - 发布门禁：**passed**
+
+## 参数指纹
+
+- 配置指纹：`sha256:1bbb55f588f6df42`
+- Chunk：`350/60`（最大字符/重叠字符）
+- CandidateTopN / TopK：`20/5`
+- Context：最多 `6` 个 Chunk，预算 `4000` estimated tokens
+- Evidence 阈值：`0.15`；文档级多样化：`False`
+- RRF k：`60`
+
+该指纹只包含非敏感参数，不包含 API Key。不同指纹的指标必须作为不同实验处理，不能覆盖或直接混算。
 
 ## 核心结果
 
@@ -45,3 +56,13 @@ Outcome Accuracy 同时要求：可回答问题召回正确文档；不可回答
 
 - `v0-keyword/acceptance` 失败：`public_acceptance_refuse_alarm_value`、`public_acceptance_refuse_diagnosis_treatment`、`public_acceptance_refuse_future_registration`、`public_acceptance_refuse_price_stock`、`public_acceptance_refuse_private_history`、`public_acceptance_refuse_safety_bypass`、`public_acceptance_refuse_shock_decision`、`public_acceptance_refuse_unknown`、`public_acceptance_refuse_ventilator_mode`
 - `v5-rerank/acceptance` 失败：`public_acceptance_refuse_alarm_value`、`public_acceptance_refuse_diagnosis_treatment`、`public_acceptance_refuse_future_registration`、`public_acceptance_refuse_price_stock`、`public_acceptance_refuse_private_history`、`public_acceptance_refuse_safety_bypass`、`public_acceptance_refuse_shock_decision`、`public_acceptance_refuse_unknown`、`public_acceptance_refuse_ventilator_mode`
+
+## Regression 排序诊断
+
+以下 Case 已召回正确文档，但首个正确结果未排在第 1；应优先检查文档级去重、对比问题和精确型号边界，而不是继续扩充语料。
+
+| Case | Reciprocal Rank | Route | Top 文档 |
+| --- | ---: | --- | --- |
+| `public_regression_a9_not_atlan` | 0.500 | `exact` | official-draeger-perseus-a500-2026 → official-mindray-anesthesia-a9-2026 → official-draeger-atlan-2026 |
+| `public_regression_m9_not_consona` | 0.500 | `semantic` | official-mindray-consona-n-2026 → official-mindray-ultrasound-m9-2026 |
+| `public_regression_neo_not_or` | 0.500 | `exact` | official-mindray-benevision-v-or-2026 → official-mindray-benevision-v-neo-2026 |

@@ -65,7 +65,7 @@
 
 ## 文档接入
 
-`POST /api/v1/datasets/{dataset_id}/documents/uploads` 接收 Markdown、HTML、PDF、DOCX 和 XLSX。服务端确定 Dataset 与权限，文件上限为 50 MiB。Parser 统一输出 `document-ir-v2`：
+`POST /api/v1/datasets/{dataset_id}/documents/uploads` 接收 Markdown、HTML、PDF、DOCX 和 XLSX。服务端确定 Dataset 与权限，文件上限为 50 MiB。Parser 当前统一输出 `document-ir-v3`：
 
 ```json
 {
@@ -81,7 +81,7 @@
 }
 ```
 
-页面会显示本次解析预览。页码、标题路径、工作表和单元格范围继续进入 Chunk、Milvus Hit 和最终 Citation。DOCX 按 XML 中的真实段落/表格顺序解析；XLSX 形成带表头语义的行级 Block；PDF 文本和表格按页面坐标重排。扫描 PDF 会标记 `ocr_required` 并阻止发布；OCR 不在本阶段范围。刷新页面后，管理员还可以从 MinIO 重新读取 Document IR，并查看原件、解析、切块、Embedding、Milvus、写后验证和可检索七阶段状态。完整设计与 Bad Case 见 [Document IR v2](medical-document-ir-v2.md)，工作台的接口和验收方式见 [真实文档上传与知识状态工作台](document-ingestion-workbench.md)。
+页面会显示本次解析预览。页码、标题路径、工作表和单元格范围继续进入 Chunk、Milvus Hit 和最终 Citation。DOCX 按 XML 中的真实段落/表格顺序解析；XLSX 形成带表头语义的行级 Block；PDF 文本和表格按页面坐标重排。扫描 PDF 可交给独立 PaddleOCR PP-StructureV3 Worker；未配置 OCR、没有识别结果或低置信度时会阻止发布。刷新页面后，管理员还可以从 MinIO 重新读取 Document IR，并查看原件、解析、切块、Embedding、Milvus、写后验证和可检索七阶段状态。完整设计与 Bad Case 见 [Document IR v3](medical-document-ir-v2.md)，工作台的接口和验收方式见 [真实文档上传与知识状态工作台](document-ingestion-workbench.md)。
 
 质量页还提供跨运行的 Bad Case 工作台。人工修订正确文档、设备上下文或来源定位后，旧验证会自动失效；单题复测通过才能晋升 `human_regression`，下一次完整评测自动执行。真实 XLSX 修复与面试讲法见 [Bad Case 人工修复闭环](medical-bad-case-loop.md)。
 

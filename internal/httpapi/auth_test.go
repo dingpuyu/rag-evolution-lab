@@ -244,7 +244,7 @@ func TestDatasetDocumentPreviewReturnsPageAndParentProvenance(t *testing.T) {
 		t.Fatalf("preview status=%d body=%s", response.Code, response.Body.String())
 	}
 	body := response.Body.String()
-	for _, fragment := range []string{`"chunker_version":"document-ir-provenance-v2"`, `"parent_count":2`, `"child_count":2`, `"source_page":4`, `"parent_id":"preview#p002"`} {
+	for _, fragment := range []string{`"chunker_version":"document-ir-provenance-v2"`, `"parent_count":2`, `"child_count":2`, `"overlap_ratio":0.1`, `"embedding_amplification":`, `"source_page":4`, `"parent_id":"preview#p002"`} {
 		if !strings.Contains(body, fragment) {
 			t.Fatalf("preview missing %s: %s", fragment, body)
 		}

@@ -10,6 +10,9 @@ class Provenance(BaseModel):
     page: int = 0
     sheet: str = ""
     cell_range: str = ""
+    bbox: tuple[float, float, float, float] | None = None
+    page_width: float = 0
+    page_height: float = 0
 
 
 class DocumentBlock(BaseModel):
@@ -17,16 +20,31 @@ class DocumentBlock(BaseModel):
     text: str
     heading_path: list[str] = Field(default_factory=list)
     provenance: Provenance
+    confidence: float | None = None
+
+
+class ParseQuality(BaseModel):
+    parser: str = "native"
+    parser_version: str = "document-parser-0.2"
+    ocr_used: bool = False
+    input_blocks: int = 0
+    output_blocks: int = 0
+    normalized_blocks: int = 0
+    repeated_margin_blocks_removed: int = 0
+    overlapping_duplicates_removed: int = 0
+    low_confidence_blocks: int = 0
+    mean_confidence: float | None = None
 
 
 class DocumentIR(BaseModel):
-    schema_version: str = "document-ir-v2"
-    status: Literal["ready", "ocr_required"] = "ready"
+    schema_version: str = "document-ir-v3"
+    status: Literal["ready", "ocr_required", "review_required"] = "ready"
     source_file: str
     mime_type: str
     sha256: str
     blocks: list[DocumentBlock] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
+    quality: ParseQuality = Field(default_factory=ParseQuality)
 
     @property
     def text(self) -> str:

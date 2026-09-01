@@ -46,6 +46,7 @@ make medical-smoke
 | 评测批任务遇到 429，被误判成检索质量失败 | 首轮平台评测 89/90，唯一失败是 `rate_limit_exceeded` | 不绕过生产限流；评测默认 90 RPM，只对 429 做有限指数退避，将运行故障与质量回归分类 | 同一套 Case 复跑 90/90 |
 | 重复 Bootstrap 仍发生解析、Embedding 和 Milvus 写入 | 发现历史失败 Job 污染本轮发布，且 `openpyxl` 每次改写 XLSX 修改时间导致 SHA 漂移 | Bootstrap 输出本批精确 Job ID；固定 Office Core Properties；用内容指纹和修订号实现幂等 | 66 个上传版本全部 completed，再次 Bootstrap 为 0 个待处理任务 |
 | Binding 中存了 `token_budget`，但生成链路过去没有真正执行 | 代码审计发现策略值只被序列化；Go 直答和 Python LangGraph 又是两条独立生成链路 | 两条链路都在证据校验后按 Binding 最小预算打包 Context，最后一段可截断；返回 candidate/selected/estimated/truncated 并在对话页展示 | 单测覆盖 Go 与 LangGraph 超预算输入；`medical-smoke` 同时断言 5000/4500 两个应用预算；Customer Agent v5 复跑仍为 90/90，P50 约 362ms |
+| 扫描 PDF 被阻止发布，但无法进入知识库 | 本地扫描 PDF 不含可提取文本；OCR confidence 也不能证明关键字段完全正确 | 独立 PaddleOCR PP-StructureV3 Worker，输出 bbox/页码/confidence；低置信度进入人工复核，Cleaner 处理重复页眉页脚和 OCR 噪声 | M1 Pro 实测扫描 AED 页恢复 5 个版面 Block，平均 confidence `0.989967`；同时发现“服务人员→服务员”的高置信度 Bad Case并保留为下一轮关键字段评测 |
 
 ### 当前已验证参数
 
@@ -75,7 +76,9 @@ make medical-bootstrap-plan      # 入库前依赖、指纹、修订和权限预
 make medical-smoke               # 登录、跨租户、检索、问答、澄清、拒答和引用回归
 ```
 
-复杂 PDF、DOCX、XLSX 不再只转成纯文本：Document IR v2 会把页码、标题路径、工作表和单元格范围贯穿到 Chunk、Milvus 引用与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
+复杂 PDF、DOCX、XLSX 不再只转成纯文本：当前 Document IR v3 会把页码、标题路径、工作表、单元格范围、bbox 和解析质量贯穿到 Chunk、持久化 IR 与 Golden Case，设计与问题复盘见 [医疗复杂文档解析与可验证引用](docs/medical-document-ir-v2.md)。
+
+扫描 PDF 现在可通过可选的 PaddleOCR PP-StructureV3 Worker 进入同一 Document IR；洗料规则、真实 OCR 探针、`350/60` 与 `700/80` 的适用边界、Overlap 成本放大和长说明书候选实验见 [扫描文档 OCR、洗料与 Chunk/Overlap 调参实验](docs/ocr-cleaning-chunk-tuning.md)。
 
 管理员可以在医疗页面上传真实格式文件，并查看从 MinIO 原件、Document IR、Qwen Embedding、Milvus 写入验证到最终可检索的七阶段持久化状态；权限边界、接口和复现步骤见 [真实文档上传与知识状态工作台](docs/document-ingestion-workbench.md)。
 

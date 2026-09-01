@@ -1,4 +1,4 @@
-# 医疗复杂文档解析与可验证引用：Document IR v2
+# 医疗复杂文档解析与可验证引用：Document IR v3
 
 ## 1. 这次解决的不是“支持上传”，而是“证据能否定位”
 
@@ -14,7 +14,7 @@
 
 ## 2. 统一证据契约
 
-Parser 输出 `document-ir-v2`：
+Parser 当前输出 `document-ir-v3`。v3 在原有结构与来源字段之上增加 bbox、页面尺寸、OCR confidence 和可审计洗料报告：
 
 ```json
 {
@@ -67,11 +67,11 @@ Agent 不自行拼装来源位置，只透传 Knowledge Gateway 返回的服务�
 - 标题上下文允许跨页延续。
 - 每个 Block 保留真实页码。
 
-扫描 PDF 仍标记为 `ocr_required`，不允许静默发布空索引。OCR 不在本阶段范围内。
+扫描 PDF 在未配置 OCR Worker 时仍标记为 `ocr_required`，不允许静默发布空索引。可选的 PaddleOCR PP-StructureV3 Worker 已通过 Document IR 适配器接入；低置信度结果进入 `review_required` 并阻止发布。真实探针和洗料策略见 [扫描文档 OCR、洗料与 Chunk/Overlap 调参实验](ocr-cleaning-chunk-tuning.md)。
 
 ## 4. 防止定位信息在 Chunk 阶段丢失
 
-Document IR v2 使用显式来源边界：
+Document IR v3 延续显式来源边界：
 
 ```text
 <!-- source: page=0; sheet=兼容矩阵; range=A1:E1,A4:E4 -->
@@ -88,7 +88,7 @@ Chunker 遇到页码、工作表或单元格范围变化时，必须先关闭前
 现在文档注册表保存：
 
 ```text
-metadata.document_ir_schema_version = document-ir-v2
+metadata.document_ir_schema_version = document-ir-v3
 metadata.ingestion_metadata_sha256 = <影响检索的元数据指纹>
 ```
 
@@ -119,7 +119,7 @@ Bootstrap 只有在以下条件同时满足时才跳过：
 
 1. **问题**：多格式文档转成纯文本后能搜到，但表格行、章节和页码会错，引用不可审计。
 2. **方案**：建立 Document IR，把文本、结构和 Provenance 一起传到 Milvus；XLSX 做表头感知的行级 Chunk，PDF 做坐标排序，DOCX 保持 XML 顺序。
-3. **工程权衡**：行级表格增加向量数量，但换来更低的型号串扰和精确引用；扫描 PDF 暂不 OCR，而是阻止不完整索引发布。
+3. **工程权衡**：行级表格增加向量数量，但换来更低的型号串扰和精确引用；扫描 PDF 通过独立 OCR Worker 接入，未配置或质量未过门禁时仍阻止发布。
 4. **验证**：除了 Hit@5/MRR，还用 Golden Case 断言页码、工作表、单元格范围和标题路径；Parser 版本变化会强制重建索引。
 
 这段经历的重点不是“调用了一个文档解析库”，而是识别并解决了 **解析正确性、索引一致性和引用可验证性** 三个生产问题。

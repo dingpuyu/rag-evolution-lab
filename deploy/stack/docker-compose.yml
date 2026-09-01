@@ -102,6 +102,10 @@ services:
       context: ../..
       dockerfile: services/document-parser/Dockerfile
     restart: unless-stopped
+    environment:
+      RAGLAB_OCR_BACKEND_URL: ${RAGLAB_OCR_BACKEND_URL:-}
+      RAGLAB_OCR_SHARED_SECRET: ${RAGLAB_OCR_SHARED_SECRET:-}
+      RAGLAB_OCR_TIMEOUT_SECONDS: ${RAGLAB_OCR_TIMEOUT_SECONDS:-300}
     ports:
       - "127.0.0.1:${RAGLAB_DOCUMENT_PARSER_PORT:-8070}:8070"
     healthcheck:
@@ -110,6 +114,41 @@ services:
       start_period: 20s
       timeout: 5s
       retries: 20
+
+  paddle-ocr:
+    profiles: ["ocr"]
+    build:
+      context: ../..
+      dockerfile: services/paddle-ocr-worker/Dockerfile
+      args:
+        DEBIAN_MIRROR: ${PADDLEOCR_DEBIAN_MIRROR:-deb.debian.org}
+    restart: unless-stopped
+    environment:
+      RAGLAB_OCR_SHARED_SECRET: ${RAGLAB_OCR_SHARED_SECRET:-}
+      PADDLE_PDX_MODEL_SOURCE: ${PADDLE_PDX_MODEL_SOURCE:-BOS}
+      PADDLEOCR_LAYOUT_MODEL: ${PADDLEOCR_LAYOUT_MODEL:-PP-DocLayout-S}
+      PADDLEOCR_TEXT_DET_MODEL: ${PADDLEOCR_TEXT_DET_MODEL:-PP-OCRv5_mobile_det}
+      PADDLEOCR_TEXT_REC_MODEL: ${PADDLEOCR_TEXT_REC_MODEL:-PP-OCRv5_mobile_rec}
+      PADDLEOCR_USE_ORIENTATION: ${PADDLEOCR_USE_ORIENTATION:-true}
+      PADDLEOCR_USE_UNWARPING: ${PADDLEOCR_USE_UNWARPING:-false}
+      PADDLEOCR_USE_TEXTLINE_ORIENTATION: ${PADDLEOCR_USE_TEXTLINE_ORIENTATION:-false}
+      PADDLEOCR_USE_TABLE: ${PADDLEOCR_USE_TABLE:-true}
+      PADDLEOCR_USE_SEAL: ${PADDLEOCR_USE_SEAL:-false}
+      PADDLEOCR_USE_FORMULA: ${PADDLEOCR_USE_FORMULA:-false}
+      PADDLEOCR_USE_CHART: ${PADDLEOCR_USE_CHART:-false}
+      PADDLEOCR_USE_REGION: ${PADDLEOCR_USE_REGION:-false}
+    volumes:
+      - raglab_stack_paddle_models:/root/.paddlex
+    expose:
+      - "8071"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8071/healthz')"]
+      interval: 15s
+      start_period: 30s
+      timeout: 5s
+      retries: 20
+    security_opt:
+      - no-new-privileges:true
 
   api:
     build:
@@ -260,4 +299,5 @@ volumes:
   raglab_stack_etcd_data:
   raglab_stack_minio_data:
   raglab_stack_milvus_data:
+  raglab_stack_paddle_models:
   raglab_stack_api_data:

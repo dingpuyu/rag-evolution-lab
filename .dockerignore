@@ -18,5 +18,9 @@ dist/
 coverage/
 tmp/
 **/node_modules/
+**/.venv/
+**/.pytest_cache/
+**/__pycache__/
+**/*.pyc
 web/.next/
 web/.vinext/

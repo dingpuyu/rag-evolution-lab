@@ -1,4 +1,4 @@
-.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-bootstrap medical-bootstrap-plan medical-smoke medical-source-audit medical-source-lock medical-public-build medical-dataset-audit medical-retrieval-eval medical-retrieval-local-qwen medical-retrieval-qwen ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
+.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-ocr-up medical-ocr-smoke medical-bootstrap medical-bootstrap-plan medical-smoke medical-source-audit medical-source-lock medical-public-build medical-dataset-audit medical-retrieval-eval medical-retrieval-local-qwen medical-retrieval-qwen ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
 DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then echo 'docker compose'; elif command -v docker-compose >/dev/null 2>&1; then echo 'docker-compose'; else echo 'docker compose'; fi)
 RAGLAB_ENV_FILE ?= .env
@@ -69,6 +69,12 @@ medical-compare:
 
 medical-up: stack-up
 	@echo "医疗设备销售顾问与运维 Agent: http://localhost:$${RAGLAB_WEB_PORT:-3000}/medical"
+
+medical-ocr-up:
+	RAGLAB_OCR_BACKEND_URL=http://paddle-ocr:8071 $(WITH_ENV) $(STACK_COMPOSE) --profile ocr up -d --build paddle-ocr parser api agent web
+
+medical-ocr-smoke:
+	cd services/document-parser && uv run python ../../scripts/ocr_smoke.py
 
 medical-bootstrap:
 	$(WITH_ENV) python3 scripts/medical_source_audit.py

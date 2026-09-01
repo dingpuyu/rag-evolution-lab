@@ -13,10 +13,13 @@ import (
 )
 
 type Provenance struct {
-	SourceFile string `json:"source_file"`
-	Page       int    `json:"page"`
-	Sheet      string `json:"sheet"`
-	CellRange  string `json:"cell_range"`
+	SourceFile string    `json:"source_file"`
+	Page       int       `json:"page"`
+	Sheet      string    `json:"sheet"`
+	CellRange  string    `json:"cell_range"`
+	BBox       []float64 `json:"bbox,omitempty"`
+	PageWidth  float64   `json:"page_width,omitempty"`
+	PageHeight float64   `json:"page_height,omitempty"`
 }
 
 type Block struct {
@@ -24,16 +27,31 @@ type Block struct {
 	Text        string     `json:"text"`
 	HeadingPath []string   `json:"heading_path"`
 	Provenance  Provenance `json:"provenance"`
+	Confidence  *float64   `json:"confidence,omitempty"`
+}
+
+type ParseQuality struct {
+	Parser                       string   `json:"parser"`
+	ParserVersion                string   `json:"parser_version"`
+	OCRUsed                      bool     `json:"ocr_used"`
+	InputBlocks                  int      `json:"input_blocks"`
+	OutputBlocks                 int      `json:"output_blocks"`
+	NormalizedBlocks             int      `json:"normalized_blocks"`
+	RepeatedMarginBlocksRemoved  int      `json:"repeated_margin_blocks_removed"`
+	OverlappingDuplicatesRemoved int      `json:"overlapping_duplicates_removed"`
+	LowConfidenceBlocks          int      `json:"low_confidence_blocks"`
+	MeanConfidence               *float64 `json:"mean_confidence,omitempty"`
 }
 
 type DocumentIR struct {
-	SchemaVersion string   `json:"schema_version"`
-	Status        string   `json:"status"`
-	SourceFile    string   `json:"source_file"`
-	MIMEType      string   `json:"mime_type"`
-	SHA256        string   `json:"sha256"`
-	Blocks        []Block  `json:"blocks"`
-	Warnings      []string `json:"warnings"`
+	SchemaVersion string       `json:"schema_version"`
+	Status        string       `json:"status"`
+	SourceFile    string       `json:"source_file"`
+	MIMEType      string       `json:"mime_type"`
+	SHA256        string       `json:"sha256"`
+	Blocks        []Block      `json:"blocks"`
+	Warnings      []string     `json:"warnings"`
+	Quality       ParseQuality `json:"quality"`
 }
 
 func (document DocumentIR) Markdown() string {

@@ -177,6 +177,19 @@ type DocumentDetail = {
     sha256?: string;
     block_count: number;
     blocks: IRBlock[];
+    warnings?: string[];
+    quality?: {
+      parser: string;
+      parser_version: string;
+      ocr_used: boolean;
+      input_blocks: number;
+      output_blocks: number;
+      normalized_blocks: number;
+      repeated_margin_blocks_removed: number;
+      overlapping_duplicates_removed: number;
+      low_confidence_blocks: number;
+      mean_confidence?: number;
+    };
   };
   preview_error?: string;
   searchable: boolean;
@@ -2377,6 +2390,12 @@ function DocumentPipeline({ detail }: { detail: DocumentDetail }) {
             {detail.document_ir.block_count} blocks ·{" "}
             {detail.document_ir.mime_type ||
               detail.revision.file_name.split(".").pop()}
+          </dd>
+          <dt>解析质量</dt>
+          <dd>
+            {detail.document_ir.quality?.parser || "native"} · {detail.document_ir.quality?.ocr_used ? "OCR" : "digital"}
+            {detail.document_ir.quality?.mean_confidence != null ? ` · confidence ${(detail.document_ir.quality.mean_confidence * 100).toFixed(1)}%` : ""}
+            {detail.document_ir.quality ? ` · 清洗 ${detail.document_ir.quality.normalized_blocks} / 移除 ${detail.document_ir.quality.repeated_margin_blocks_removed + detail.document_ir.quality.overlapping_duplicates_removed}` : ""}
           </dd>
         </dl>
         {(detail.revision.last_error || detail.preview_error) && (
