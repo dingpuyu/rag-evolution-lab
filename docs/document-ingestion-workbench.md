@@ -41,7 +41,7 @@ GET /api/v1/datasets/{dataset_id}/documents/detail
 |---|---|---|
 | PostgreSQL | 文档、修订、元数据、解析状态、Job ID | 可查询的业务事实与版本历史 |
 | Durable Ingestion Job | 当前阶段、失败阶段、尝试次数、结果 | Worker 重启后仍可定位失败 |
-| MinIO | 原始文件与当前 `document-ir-v3` | 页面刷新后仍能预览解析结果 |
+| MinIO | 原始文件与当前 `document-ir-v4` | 页面刷新后仍能预览解析结果及 Cleaner 删除审计 |
 | Milvus Catalog | 当前发布集合是否能看到该文档 | 避免“任务完成但实际搜不到” |
 
 只有 Worker 报告写入成功还不够。“可检索”阶段必须通过 Catalog 可见性检查；写后验证也单独展示，避免把排队完成误当成索引发布完成。

@@ -50,7 +50,7 @@ def parse_document(filename: str, content: bytes, content_type: str = "") -> Doc
     if suffix == ".pdf" and not any(block.text.strip() for block in blocks):
         status = "ocr_required"
         warnings.append("PDF contains no extractable text; OCR is required before indexing")
-    blocks, quality, cleaning_warnings = clean_blocks(blocks)
+    blocks, quality, cleaning_warnings, cleaning_removals = clean_blocks(blocks)
     warnings.extend(cleaning_warnings)
     return DocumentIR(
         status=status,
@@ -58,6 +58,7 @@ def parse_document(filename: str, content: bytes, content_type: str = "") -> Doc
         mime_type=mime,
         sha256=digest,
         blocks=blocks,
+        cleaning_removals=cleaning_removals,
         warnings=warnings,
         quality=quality,
     )

@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CORPUS = ROOT / "datasets/domains/medical-device/corpus"
 SALES_CORPUS = ROOT / "datasets/domains/medical-device-sales/corpus"
 GENERATED = ROOT / "data/medical/generated"
-DOCUMENT_IR_SCHEMA_VERSION = "document-ir-v3"
+DOCUMENT_IR_SCHEMA_VERSION = "document-ir-v4"
 INGESTION_METADATA_FIELDS = (
     "title", "version", "domain", "manufacturer", "product_family", "model_codes",
     "software_version_from", "software_version_to", "hardware_revision", "region", "language",

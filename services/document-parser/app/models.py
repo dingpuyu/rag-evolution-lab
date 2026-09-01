@@ -36,13 +36,21 @@ class ParseQuality(BaseModel):
     mean_confidence: float | None = None
 
 
+class CleaningRemoval(BaseModel):
+    """One deterministic cleaner decision retained for quality evaluation."""
+
+    reason: Literal["page_number", "repeated_margin", "overlapping_duplicate"]
+    block: DocumentBlock
+
+
 class DocumentIR(BaseModel):
-    schema_version: str = "document-ir-v3"
+    schema_version: str = "document-ir-v4"
     status: Literal["ready", "ocr_required", "review_required"] = "ready"
     source_file: str
     mime_type: str
     sha256: str
     blocks: list[DocumentBlock] = Field(default_factory=list)
+    cleaning_removals: list[CleaningRemoval] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     quality: ParseQuality = Field(default_factory=ParseQuality)
 

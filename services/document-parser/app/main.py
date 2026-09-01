@@ -29,7 +29,7 @@ def _ocr_client() -> PaddleOCRClient | None:
 async def healthz() -> dict[str, str]:
     return {
         "status": "ok",
-        "schema": "document-ir-v3",
+        "schema": "document-ir-v4",
         "ocr_backend": "configured" if _ocr_client() else "disabled",
     }
 

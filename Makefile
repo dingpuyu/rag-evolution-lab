@@ -1,4 +1,4 @@
-.PHONY: fmt test agent-test parser-test deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-ocr-up medical-ocr-smoke medical-bootstrap medical-bootstrap-plan medical-smoke medical-source-audit medical-source-lock medical-public-build medical-dataset-audit medical-retrieval-eval medical-retrieval-local-qwen medical-retrieval-qwen ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
+.PHONY: fmt test agent-test parser-test document-quality-export deploy-test deploy-init deploy-check deploy-up deploy-bootstrap deploy-verify deploy-status deploy-down validate validate-v4 medical-validate medical-eval medical-eval-all medical-compare medical-up medical-ocr-up medical-ocr-smoke medical-bootstrap medical-bootstrap-plan medical-smoke medical-source-audit medical-source-lock medical-public-build medical-dataset-audit medical-retrieval-eval medical-retrieval-local-qwen medical-retrieval-qwen ingest eval compare compare-metadata compare-routing compare-rerank eval-gate reliability-test dataset-eval dataset-eval-isolated answer-eval answer-eval-blind answer-eval-stream answer-eval-blind-stream answer-eval-blind-isolated enterprise-eval enterprise-eval-build serve-embedding milvus-up milvus-down milvus-status milvus-seed query-milvus eval-milvus compare-milvus postgres-up postgres-down postgres-status scale-10k scale-100k scale-bench serve-lab serve-lab-eval regression-smoke web-dev stack-up stack-smoke stack-down stack-status observability-up observability-down observability-status production-preflight
 
 DOCKER_COMPOSE ?= $(shell if docker compose version >/dev/null 2>&1; then echo 'docker compose'; elif command -v docker-compose >/dev/null 2>&1; then echo 'docker-compose'; else echo 'docker compose'; fi)
 RAGLAB_ENV_FILE ?= .env
@@ -18,6 +18,9 @@ agent-test:
 
 parser-test:
 	cd services/document-parser && uv run --extra test pytest
+
+document-quality-export:
+	$(WITH_ENV) sh -c 'cd services/document-parser && uv run python ../../scripts/export_document_quality_artifacts.py --output "$${OUTPUT:-../../../agent-evaluation/data/document-quality/artifacts-latest.json}" --max-runes "$${MAX_RUNES:-700}" --overlap-runes "$${OVERLAP_RUNES:-80}"'
 
 deploy-test:
 	python3 -m unittest discover -s scripts/tests -p 'test_deploy_init.py'

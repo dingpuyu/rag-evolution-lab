@@ -138,6 +138,7 @@ func newLabHandler(embeddingService *embeddinglab.Service, milvusService *milvus
 		mux.Handle("GET /api/v1/datasets/{dataset_id}/documents/diff", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.documentDiff)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.document)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents/preview", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.previewDocument)))
+		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents/evaluation-artifacts", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.documentQualityArtifact)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/documents/uploads", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.uploadDocument)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/search", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.search)))
 		mux.Handle("POST /api/v1/datasets/{dataset_id}/answer", authenticator.requireIdentity(http.HandlerFunc(datasetAPI.answer)))

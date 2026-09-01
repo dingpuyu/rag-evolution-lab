@@ -33,7 +33,7 @@ def test_cleaner_removes_repeated_margin_noise_and_page_numbers():
             _block(f"第 {page} 页的有效正文 SYS-NET-042", page, 160, 220),
         ])
 
-    cleaned, quality, warnings = clean_blocks(blocks)
+    cleaned, quality, warnings, removals = clean_blocks(blocks)
 
     assert [block.text for block in cleaned] == [
         "第 1 页的有效正文 SYS-NET-042",
@@ -41,16 +41,19 @@ def test_cleaner_removes_repeated_margin_noise_and_page_numbers():
         "第 3 页的有效正文 SYS-NET-042",
     ]
     assert quality.repeated_margin_blocks_removed == 6
+    assert {removal.reason for removal in removals} == {"page_number", "repeated_margin"}
+    assert {removal.block.text for removal in removals} >= {"PulseCare Medical Devices", "第 1 页"}
     assert any("header/footer" in warning for warning in warnings)
 
 
 def test_cleaner_reports_low_ocr_confidence_without_silent_deletion():
     blocks = [_block("BAT-LOW-021", 1, 120, 160, confidence=0.52)]
-    cleaned, quality, warnings = clean_blocks(blocks, parser="paddle-ppstructurev3", ocr_used=True)
+    cleaned, quality, warnings, removals = clean_blocks(blocks, parser="paddle-ppstructurev3", ocr_used=True)
     assert cleaned[0].text == "BAT-LOW-021"
     assert quality.low_confidence_blocks == 1
     assert quality.mean_confidence == 0.52
     assert "human review" in warnings[0]
+    assert removals == []
 
 
 def test_cleaner_only_deduplicates_exact_text_at_the_same_visual_position():
@@ -61,10 +64,11 @@ def test_cleaner_only_deduplicates_exact_text_at_the_same_visual_position():
         _block("同一型号说明 VSM-100", 2, 120, 160),
     ]
 
-    cleaned, quality, _ = clean_blocks(blocks)
+    cleaned, quality, _, removals = clean_blocks(blocks)
 
     assert len(cleaned) == 3
     assert quality.overlapping_duplicates_removed == 1
+    assert removals[0].reason == "overlapping_duplicate"
 
 
 def test_table_cleaning_preserves_rows_and_exact_identifiers():
@@ -74,6 +78,6 @@ def test_table_cleaning_preserves_rows_and_exact_identifiers():
         provenance=Provenance(source_file="manual.pdf", page=3),
     )
 
-    cleaned, _, _ = clean_blocks([table])
+    cleaned, _, _, _ = clean_blocks([table])
 
     assert cleaned[0].text == "型号 | 版本\nVSM-100 | 2.6\nBAT-LOW-021 | 保留"

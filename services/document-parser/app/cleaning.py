@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 import re
 
-from .models import DocumentBlock, ParseQuality
+from .models import CleaningRemoval, DocumentBlock, ParseQuality
 
 
 ZERO_WIDTH = re.compile(r"[\u200b\u200c\u200d\u2060\ufeff]")
@@ -19,7 +19,7 @@ def clean_blocks(
     parser_version: str = "document-parser-0.2",
     ocr_used: bool = False,
     low_confidence_threshold: float = 0.60,
-) -> tuple[list[DocumentBlock], ParseQuality, list[str]]:
+) -> tuple[list[DocumentBlock], ParseQuality, list[str], list[CleaningRemoval]]:
     """Clean layout blocks without destroying identifiers or provenance.
 
     The cleaner deliberately avoids broad Unicode compatibility conversion and
@@ -38,6 +38,10 @@ def clean_blocks(
         cleaned.append(block.model_copy(update={"text": value}))
 
     repeated_margin_indexes = _repeated_margin_indexes(cleaned)
+    removals = [
+        CleaningRemoval(reason=reason, block=cleaned[index])
+        for index, reason in sorted(repeated_margin_indexes.items())
+    ]
     without_margins = [block for index, block in enumerate(cleaned) if index not in repeated_margin_indexes]
 
     deduplicated: list[DocumentBlock] = []
@@ -45,6 +49,7 @@ def clean_blocks(
     for block in without_margins:
         if deduplicated and _same_overlapping_block(deduplicated[-1], block):
             overlapping_duplicates += 1
+            removals.append(CleaningRemoval(reason="overlapping_duplicate", block=block))
             continue
         deduplicated.append(block)
 
@@ -73,7 +78,7 @@ def clean_blocks(
         low_confidence_blocks=low_confidence,
         mean_confidence=mean_confidence,
     )
-    return deduplicated, quality, warnings
+    return deduplicated, quality, warnings, removals
 
 
 def normalize_text(value: str, *, preserve_lines: bool = False) -> str:
@@ -86,9 +91,9 @@ def normalize_text(value: str, *, preserve_lines: bool = False) -> str:
     return " ".join(line for line in lines if line).strip()
 
 
-def _repeated_margin_indexes(blocks: list[DocumentBlock]) -> set[int]:
+def _repeated_margin_indexes(blocks: list[DocumentBlock]) -> dict[int, str]:
     candidates: dict[str, list[tuple[int, int]]] = defaultdict(list)
-    remove: set[int] = set()
+    remove: dict[int, str] = {}
     for index, block in enumerate(blocks):
         provenance = block.provenance
         if provenance.page <= 0 or not _is_margin(block):
@@ -97,12 +102,12 @@ def _repeated_margin_indexes(blocks: list[DocumentBlock]) -> set[int]:
         if not key:
             continue
         if PAGE_NUMBER.fullmatch(key):
-            remove.add(index)
+            remove[index] = "page_number"
             continue
         candidates[key].append((index, provenance.page))
     for occurrences in candidates.values():
         if len({page for _, page in occurrences}) >= 3:
-            remove.update(index for index, _ in occurrences)
+            remove.update({index: "repeated_margin" for index, _ in occurrences})
     return remove
 
 

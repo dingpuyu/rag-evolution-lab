@@ -53,7 +53,7 @@ class PaddleOCRClient:
         for block in result.blocks:
             provenance = block.provenance.model_copy(update={"source_file": source_file})
             normalized.append(block.model_copy(update={"provenance": provenance}))
-        normalized, quality, warnings = clean_blocks(
+        normalized, quality, warnings, cleaning_removals = clean_blocks(
             normalized,
             parser=result.quality.parser or "paddle-ppstructurev3",
             parser_version=result.quality.parser_version or "unknown",
@@ -67,11 +67,16 @@ class PaddleOCRClient:
             status = "ready"
         return result.model_copy(
             update={
+                # The parser boundary owns the externally visible IR version.
+                # This also upgrades responses from an older compatible OCR
+                # worker after the v4 cleaner deletion audit has been applied.
+                "schema_version": "document-ir-v4",
                 "status": status,
                 "source_file": source_file,
                 "mime_type": content_type or "application/pdf",
                 "sha256": hashlib.sha256(content).hexdigest(),
                 "blocks": normalized,
+                "cleaning_removals": list(result.cleaning_removals) + cleaning_removals,
                 "warnings": list(result.warnings) + warnings,
                 "quality": quality,
             }

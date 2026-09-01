@@ -20,7 +20,7 @@ GET /api/v1/datasets/{dataset_id}/documents/diff
     &to_revision={positive_integer}
 ```
 
-服务端不会比较前端缓存或最终 Chunk，而是从 MinIO 读取两个持久化 Document IR（当前 schema 为 `document-ir-v3`），返回：
+服务端不会比较前端缓存或最终 Chunk，而是从 MinIO 读取两个持久化 Document IR（当前 schema 为 `document-ir-v4`），返回：
 
 - 标题、业务版本、文件名、内容指纹、解析状态和医疗适用范围的变化；
 - `added / removed / modified / unchanged` 结构块数量；

@@ -43,20 +43,33 @@ type ParseQuality struct {
 	MeanConfidence               *float64 `json:"mean_confidence,omitempty"`
 }
 
+type CleaningRemoval struct {
+	Reason string `json:"reason"`
+	Block  Block  `json:"block"`
+}
+
 type DocumentIR struct {
-	SchemaVersion string       `json:"schema_version"`
-	Status        string       `json:"status"`
-	SourceFile    string       `json:"source_file"`
-	MIMEType      string       `json:"mime_type"`
-	SHA256        string       `json:"sha256"`
-	Blocks        []Block      `json:"blocks"`
-	Warnings      []string     `json:"warnings"`
-	Quality       ParseQuality `json:"quality"`
+	SchemaVersion    string            `json:"schema_version"`
+	Status           string            `json:"status"`
+	SourceFile       string            `json:"source_file"`
+	MIMEType         string            `json:"mime_type"`
+	SHA256           string            `json:"sha256"`
+	Blocks           []Block           `json:"blocks"`
+	CleaningRemovals []CleaningRemoval `json:"cleaning_removals,omitempty"`
+	Warnings         []string          `json:"warnings"`
+	Quality          ParseQuality      `json:"quality"`
 }
 
 func (document DocumentIR) Markdown() string {
 	var output strings.Builder
 	var lastHeadingPath []string
+	onlyHeadings := len(document.Blocks) > 0
+	for _, block := range document.Blocks {
+		if block.BlockType != "heading" {
+			onlyHeadings = false
+			break
+		}
+	}
 	for _, block := range document.Blocks {
 		fmt.Fprintf(&output, "<!-- source: page=%d; sheet=%s; range=%s -->\n",
 			block.Provenance.Page, safeMarkerValue(block.Provenance.Sheet), safeMarkerValue(block.Provenance.CellRange))
@@ -83,7 +96,7 @@ func (document DocumentIR) Markdown() string {
 		// A heading block has already been represented by the structured
 		// heading path above. Writing its text again would pollute retrieval
 		// with duplicate titles and can produce artificial parent chunks.
-		if block.BlockType == "heading" && heading != "" {
+		if block.BlockType == "heading" && heading != "" && !onlyHeadings {
 			continue
 		}
 		output.WriteString(strings.TrimSpace(block.Text))

@@ -53,6 +53,7 @@ async def test_paddle_adapter_normalizes_worker_document_ir(monkeypatch):
     )
 
     assert result.status == "ready"
+    assert result.schema_version == "document-ir-v4"
     assert result.source_file == "customer-scan.pdf"
     assert result.blocks[0].text == "AED 设备故障排查"
     assert result.blocks[0].provenance.source_file == "customer-scan.pdf"

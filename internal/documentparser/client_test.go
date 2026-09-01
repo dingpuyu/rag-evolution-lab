@@ -20,7 +20,7 @@ func TestClientParsesDocumentIRAndBuildsPageAwareMarkdown(t *testing.T) {
 		}
 		file.Close()
 		_ = json.NewEncoder(writer).Encode(DocumentIR{
-			SchemaVersion: "document-ir-v3", Status: "ready", SourceFile: "manual.pdf",
+			SchemaVersion: "document-ir-v4", Status: "ready", SourceFile: "manual.pdf",
 			Blocks: []Block{
 				{BlockType: "paragraph", Text: "SYS-NET-042", HeadingPath: []string{"错误码"}, Provenance: Provenance{Page: 7}},
 				{BlockType: "table", Text: "型号 | 版本", HeadingPath: []string{"兼容矩阵"}, Provenance: Provenance{Sheet: "设备矩阵", CellRange: "A1:D8"}},
@@ -49,5 +49,17 @@ func TestMarkdownPreservesHierarchicalHeadingsWithoutDuplicateTitles(t *testing.
 	}
 	if strings.Count(markdown, "型号: VSM-100") != 1 {
 		t.Fatalf("table content missing or duplicated: %q", markdown)
+	}
+}
+
+func TestMarkdownKeepsContentWhenLayoutModelMarksEveryBlockAsHeading(t *testing.T) {
+	document := DocumentIR{Blocks: []Block{
+		{BlockType: "heading", Text: "VSM-100 网络配置说明", HeadingPath: []string{"VSM-100 网络配置说明"}, Provenance: Provenance{Page: 1}},
+		{BlockType: "heading", Text: "SYS-NET-042 请检查网络接口和网关配置", HeadingPath: []string{"SYS-NET-042 请检查网络接口和网关配置"}, Provenance: Provenance{Page: 2}},
+	}}
+	markdown := document.Markdown()
+	if !strings.Contains(markdown, "VSM-100 网络配置说明\n\nVSM-100 网络配置说明") ||
+		!strings.Contains(markdown, "SYS-NET-042 请检查网络接口和网关配置\n\nSYS-NET-042 请检查网络接口和网关配置") {
+		t.Fatalf("heading-only document lost retrievable content: %q", markdown)
 	}
 }

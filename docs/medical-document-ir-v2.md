@@ -1,4 +1,4 @@
-# 医疗复杂文档解析与可验证引用：Document IR v3
+# 医疗复杂文档解析与可验证引用：Document IR v4
 
 ## 1. 这次解决的不是“支持上传”，而是“证据能否定位”
 
@@ -10,11 +10,11 @@
 - Document IR 转为索引文本时，如果相邻页或不同行的定位信息没有形成分块边界，最终 Citation 的页码或单元格范围可能是错的。
 - 文件 SHA-256 没变不等于索引不需要重建；Parser 或 Chunker 升级后，旧索引必须能够识别并迁移。
 
-因此 v2 的目标是：**结构、定位和解析版本必须与文本一起贯穿 Parser → Chunk → Milvus → Knowledge Gateway → Agent Citation → Evaluation。**
+因此这一层的目标是：**结构、定位、清洗决策和解析版本必须与文本一起贯穿 Parser → Chunk → Milvus → Knowledge Gateway → Agent Citation → Evaluation。**
 
 ## 2. 统一证据契约
 
-Parser 当前输出 `document-ir-v3`。v3 在原有结构与来源字段之上增加 bbox、页面尺寸、OCR confidence 和可审计洗料报告：
+Parser 当前输出 `document-ir-v4`。v4 在原有结构与来源字段之上增加 bbox、页面尺寸、OCR confidence，以及逐 Block 的清洗删除审计：
 
 ```json
 {
@@ -29,6 +29,25 @@ Parser 当前输出 `document-ir-v3`。v3 在原有结构与来源字段之上�
   }
 }
 ```
+
+Cleaner 不再只报告“删了几块”，而是保留被删除 Block 的原文、页码、bbox 和确定性原因：
+
+```json
+{
+  "cleaning_removals": [
+    {
+      "reason": "repeated_margin",
+      "block": {
+        "block_type": "paragraph",
+        "text": "PulseCare Medical Devices",
+        "provenance": {"page": 2}
+      }
+    }
+  ]
+}
+```
+
+允许的原因目前只有 `page_number`、`repeated_margin` 和 `overlapping_duplicate`。这样评测平台能够检查“噪声是否删掉”和“业务正文是否被误删”，而不是把 Cleaner 当成黑盒。
 
 `A1:E1,A4:E4` 表示该证据同时依赖表头和第 4 行。只引用 `A4:E4` 会丢失列语义；引用 `A1:E4` 又会把无关的第 2、3 行错误包含进来。
 
@@ -71,7 +90,7 @@ Agent 不自行拼装来源位置，只透传 Knowledge Gateway 返回的服务�
 
 ## 4. 防止定位信息在 Chunk 阶段丢失
 
-Document IR v3 延续显式来源边界：
+Document IR v4 延续显式来源边界：
 
 ```text
 <!-- source: page=0; sheet=兼容矩阵; range=A1:E1,A4:E4 -->
@@ -88,7 +107,7 @@ Chunker 遇到页码、工作表或单元格范围变化时，必须先关闭前
 现在文档注册表保存：
 
 ```text
-metadata.document_ir_schema_version = document-ir-v3
+metadata.document_ir_schema_version = document-ir-v4
 metadata.ingestion_metadata_sha256 = <影响检索的元数据指纹>
 ```
 

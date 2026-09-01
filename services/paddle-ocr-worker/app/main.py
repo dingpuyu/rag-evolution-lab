@@ -84,12 +84,13 @@ async def parse(
     if not blocks:
         warnings.append("PP-StructureV3 returned no indexable blocks")
     return {
-        "schema_version": "document-ir-v3",
+        "schema_version": "document-ir-v4",
         "status": "ready" if blocks else "ocr_required",
         "source_file": filename,
         "mime_type": file.content_type or "application/octet-stream",
         "sha256": hashlib.sha256(content).hexdigest(),
         "blocks": blocks,
+        "cleaning_removals": [],
         "warnings": warnings,
         "quality": {
             "parser": "paddle-ppstructurev3",
