@@ -48,6 +48,9 @@ type documentQualityArtifactChunk struct {
 type documentQualityArtifact struct {
 	Schema            string                         `json:"schema"`
 	CaseID            string                         `json:"case_id"`
+	DocumentID        string                         `json:"document_id"`
+	SourceFile        string                         `json:"source_file"`
+	Metadata          documentQualityMetadata        `json:"metadata"`
 	DatasetID         string                         `json:"dataset_id,omitempty"`
 	Status            string                         `json:"status"`
 	Indexed           bool                           `json:"indexed"`
@@ -62,6 +65,16 @@ type documentQualityArtifact struct {
 		DurationMS float64 `json:"duration_ms"`
 	} `json:"runtime"`
 	DocumentIR documentparser.DocumentIR `json:"document_ir"`
+}
+
+type documentQualityMetadata struct {
+	ModelCodes          []string `json:"model_codes,omitempty"`
+	SoftwareVersionFrom string   `json:"software_version_from,omitempty"`
+	SoftwareVersionTo   string   `json:"software_version_to,omitempty"`
+	DocumentRevision    string   `json:"document_revision,omitempty"`
+	Supersedes          []string `json:"supersedes,omitempty"`
+	AffectedLots        []string `json:"affected_lots,omitempty"`
+	AuthorityLevel      string   `json:"authority_level,omitempty"`
 }
 
 // documentQualityArtifact parses and chunks an uploaded file for evaluation,
@@ -91,6 +104,21 @@ func (api *DatasetAPI) documentQualityArtifact(writer http.ResponseWriter, reque
 	if !documentQualityCaseID.MatchString(caseID) {
 		writeError(writer, http.StatusBadRequest, "invalid_case_id", "case_id must use 1-200 letters, digits, dot, underscore, colon or dash")
 		return
+	}
+	documentID := strings.TrimSpace(request.FormValue("document_id"))
+	if documentID == "" {
+		documentID = caseID
+	}
+	if !documentQualityCaseID.MatchString(documentID) {
+		writeError(writer, http.StatusBadRequest, "invalid_document_id", "document_id must use 1-200 letters, digits, dot, underscore, colon or dash")
+		return
+	}
+	metadata := documentQualityMetadata{}
+	if raw := strings.TrimSpace(request.FormValue("metadata")); raw != "" {
+		if len(raw) > 16<<10 || json.Unmarshal([]byte(raw), &metadata) != nil {
+			writeError(writer, http.StatusBadRequest, "invalid_document_metadata", "metadata must be a JSON object smaller than 16 KiB")
+			return
+		}
 	}
 	maxRunes, ok := parseDocumentQualityInteger(writer, request.FormValue("max_runes"), 700, 100, 2000, "max_runes")
 	if !ok {
@@ -126,7 +154,7 @@ func (api *DatasetAPI) documentQualityArtifact(writer http.ResponseWriter, reque
 		writeError(writer, http.StatusUnprocessableEntity, "document_parse_failed", err.Error())
 		return
 	}
-	artifact := buildDocumentQualityArtifact(caseID, maxRunes, overlapRunes, documentIR)
+	artifact := buildDocumentQualityArtifact(caseID, documentID, filename, metadata, maxRunes, overlapRunes, documentIR)
 	artifact.DatasetID = dataset.ID
 	artifact.Runtime.DurationMS = float64(time.Since(started).Microseconds()) / 1000
 	writeJSON(writer, http.StatusOK, artifact)
@@ -145,7 +173,7 @@ func parseDocumentQualityInteger(writer http.ResponseWriter, raw string, fallbac
 	return value, true
 }
 
-func buildDocumentQualityArtifact(caseID string, maxRunes, overlapRunes int, documentIR documentparser.DocumentIR) documentQualityArtifact {
+func buildDocumentQualityArtifact(caseID, documentID, sourceFile string, metadata documentQualityMetadata, maxRunes, overlapRunes int, documentIR documentparser.DocumentIR) documentQualityArtifact {
 	config, _ := json.Marshal(map[string]any{
 		"document_ir_schema": documentIR.SchemaVersion,
 		"parser":             documentIR.Quality.Parser,
@@ -156,7 +184,8 @@ func buildDocumentQualityArtifact(caseID string, maxRunes, overlapRunes int, doc
 	})
 	fingerprint := fmt.Sprintf("sha256:%x", sha256.Sum256(config))
 	artifact := documentQualityArtifact{
-		Schema: "agent-evaluation.document-quality.artifact.v1", CaseID: caseID,
+		Schema: "agent-evaluation.document-quality.artifact.v2", CaseID: caseID,
+		DocumentID: documentID, SourceFile: sourceFile, Metadata: metadata,
 		Status: documentIR.Status, Indexed: false, ConfigFingerprint: fingerprint,
 		Blocks: make([]documentQualityArtifactBlock, 0, len(documentIR.Blocks)),
 		Chunks: []documentQualityArtifactChunk{}, Retrieval: []any{}, DocumentIR: documentIR,
@@ -171,7 +200,7 @@ func buildDocumentQualityArtifact(caseID string, maxRunes, overlapRunes int, doc
 		})
 	}
 	chunks := (ingest.Chunker{MaxRunes: maxRunes, OverlapRunes: overlapRunes, PageAware: true}).Chunk(domain.Document{
-		ID: caseID, Title: documentIR.SourceFile, Content: documentIR.Markdown(),
+		ID: documentID, Title: documentIR.SourceFile, Content: documentIR.Markdown(),
 	})
 	for _, chunk := range chunks {
 		artifact.Chunks = append(artifact.Chunks, documentQualityArtifactChunk{

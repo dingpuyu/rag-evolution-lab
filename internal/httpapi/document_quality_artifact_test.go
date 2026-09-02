@@ -29,9 +29,17 @@ func TestDocumentQualityArtifactIsAuditableAndDoesNotIndex(t *testing.T) {
 			Reason: "repeated_margin", Block: documentparser.Block{BlockType: "paragraph", Text: "PulseCare Medical Devices", Provenance: documentparser.Provenance{Page: 2}},
 		}},
 	}
-	artifact := buildDocumentQualityArtifact("dev-aed-001", 500, 50, documentIR)
-	if artifact.Indexed || artifact.Schema != "agent-evaluation.document-quality.artifact.v1" || artifact.ConfigFingerprint == "" {
+	artifact := buildDocumentQualityArtifact("dev-aed-001", "synthetic-aed-r1", "aed.pdf", documentQualityMetadata{
+		ModelCodes: []string{"BeneHeart C2"}, DocumentRevision: "R1",
+	}, 500, 50, documentIR)
+	if artifact.Indexed || artifact.Schema != "agent-evaluation.document-quality.artifact.v2" || artifact.ConfigFingerprint == "" {
 		t.Fatalf("unexpected artifact identity: %#v", artifact)
+	}
+	if artifact.DocumentID != "synthetic-aed-r1" || artifact.SourceFile != "aed.pdf" {
+		t.Fatalf("stable document provenance missing: %#v", artifact)
+	}
+	if len(artifact.Metadata.ModelCodes) != 1 || artifact.Metadata.DocumentRevision != "R1" {
+		t.Fatalf("document scope metadata missing: %#v", artifact.Metadata)
 	}
 	if len(artifact.Cleaning.RemovedBlocks) != 1 || artifact.Cleaning.RemovedBlocks[0].Reason != "repeated_margin" {
 		t.Fatalf("cleaner audit missing: %#v", artifact.Cleaning)

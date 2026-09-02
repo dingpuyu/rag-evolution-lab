@@ -21,23 +21,62 @@ from docx import Document
 
 
 DEVELOPMENT_CASES = (
-    ("dev-ocr-aed-critical-001", "aed-scan.pdf", "application/pdf"),
-    ("dev-cleaning-margin-002", "vsm100-margins.pdf", "application/pdf"),
-    ("dev-table-version-003", "vsm-compatibility.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
-    ("dev-chunk-long-procedure-004", "long-procedure.md", "text/markdown"),
-    ("dev-ocr-degraded-fallback-005", "monitor-degraded-development.pdf", "application/pdf"),
+    ("dev-ocr-aed-critical-001", "synthetic-aed-troubleshooting-r1", "aed-scan.pdf", "application/pdf"),
+    ("dev-cleaning-margin-002", "synthetic-vsm100-operator-r1", "vsm100-margins.pdf", "application/pdf"),
+    ("dev-table-version-003", "synthetic-vsm-compatibility-r1", "vsm-compatibility.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+    ("dev-chunk-long-procedure-004", "synthetic-long-service-procedure-r1", "long-procedure.md", "text/markdown"),
+    ("dev-ocr-degraded-fallback-005", "synthetic-monitor-degraded-ocr-r1", "monitor-degraded-development.pdf", "application/pdf"),
+    ("dev-version-scope-filter-006", "synthetic-vsm460-network-r4", "vsm460-network-current.md", "text/markdown"),
+    ("dev-version-scope-filter-006", "synthetic-vsm460-network-r3", "vsm460-network-history.md", "text/markdown"),
+    ("dev-model-suffix-filter-007", "synthetic-vsm420-pro-power-r1", "vsm420-pro-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("dev-model-suffix-filter-007", "synthetic-vsm420-power-r1", "vsm420-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("dev-lot-scope-filter-008", "synthetic-c5-field-notice-r2", "c5-field-notice-current.html", "text/html"),
+    ("dev-lot-scope-filter-008", "synthetic-c5-field-notice-r1", "c5-field-notice-history.html", "text/html"),
 )
 
 HOLDOUT_CASES = (
-    ("holdout-rotated-manual-001", "pump-rotated.pdf", "application/pdf"),
-    ("holdout-low-dpi-review-002", "monitor-low-contrast.pdf", "application/pdf"),
-    ("holdout-docx-structure-003", "aed-maintenance.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("holdout-version-conflict-004", "synthetic-vsm450-network-r3", "vsm450-network-current.md", "text/markdown"),
+    ("holdout-version-conflict-004", "synthetic-vsm450-network-r2", "vsm450-network-history.md", "text/markdown"),
+    ("holdout-similar-model-005", "synthetic-vsm410-pro-power-r1", "vsm410-pro-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("holdout-similar-model-005", "synthetic-vsm410-power-r1", "vsm410-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r3", "c3-field-notice-current.html", "text/html"),
+    ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r1", "c3-field-notice-obsolete.html", "text/html"),
 )
+
+DOCUMENT_METADATA = {
+    "synthetic-aed-troubleshooting-r1": {"model_codes": ["BeneHeart C2"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-vsm100-operator-r1": {"model_codes": ["VSM-100"], "document_revision": "R1", "authority_level": "operator_manual"},
+    "synthetic-vsm-compatibility-r1": {"model_codes": ["VSM-100", "VSM-100 Pro"], "software_version_from": "2.6", "software_version_to": "2.6", "document_revision": "R1"},
+    "synthetic-long-service-procedure-r1": {"model_codes": ["VSM-300"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-monitor-degraded-ocr-r1": {"model_codes": ["BeneVision N12"], "document_revision": "R1"},
+    "synthetic-vsm450-network-r3": {"model_codes": ["VSM-450"], "software_version_from": "4.2", "software_version_to": "4.2", "document_revision": "R3", "supersedes": ["synthetic-vsm450-network-r2"], "authority_level": "current_service_manual"},
+    "synthetic-vsm450-network-r2": {"model_codes": ["VSM-450"], "software_version_from": "3.8", "software_version_to": "3.8", "document_revision": "R2", "authority_level": "superseded"},
+    "synthetic-vsm410-pro-power-r1": {"model_codes": ["VSM-410 Pro"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-vsm410-power-r1": {"model_codes": ["VSM-410"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-c3-field-notice-r3": {"model_codes": ["BeneHeart C3"], "document_revision": "R3", "supersedes": ["synthetic-c3-field-notice-r1"], "affected_lots": ["LOT-K2608"], "authority_level": "current_field_notice"},
+    "synthetic-c3-field-notice-r1": {"model_codes": ["BeneHeart C3"], "document_revision": "R1", "affected_lots": ["LOT-K2501"], "authority_level": "superseded"},
+    "synthetic-vsm460-network-r4": {"model_codes": ["VSM-460"], "software_version_from": "5.1", "software_version_to": "5.1", "document_revision": "R4", "supersedes": ["synthetic-vsm460-network-r3"], "authority_level": "current_service_manual"},
+    "synthetic-vsm460-network-r3": {"model_codes": ["VSM-460"], "software_version_from": "4.7", "software_version_to": "4.7", "document_revision": "R3", "authority_level": "superseded"},
+    "synthetic-vsm420-pro-power-r1": {"model_codes": ["VSM-420 Pro"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-vsm420-power-r1": {"model_codes": ["VSM-420"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-c5-field-notice-r2": {"model_codes": ["BeneHeart C5"], "document_revision": "R2", "supersedes": ["synthetic-c5-field-notice-r1"], "affected_lots": ["LOT-M2701"], "authority_level": "current_field_notice"},
+    "synthetic-c5-field-notice-r1": {"model_codes": ["BeneHeart C5"], "document_revision": "R1", "affected_lots": ["LOT-M2602"], "authority_level": "superseded"},
+}
 
 LONG_PROCEDURE = (
     "处理步骤：先断开 VSM-300 外部电源并记录 BAT-SVC-088，再确认备用电池已隔离；"
     "随后依次检查电池连接器、保险丝状态与电源管理板指示灯，禁止跳过绝缘检查；"
     "完成后恢复供电并观察十五分钟，确认错误码不再出现，最后把测量值、设备序列号、软件版本和复核人员写入服务记录。"
+)
+
+VSM450_CURRENT_PROCEDURE = (
+    "NET-LINK-204 当前处理流程：仅适用于 VSM-450 软件 4.2。先在维护界面导出网络诊断包并记录设备序列号、"
+    "网卡地址和告警时间，不得直接恢复出厂设置；随后核对有线接口指示灯、交换机端口 VLAN 与网关地址，"
+    "确认现场没有把 VSM-450 历史版本 3.8 的固定地址模板复制到 4.2。保持患者监护功能由备用设备接管后，"
+    "依次断开数据上传服务、刷新网络证书、重新加载 4.2 配置，再执行网关连通性和时间同步测试。若证书链"
+    "校验失败，只允许安装工单中批准的当前证书，不得回退到旧版共享证书。恢复连接后连续观察十五分钟，"
+    "确认 NET-LINK-204 不再出现，并分别验证中央站、归档服务器和远程维护通道。最后把诊断包哈希、变更前后"
+    "地址、软件版本 4.2、测试结果和复核人员写入服务记录；任一验证失败都必须恢复变更前配置并升级厂商支持。"
 )
 
 
@@ -202,6 +241,36 @@ def aed_maintenance_docx() -> bytes:
     return output.getvalue()
 
 
+def vsm450_network_current_markdown() -> bytes:
+    return f"# VSM-450 4.2 网络恢复流程\n\n{VSM450_CURRENT_PROCEDURE}\n".encode()
+
+
+def vsm450_network_history_markdown() -> bytes:
+    return (
+        "# VSM-450 3.8 历史网络说明\n\n"
+        "NET-LINK-204 历史处理流程：仅适用于 VSM-450 软件 3.8。该版本使用固定地址模板，"
+        "完成接口检查后重新导入 3.8 备份。此修订已被 4.2 网络恢复流程取代，不得用于软件 4.2。\n"
+    ).encode()
+
+
+def power_docx(model: str, document_revision: str, action: str) -> bytes:
+    document = Document()
+    document.add_heading(f"{model} 电源告警说明", level=1)
+    document.add_paragraph(f"文档修订：{document_revision}")
+    document.add_paragraph(f"型号：{model}")
+    document.add_paragraph(f"PWR-017 处理：{action}")
+    output = io.BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
+def field_notice_html(model: str, revision: str, status: str, lot: str, action: str) -> bytes:
+    return f"""<!doctype html><html lang=\"zh-CN\"><body>
+<h1>{model} 现场更正通知 Revision {revision}</h1>
+<p>状态：{status}</p><p>适用批次：{lot}</p><p>通知编号：C3-FSN-026</p>
+<h2>处理要求</h2><p>{action}</p></body></html>""".encode()
+
+
 def login(client: httpx.Client, api: str) -> str:
     response = client.post(
         f"{api}/api/v1/auth/login",
@@ -231,16 +300,25 @@ def main() -> None:
     with tempfile.TemporaryDirectory(prefix="raglab-document-quality-") as directory:
         root = Path(directory)
         development_sources = {
-            "dev-ocr-aed-critical-001": scanned_aed(font_file),
-            "dev-cleaning-margin-002": repeated_margin_pdf(font_file),
-            "dev-table-version-003": compatibility_xlsx(root / "vsm-compatibility.xlsx"),
-            "dev-chunk-long-procedure-004": long_procedure_markdown(),
-            "dev-ocr-degraded-fallback-005": degraded_monitor_development_scan(font_file),
+            ("dev-ocr-aed-critical-001", "synthetic-aed-troubleshooting-r1"): scanned_aed(font_file),
+            ("dev-cleaning-margin-002", "synthetic-vsm100-operator-r1"): repeated_margin_pdf(font_file),
+            ("dev-table-version-003", "synthetic-vsm-compatibility-r1"): compatibility_xlsx(root / "vsm-compatibility.xlsx"),
+            ("dev-chunk-long-procedure-004", "synthetic-long-service-procedure-r1"): long_procedure_markdown(),
+            ("dev-ocr-degraded-fallback-005", "synthetic-monitor-degraded-ocr-r1"): degraded_monitor_development_scan(font_file),
+            ("dev-version-scope-filter-006", "synthetic-vsm460-network-r4"): b"# VSM-460 5.1 Network Recovery\n\nVSM-460 software 5.1 NET-SYNC-311: export diagnostics, renew the current certificate, verify gateway and time sync, then observe for 15 minutes.\n",
+            ("dev-version-scope-filter-006", "synthetic-vsm460-network-r3"): b"# VSM-460 4.7 Historical Recovery\n\nVSM-460 software 4.7 NET-SYNC-311: import the fixed-address backup. Superseded by revision R4 and forbidden for software 5.1.\n",
+            ("dev-model-suffix-filter-007", "synthetic-vsm420-pro-power-r1"): power_docx("VSM-420 Pro", "R1", "保留增强电源日志并检查双路冗余输入。"),
+            ("dev-model-suffix-filter-007", "synthetic-vsm420-power-r1"): power_docx("VSM-420", "R1", "检查标准电源模块和单路输入。"),
+            ("dev-lot-scope-filter-008", "synthetic-c5-field-notice-r2"): field_notice_html("BeneHeart C5", "2", "current", "LOT-M2701", "Quarantine sales stock and install insulation kit C5-M27."),
+            ("dev-lot-scope-filter-008", "synthetic-c5-field-notice-r1"): field_notice_html("BeneHeart C5", "1", "superseded", "LOT-M2602", "Historical lot only; do not apply to LOT-M2701."),
         }
         holdout_sources = {
-            "holdout-rotated-manual-001": rotated_pump_scan(font_file),
-            "holdout-low-dpi-review-002": low_contrast_monitor_scan(font_file),
-            "holdout-docx-structure-003": aed_maintenance_docx(),
+            ("holdout-version-conflict-004", "synthetic-vsm450-network-r3"): vsm450_network_current_markdown(),
+            ("holdout-version-conflict-004", "synthetic-vsm450-network-r2"): vsm450_network_history_markdown(),
+            ("holdout-similar-model-005", "synthetic-vsm410-pro-power-r1"): power_docx("VSM-410 Pro", "R1", "保留增强电源模块日志并检查双路输入。"),
+            ("holdout-similar-model-005", "synthetic-vsm410-power-r1"): power_docx("VSM-410", "R1", "检查标准电源模块和单路输入。"),
+            ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r3"): field_notice_html("BeneHeart C3", "3", "当前有效", "LOT-K2608", "停止销售库存并由授权人员安装绝缘垫片套件 FSN-K26。"),
+            ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r1"): field_notice_html("BeneHeart C3", "1", "已被 Revision 3 取代", "LOT-K2501", "旧批次执行目视检查；不得用于 LOT-K2608。"),
         }
         cases = DEVELOPMENT_CASES if arguments.split == "development" else HOLDOUT_CASES
         sources = development_sources if arguments.split == "development" else holdout_sources
@@ -248,16 +326,18 @@ def main() -> None:
         with httpx.Client(timeout=420) as client:
             token = login(client, arguments.api.rstrip("/"))
             headers = {"Authorization": f"Bearer {token}"}
-            for case_id, filename, content_type in cases:
+            for case_id, document_id, filename, content_type in cases:
                 response = client.post(
                     f"{arguments.api.rstrip('/')}/api/v1/datasets/{arguments.dataset}/documents/evaluation-artifacts",
                     headers=headers,
                     data={
                         "case_id": case_id,
+                        "document_id": document_id,
+                        "metadata": json.dumps(DOCUMENT_METADATA.get(document_id, {}), ensure_ascii=False),
                         "max_runes": str(arguments.max_runes),
                         "overlap_runes": str(arguments.overlap_runes),
                     },
-                    files={"file": (filename, sources[case_id], content_type)},
+                    files={"file": (filename, sources[(case_id, document_id)], content_type)},
                 )
                 response.raise_for_status()
                 artifact = response.json()
@@ -270,14 +350,19 @@ def main() -> None:
             f"{item.get('document_ir', {}).get('quality', {}).get('parser_version', 'unknown')}"
             for item in artifacts
         })
-        pipeline_release = arguments.pipeline_release or f"document-ir-v4+chunker-v1+{'|'.join(observed_parsers)}"
+        # Release identity must be invariant across corpora. The previous
+        # implementation derived it from parsers observed in the current
+        # sample, so an OCR-heavy Development split and a native-format
+        # Holdout from the same deployment produced different fingerprints.
+        pipeline_release = arguments.pipeline_release or "document-ir-v4+chunker-v1+artifact-contract-v2+scope-filter-v1"
         output.write_text(json.dumps({
-            "schema": "agent-evaluation.document-quality.artifacts.v1",
+            "schema": "agent-evaluation.document-quality.artifacts.v2",
             "source": f"rag-evolution-lab authenticated no-index {arguments.split} preview",
             "config": {
                 "max_runes": arguments.max_runes,
                 "overlap_runes": arguments.overlap_runes,
                 "pipeline_release": pipeline_release,
+                "observed_parsers": observed_parsers,
             },
             "artifacts": artifacts,
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

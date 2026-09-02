@@ -442,6 +442,8 @@ RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
 
 项目提供固定版本的 Milvus Standalone 本地部署、Qwen3 真实向量写入、HNSW/COSINE 检索、Tenant/Role/Product/Status 标量过滤，并把原有内存 Vector Retriever 替换为完整 RAG Pipeline 中的 Milvus Retriever：
 
+Document Quality 的无索引评测端点现已输出 `artifact.v2`：同一 Case 可以包含多个稳定 `document_id`，并携带型号、软件版本、文档修订、替代关系、批次与权威级别。隔离检索除 Tenant/Role ACL 外，会对查询中显式出现的最长型号、版本和批次执行服务端 pre-ANN 过滤，并返回 `applied_scope` Trace；这用于解决相似型号和历史版本即使经 Rerank 仍污染 Top-K 的问题。
+
 ```bash
 make milvus-up
 make milvus-status

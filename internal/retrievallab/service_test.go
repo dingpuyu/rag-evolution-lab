@@ -90,3 +90,32 @@ func TestRunRejectsUnboundedOrIncompleteInput(t *testing.T) {
 		t.Fatalf("expected bounded input validation, got %v", err)
 	}
 }
+
+func TestExactScopeFilterPrefersLongestModelAndExplicitVersionAndLot(t *testing.T) {
+	filters, applied := exactScopeFilter(
+		"VSM-410 Pro 软件 4.2 批次 LOT-K2608 怎么处理？",
+		[]Chunk{
+			{ModelCodes: []string{"VSM-410"}, SoftwareVersionFrom: "3.8", SoftwareVersionTo: "3.8", AffectedLots: []string{"LOT-K2501"}},
+			{ModelCodes: []string{"VSM-410 Pro"}, SoftwareVersionFrom: "4.2", SoftwareVersionTo: "4.2", AffectedLots: []string{"LOT-K2608"}},
+		},
+	)
+	joined := strings.Join(filters, " and ")
+	if !strings.Contains(joined, `array_contains(model_codes, "VSM-410 Pro")`) || strings.Contains(joined, `array_contains(model_codes, "VSM-410")`) {
+		t.Fatalf("model suffix scope is unsafe: %s", joined)
+	}
+	if !strings.Contains(joined, `software_version_from == "4.2"`) || !strings.Contains(joined, `array_contains(affected_lots, "LOT-K2608")`) {
+		t.Fatalf("version/lot scope missing: %s", joined)
+	}
+	if strings.Join(applied, ",") != "model_code=VSM-410 Pro,software_version=4.2,affected_lot=LOT-K2608" {
+		t.Fatalf("unexpected scope trace: %#v", applied)
+	}
+}
+
+func TestExactScopeFilterRejectsPartialASCIIIdentifiers(t *testing.T) {
+	filters, applied := exactScopeFilter("VSM-420 软件 14.2，批次 LOT-K26081", []Chunk{
+		{ModelCodes: []string{"VSM-42"}, SoftwareVersionFrom: "4.2", AffectedLots: []string{"LOT-K2608"}},
+	})
+	if len(filters) != 0 || len(applied) != 0 {
+		t.Fatalf("partial identifiers must not become trusted scope filters: filters=%v applied=%v", filters, applied)
+	}
+}

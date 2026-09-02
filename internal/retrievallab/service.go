@@ -39,16 +39,23 @@ type Service struct {
 }
 
 type Chunk struct {
-	ChunkID         string   `json:"chunk_id"`
-	DocumentID      string   `json:"document_id"`
-	DatasetID       string   `json:"dataset_id,omitempty"`
-	Title           string   `json:"title,omitempty"`
-	Content         string   `json:"content"`
-	SourceFile      string   `json:"source_file,omitempty"`
-	SourcePage      int64    `json:"source_page,omitempty"`
-	SourceSheet     string   `json:"source_sheet,omitempty"`
-	SourceCellRange string   `json:"source_cell_range,omitempty"`
-	HeadingPath     []string `json:"heading_path,omitempty"`
+	ChunkID             string   `json:"chunk_id"`
+	DocumentID          string   `json:"document_id"`
+	DatasetID           string   `json:"dataset_id,omitempty"`
+	Title               string   `json:"title,omitempty"`
+	Content             string   `json:"content"`
+	SourceFile          string   `json:"source_file,omitempty"`
+	SourcePage          int64    `json:"source_page,omitempty"`
+	SourceSheet         string   `json:"source_sheet,omitempty"`
+	SourceCellRange     string   `json:"source_cell_range,omitempty"`
+	HeadingPath         []string `json:"heading_path,omitempty"`
+	ModelCodes          []string `json:"model_codes,omitempty"`
+	SoftwareVersionFrom string   `json:"software_version_from,omitempty"`
+	SoftwareVersionTo   string   `json:"software_version_to,omitempty"`
+	DocumentRevision    string   `json:"document_revision,omitempty"`
+	Supersedes          []string `json:"supersedes,omitempty"`
+	AffectedLots        []string `json:"affected_lots,omitempty"`
+	AuthorityLevel      string   `json:"authority_level,omitempty"`
 }
 
 type Query struct {
@@ -89,12 +96,13 @@ type Hit struct {
 }
 
 type QueryResult struct {
-	QueryID            string  `json:"query_id"`
-	Query              string  `json:"query"`
-	EmbeddingLatencyMS float64 `json:"embedding_latency_ms"`
-	SearchLatencyMS    float64 `json:"search_latency_ms"`
-	RerankLatencyMS    float64 `json:"rerank_latency_ms"`
-	Hits               []Hit   `json:"hits"`
+	QueryID            string   `json:"query_id"`
+	Query              string   `json:"query"`
+	EmbeddingLatencyMS float64  `json:"embedding_latency_ms"`
+	SearchLatencyMS    float64  `json:"search_latency_ms"`
+	RerankLatencyMS    float64  `json:"rerank_latency_ms"`
+	Hits               []Hit    `json:"hits"`
+	AppliedScope       []string `json:"applied_scope,omitempty"`
 }
 
 type RunResult struct {
@@ -181,7 +189,11 @@ func (service *Service) Run(ctx context.Context, identity Identity, input RunInp
 			AllowedTenants: []string{identity.TenantID}, AllowedRoles: []string{identity.Role},
 			Domain: "document-quality-evaluation", SourceFile: chunk.SourceFile, SourcePage: chunk.SourcePage,
 			SourceSheet: chunk.SourceSheet, SourceCellRange: chunk.SourceCellRange, HeadingPath: chunk.HeadingPath,
-			Status: "active", Visibility: "tenant", EmbeddingModel: service.embedder.Name(),
+			ModelCodes: append([]string(nil), chunk.ModelCodes...), SoftwareVersionFrom: chunk.SoftwareVersionFrom,
+			SoftwareVersionTo: chunk.SoftwareVersionTo, DocumentRevision: chunk.DocumentRevision,
+			Supersedes: append([]string(nil), chunk.Supersedes...), AffectedLots: append([]string(nil), chunk.AffectedLots...),
+			AuthorityLevel: chunk.AuthorityLevel,
+			Status:         "active", Visibility: "tenant", EmbeddingModel: service.embedder.Name(),
 			SourceRevision: 1, IndexedAt: service.now().UTC().Unix(), Embedding: vectors[index],
 		}
 	}
@@ -201,6 +213,7 @@ func (service *Service) Run(ctx context.Context, identity Identity, input RunInp
 	}
 	filter := fmt.Sprintf(`tenant_id == "%s" and visibility == "tenant" and array_contains(allowed_tenants, "%s") and array_contains(allowed_roles, "%s")`, escape(identity.TenantID), escape(identity.TenantID), escape(identity.Role))
 	for _, query := range input.Queries {
+		queryFilter, appliedScope := exactScopeFilter(query.Text, input.Chunks)
 		embedStarted := service.now()
 		vector, embedErr := service.embedder.EmbedQuery(ctx, query.Text)
 		if embedErr != nil {
@@ -209,7 +222,7 @@ func (service *Service) Run(ctx context.Context, identity Identity, input RunInp
 		embedLatency := service.now().Sub(embedStarted)
 		searchStarted := service.now()
 		hits, searchErr := service.client.HybridSearch(ctx, milvus.HybridSearchRequest{
-			Collection: collection, Vector: vector, QueryText: query.Text, Filter: filter,
+			Collection: collection, Vector: vector, QueryText: query.Text, Filter: strings.Join(append([]string{filter}, queryFilter...), " and "),
 			Limit: query.CandidateK, CandidateK: query.CandidateK, EF: 64, RRFK: 60,
 		})
 		if searchErr != nil {
@@ -230,7 +243,7 @@ func (service *Service) Run(ctx context.Context, identity Identity, input RunInp
 		if len(ranked) > query.TopK {
 			ranked = ranked[:query.TopK]
 		}
-		queryResult := QueryResult{QueryID: query.QueryID, Query: query.Text, EmbeddingLatencyMS: milliseconds(embedLatency), SearchLatencyMS: milliseconds(searchLatency), RerankLatencyMS: milliseconds(rerankLatency)}
+		queryResult := QueryResult{QueryID: query.QueryID, Query: query.Text, EmbeddingLatencyMS: milliseconds(embedLatency), SearchLatencyMS: milliseconds(searchLatency), RerankLatencyMS: milliseconds(rerankLatency), AppliedScope: appliedScope}
 		for index, hit := range ranked {
 			var score *float64
 			if hit.RerankScoreSet {
@@ -257,6 +270,79 @@ func (service *Service) Run(ctx context.Context, identity Identity, input RunInp
 	result.CleanupCompleted = true
 	result.TotalLatencyMS = milliseconds(service.now().Sub(totalStarted))
 	return result, nil
+}
+
+func exactScopeFilter(query string, chunks []Chunk) ([]string, []string) {
+	lowerQuery := strings.ToLower(query)
+	longestModel := ""
+	versions := make(map[string]struct{})
+	lots := make(map[string]struct{})
+	for _, chunk := range chunks {
+		for _, model := range chunk.ModelCodes {
+			if containsIdentifier(lowerQuery, model) && utf8.RuneCountInString(model) > utf8.RuneCountInString(longestModel) {
+				longestModel = model
+			}
+		}
+		for _, version := range []string{chunk.SoftwareVersionFrom, chunk.SoftwareVersionTo} {
+			if version != "" && containsIdentifier(lowerQuery, version) {
+				versions[version] = struct{}{}
+			}
+		}
+		for _, lot := range chunk.AffectedLots {
+			if containsIdentifier(lowerQuery, lot) {
+				lots[lot] = struct{}{}
+			}
+		}
+	}
+	filters := []string{}
+	applied := []string{}
+	if longestModel != "" {
+		filters = append(filters, `array_contains(model_codes, "`+escape(longestModel)+`")`)
+		applied = append(applied, "model_code="+longestModel)
+	}
+	if len(versions) == 1 {
+		for version := range versions {
+			filters = append(filters, `software_version_from == "`+escape(version)+`"`)
+			applied = append(applied, "software_version="+version)
+		}
+	}
+	if len(lots) == 1 {
+		for lot := range lots {
+			filters = append(filters, `array_contains(affected_lots, "`+escape(lot)+`")`)
+			applied = append(applied, "affected_lot="+lot)
+		}
+	}
+	return filters, applied
+}
+
+// containsIdentifier matches identifiers next to Chinese prose and punctuation,
+// while preventing partial ASCII matches such as VSM-42 in VSM-420 or 4.2 in
+// 14.2. All evaluation metadata is trusted index-time data; the query remains
+// untrusted and is never interpolated into a Milvus expression.
+func containsIdentifier(lowerQuery, identifier string) bool {
+	identifier = strings.ToLower(strings.TrimSpace(identifier))
+	if identifier == "" {
+		return false
+	}
+	for offset := 0; offset <= len(lowerQuery)-len(identifier); {
+		relative := strings.Index(lowerQuery[offset:], identifier)
+		if relative < 0 {
+			return false
+		}
+		start := offset + relative
+		end := start + len(identifier)
+		beforeOK := start == 0 || !isASCIIAlphaNumeric(lowerQuery[start-1])
+		afterOK := end == len(lowerQuery) || !isASCIIAlphaNumeric(lowerQuery[end])
+		if beforeOK && afterOK {
+			return true
+		}
+		offset = start + 1
+	}
+	return false
+}
+
+func isASCIIAlphaNumeric(value byte) bool {
+	return value >= '0' && value <= '9' || value >= 'a' && value <= 'z' || value >= 'A' && value <= 'Z'
 }
 
 func validate(identity Identity, input *RunInput) error {
