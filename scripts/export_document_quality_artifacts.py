@@ -35,12 +35,14 @@ DEVELOPMENT_CASES = (
 )
 
 HOLDOUT_CASES = (
-    ("holdout-version-conflict-004", "synthetic-vsm450-network-r3", "vsm450-network-current.md", "text/markdown"),
-    ("holdout-version-conflict-004", "synthetic-vsm450-network-r2", "vsm450-network-history.md", "text/markdown"),
-    ("holdout-similar-model-005", "synthetic-vsm410-pro-power-r1", "vsm410-pro-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    ("holdout-similar-model-005", "synthetic-vsm410-power-r1", "vsm410-power.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
-    ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r3", "c3-field-notice-current.html", "text/html"),
-    ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r1", "c3-field-notice-obsolete.html", "text/html"),
+    ("holdout-model-boundary-007", "synthetic-vsm520-temperature-r1", "vsm520-temperature.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("holdout-model-boundary-007", "synthetic-vsm52-temperature-r1", "vsm52-temperature.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+    ("holdout-longest-model-008", "synthetic-n17-elite-network-r1", "n17-elite-network.html", "text/html"),
+    ("holdout-longest-model-008", "synthetic-n17-network-r1", "n17-network.html", "text/html"),
+    ("holdout-version-boundary-009", "synthetic-vsm480-calibration-r5", "vsm480-calibration-current.md", "text/markdown"),
+    ("holdout-version-boundary-009", "synthetic-vsm480-calibration-r2", "vsm480-calibration-history.md", "text/markdown"),
+    ("holdout-lot-boundary-010", "synthetic-c7-field-notice-r4", "c7-field-notice-current.html", "text/html"),
+    ("holdout-lot-boundary-010", "synthetic-c7-field-notice-r1", "c7-field-notice-history.html", "text/html"),
 )
 
 DOCUMENT_METADATA = {
@@ -61,6 +63,14 @@ DOCUMENT_METADATA = {
     "synthetic-vsm420-power-r1": {"model_codes": ["VSM-420"], "document_revision": "R1", "authority_level": "service_manual"},
     "synthetic-c5-field-notice-r2": {"model_codes": ["BeneHeart C5"], "document_revision": "R2", "supersedes": ["synthetic-c5-field-notice-r1"], "affected_lots": ["LOT-M2701"], "authority_level": "current_field_notice"},
     "synthetic-c5-field-notice-r1": {"model_codes": ["BeneHeart C5"], "document_revision": "R1", "affected_lots": ["LOT-M2602"], "authority_level": "superseded"},
+    "synthetic-vsm520-temperature-r1": {"model_codes": ["VSM-520"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-vsm52-temperature-r1": {"model_codes": ["VSM-52"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-n17-elite-network-r1": {"model_codes": ["BeneVision N17 Elite"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-n17-network-r1": {"model_codes": ["BeneVision N17"], "document_revision": "R1", "authority_level": "service_manual"},
+    "synthetic-vsm480-calibration-r5": {"model_codes": ["VSM-480"], "software_version_from": "14.2", "software_version_to": "14.2", "document_revision": "R5", "supersedes": ["synthetic-vsm480-calibration-r2"], "authority_level": "current_service_manual"},
+    "synthetic-vsm480-calibration-r2": {"model_codes": ["VSM-480"], "software_version_from": "4.2", "software_version_to": "4.2", "document_revision": "R2", "authority_level": "superseded"},
+    "synthetic-c7-field-notice-r4": {"model_codes": ["BeneHeart C7"], "document_revision": "R4", "supersedes": ["synthetic-c7-field-notice-r1"], "affected_lots": ["LOT-P28010"], "authority_level": "current_field_notice"},
+    "synthetic-c7-field-notice-r1": {"model_codes": ["BeneHeart C7"], "document_revision": "R1", "affected_lots": ["LOT-P2801"], "authority_level": "superseded"},
 }
 
 LONG_PROCEDURE = (
@@ -77,6 +87,17 @@ VSM450_CURRENT_PROCEDURE = (
     "校验失败，只允许安装工单中批准的当前证书，不得回退到旧版共享证书。恢复连接后连续观察十五分钟，"
     "确认 NET-LINK-204 不再出现，并分别验证中央站、归档服务器和远程维护通道。最后把诊断包哈希、变更前后"
     "地址、软件版本 4.2、测试结果和复核人员写入服务记录；任一验证失败都必须恢复变更前配置并升级厂商支持。"
+)
+
+VSM480_CURRENT_PROCEDURE = (
+    "CAL-LINK-914 当前处理流程：仅适用于 VSM-480 软件 14.2。先在维护界面导出校准日志、设备序列号、传感器板修订和告警时间，"
+    "禁止直接清除校准记录；随后核对校准基座连接、电源状态和环境温度，确认现场没有把软件 4.2 的旧版校准包复制到 14.2。"
+    "由备用设备接管监护后，停止趋势上传服务，验证当前签名包的哈希，再加载 14.2 校准配置并依次执行零点、量程和漂移检查。"
+    "若签名校验失败，只允许从批准工单重新获取 14.2 包，不得安装软件 4.2 的旧版校准包。恢复服务后连续观察二十分钟，"
+    "确认 CAL-LINK-914 不再出现，并验证本地显示、中央站同步和审计日志时间一致。最后记录变更前后校准值、软件版本 14.2、"
+    "签名包哈希、测试结果和复核人员。此外还要分别保存零点、量程、漂移三组原始测量值，核对传感器板序列号与工单配置一致，"
+    "并在交接前由第二名授权工程师复核运行日志；不得以一次成功校准替代连续观察，也不得省略中央站离线重连测试。"
+    "任一检查失败都必须恢复变更前配置并升级厂商支持。"
 )
 
 
@@ -264,11 +285,40 @@ def power_docx(model: str, document_revision: str, action: str) -> bytes:
     return output.getvalue()
 
 
-def field_notice_html(model: str, revision: str, status: str, lot: str, action: str) -> bytes:
+def alarm_docx(model: str, code: str, document_revision: str, action: str) -> bytes:
+    document = Document()
+    document.add_heading(f"{model} 告警处理说明", level=1)
+    document.add_paragraph(f"文档修订：{document_revision}")
+    document.add_paragraph(f"型号：{model}")
+    document.add_paragraph(f"{code} 处理：{action}")
+    output = io.BytesIO()
+    document.save(output)
+    return output.getvalue()
+
+
+def service_html(model: str, code: str, action: str) -> bytes:
+    return f"""<!doctype html><html lang=\"zh-CN\"><body>
+<h1>{model} 服务说明</h1><p>型号：{model}</p><p>告警编号：{code}</p>
+<h2>处理要求</h2><p>{code} 处理：{action}</p></body></html>""".encode()
+
+
+def field_notice_html(model: str, revision: str, status: str, lot: str, action: str, notice_code: str = "C3-FSN-026") -> bytes:
     return f"""<!doctype html><html lang=\"zh-CN\"><body>
 <h1>{model} 现场更正通知 Revision {revision}</h1>
-<p>状态：{status}</p><p>适用批次：{lot}</p><p>通知编号：C3-FSN-026</p>
+<p>状态：{status}</p><p>适用批次：{lot}</p><p>通知编号：{notice_code}</p>
 <h2>处理要求</h2><p>{action}</p></body></html>""".encode()
+
+
+def vsm480_calibration_current_markdown() -> bytes:
+    return f"# VSM-480 14.2 校准恢复流程\n\n{VSM480_CURRENT_PROCEDURE}\n".encode()
+
+
+def vsm480_calibration_history_markdown() -> bytes:
+    return (
+        "# VSM-480 4.2 历史校准流程\n\n"
+        "CAL-LINK-914 历史处理流程：仅适用于 VSM-480 软件 4.2。导出旧版记录后重新加载 4.2 校准包。"
+        "此修订已被 14.2 流程取代，不得用于软件 14.2。\n"
+    ).encode()
 
 
 def login(client: httpx.Client, api: str) -> str:
@@ -313,12 +363,14 @@ def main() -> None:
             ("dev-lot-scope-filter-008", "synthetic-c5-field-notice-r1"): field_notice_html("BeneHeart C5", "1", "superseded", "LOT-M2602", "Historical lot only; do not apply to LOT-M2701."),
         }
         holdout_sources = {
-            ("holdout-version-conflict-004", "synthetic-vsm450-network-r3"): vsm450_network_current_markdown(),
-            ("holdout-version-conflict-004", "synthetic-vsm450-network-r2"): vsm450_network_history_markdown(),
-            ("holdout-similar-model-005", "synthetic-vsm410-pro-power-r1"): power_docx("VSM-410 Pro", "R1", "保留增强电源模块日志并检查双路输入。"),
-            ("holdout-similar-model-005", "synthetic-vsm410-power-r1"): power_docx("VSM-410", "R1", "检查标准电源模块和单路输入。"),
-            ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r3"): field_notice_html("BeneHeart C3", "3", "当前有效", "LOT-K2608", "停止销售库存并由授权人员安装绝缘垫片套件 FSN-K26。"),
-            ("holdout-superseded-notice-006", "synthetic-c3-field-notice-r1"): field_notice_html("BeneHeart C3", "1", "已被 Revision 3 取代", "LOT-K2501", "旧批次执行目视检查；不得用于 LOT-K2608。"),
+            ("holdout-model-boundary-007", "synthetic-vsm520-temperature-r1"): alarm_docx("VSM-520", "TMP-SNS-118", "R1", "导出 VSM-520 温度趋势并校准双传感器通道。"),
+            ("holdout-model-boundary-007", "synthetic-vsm52-temperature-r1"): alarm_docx("VSM-52", "TMP-SNS-118", "R1", "检查 VSM-52 单传感器连接。"),
+            ("holdout-longest-model-008", "synthetic-n17-elite-network-r1"): service_html("BeneVision N17 Elite", "NET-GW-052", "在 Elite 扩展网络页重新绑定双网关并验证离线续传。"),
+            ("holdout-longest-model-008", "synthetic-n17-network-r1"): service_html("BeneVision N17", "NET-GW-052", "在标准网络页检查单网关地址。"),
+            ("holdout-version-boundary-009", "synthetic-vsm480-calibration-r5"): vsm480_calibration_current_markdown(),
+            ("holdout-version-boundary-009", "synthetic-vsm480-calibration-r2"): vsm480_calibration_history_markdown(),
+            ("holdout-lot-boundary-010", "synthetic-c7-field-notice-r4"): field_notice_html("BeneHeart C7", "4", "当前有效", "LOT-P28010", "隔离库存并由授权人员安装电极接口加固件 C7-P28。", "C7-FSN-031"),
+            ("holdout-lot-boundary-010", "synthetic-c7-field-notice-r1"): field_notice_html("BeneHeart C7", "1", "已被 Revision 4 取代", "LOT-P2801", "历史批次只执行外观检查；不得用于 LOT-P28010。", "C7-FSN-031"),
         }
         cases = DEVELOPMENT_CASES if arguments.split == "development" else HOLDOUT_CASES
         sources = development_sources if arguments.split == "development" else holdout_sources
@@ -368,7 +420,8 @@ def main() -> None:
         }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         print(json.dumps({
             "status": "exported",
-            "cases": len(artifacts),
+            "cases": len({item["case_id"] for item in artifacts}),
+            "documents": len(artifacts),
             "output": str(output.resolve()),
             "indexed": False,
             "statuses": {item["case_id"]: item["status"] for item in artifacts},

@@ -444,6 +444,8 @@ RAGLAB_OLLAMA_MODEL=qwen3-embedding:4b-local \
 
 Document Quality 的无索引评测端点现已输出 `artifact.v2`：同一 Case 可以包含多个稳定 `document_id`，并携带型号、软件版本、文档修订、替代关系、批次与权威级别。隔离检索除 Tenant/Role ACL 外，会对查询中显式出现的最长型号、版本和批次执行服务端 pre-ANN 过滤，并返回 `applied_scope` Trace；这用于解决相似型号和历史版本即使经 Rerank 仍污染 Top-K 的问题。
 
+独立 Holdout 又验证了 ASCII 标识符边界：`VSM-52` 不会误命中 `VSM-520`、版本 `4.2` 不会误命中 `14.2`、批次 `LOT-P2801` 不会误命中 `LOT-P28010`，而 `BeneVision N17 Elite` 会优先于基础型号 `N17`。真实 Qwen/Milvus/Rerank 盲测 Candidate 为 `4/4`、Wrong Document=`0`；这里的结论是检索候选具备 Regression 资格，不等价于生产发布。
+
 ```bash
 make milvus-up
 make milvus-status
