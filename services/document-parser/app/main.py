@@ -34,6 +34,18 @@ async def healthz() -> dict[str, str]:
     }
 
 
+@app.get("/readyz")
+async def readyz() -> dict[str, str]:
+    client = _ocr_client()
+    if client is None:
+        return {"status": "ok", "schema": "document-ir-v4", "ocr_backend": "disabled"}
+    try:
+        await client.ready()
+    except OCRServiceError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    return {"status": "ok", "schema": "document-ir-v4", "ocr_backend": "ready"}
+
+
 @app.post("/v1/parse", response_model=DocumentIR)
 async def parse(file: UploadFile = File(...)) -> DocumentIR:
     content = await file.read(MAX_FILE_BYTES + 1)

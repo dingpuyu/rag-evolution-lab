@@ -11,7 +11,8 @@ from fastapi import FastAPI, File, Header, HTTPException, UploadFile
 
 
 MAX_FILE_BYTES = 50 * 1024 * 1024
-app = FastAPI(title="RagLab PaddleOCR Worker", version="0.1.0")
+WORKER_VERSION = "0.2.0"
+app = FastAPI(title="RagLab PaddleOCR Worker", version=WORKER_VERSION)
 
 
 def _enabled(name: str, default: bool) -> bool:
@@ -27,8 +28,8 @@ def _authorize(authorization: str | None) -> None:
         raise HTTPException(status_code=401, detail="invalid OCR worker credential")
 
 
-@lru_cache(maxsize=1)
-def _pipeline():
+@lru_cache(maxsize=2)
+def _pipeline(use_table: bool | None = None):
     # Import lazily so health checks remain cheap and model initialization only
     # happens when OCR is actually requested.
     from paddleocr import PPStructureV3
@@ -40,7 +41,7 @@ def _pipeline():
         use_doc_orientation_classify=_enabled("PADDLEOCR_USE_ORIENTATION", True),
         use_doc_unwarping=_enabled("PADDLEOCR_USE_UNWARPING", False),
         use_textline_orientation=_enabled("PADDLEOCR_USE_TEXTLINE_ORIENTATION", False),
-        use_table_recognition=_enabled("PADDLEOCR_USE_TABLE", True),
+        use_table_recognition=_enabled("PADDLEOCR_USE_TABLE", True) if use_table is None else use_table,
         use_seal_recognition=_enabled("PADDLEOCR_USE_SEAL", False),
         use_formula_recognition=_enabled("PADDLEOCR_USE_FORMULA", False),
         use_chart_recognition=_enabled("PADDLEOCR_USE_CHART", False),
@@ -50,7 +51,7 @@ def _pipeline():
 
 @app.get("/healthz")
 async def healthz() -> dict[str, str]:
-    return {"status": "ok", "engine": "PaddleOCR", "pipeline": "PP-StructureV3"}
+    return {"status": "ok", "engine": "PaddleOCR", "pipeline": "PP-StructureV3", "worker_version": WORKER_VERSION}
 
 
 @app.post("/v1/parse")
@@ -73,8 +74,21 @@ async def parse(
         with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temporary:
             temporary.write(content)
             temporary_path = temporary.name
-        pages = list(_pipeline().predict(temporary_path))
-        blocks, warnings = _to_blocks(filename, pages)
+        degraded = False
+        warnings: list[str] = []
+        try:
+            pages = list(_pipeline().predict(temporary_path))
+        except Exception as primary:
+            if not _enabled("PADDLEOCR_RETRY_WITHOUT_TABLE", True) or not _enabled("PADDLEOCR_USE_TABLE", True):
+                raise
+            try:
+                pages = list(_pipeline(False).predict(temporary_path))
+                degraded = True
+                warnings.append(f"table pipeline failed; retried without table recognition: {type(primary).__name__}")
+            except Exception as fallback:
+                raise RuntimeError(f"primary pipeline failed ({primary}); text fallback failed ({fallback})") from fallback
+        blocks, mapping_warnings = _to_blocks(filename, pages)
+        warnings.extend(mapping_warnings)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"PP-StructureV3 parse failed: {exc}") from exc
     finally:
@@ -85,7 +99,7 @@ async def parse(
         warnings.append("PP-StructureV3 returned no indexable blocks")
     return {
         "schema_version": "document-ir-v4",
-        "status": "ready" if blocks else "ocr_required",
+        "status": _document_status(blocks, degraded),
         "source_file": filename,
         "mime_type": file.content_type or "application/octet-stream",
         "sha256": hashlib.sha256(content).hexdigest(),
@@ -99,7 +113,13 @@ async def parse(
             "input_blocks": len(blocks),
             "output_blocks": len(blocks),
         },
-    }
+}
+
+
+def _document_status(blocks: list[dict[str, Any]], degraded: bool) -> str:
+    if not blocks:
+        return "ocr_required"
+    return "review_required" if degraded else "ready"
 
 
 def _to_blocks(filename: str, results: list[Any]) -> tuple[list[dict[str, Any]], list[str]]:
@@ -112,7 +132,18 @@ def _to_blocks(filename: str, results: list[Any]) -> tuple[list[dict[str, Any]],
         page_number = int(page.get("page_index", fallback_page - 1)) + 1
         width, height = float(page.get("width", 0)), float(page.get("height", 0))
         scores, page_mean_confidence = _ocr_scores(page.get("overall_ocr_res") or {})
-        ordered = sorted(page.get("parsing_res_list") or [], key=lambda item: item.get("block_order", 0))
+        # Paddle may emit null block_order for low-contrast or unclassified
+        # regions. Comparing None with numeric orders raises TypeError and used
+        # to fail the whole page. Put unordered blocks last and use bbox as a
+        # deterministic visual-order fallback.
+        raw_blocks = page.get("parsing_res_list") or []
+        if all(isinstance(item.get("block_order"), (int, float)) for item in raw_blocks):
+            ordered = sorted(raw_blocks, key=lambda item: float(item["block_order"]))
+        else:
+            # A partially missing order makes the sequence incomparable. Use
+            # visual order for the whole page instead of putting every null
+            # item after numeric ones and silently scrambling reading order.
+            ordered = sorted(raw_blocks, key=_block_visual_key)
         for item in ordered:
             text = str(item.get("block_content") or "").strip()
             if not text:
@@ -140,6 +171,13 @@ def _to_blocks(filename: str, results: list[Any]) -> tuple[list[dict[str, Any]],
                 "confidence": scores.get(_score_key(text), page_mean_confidence),
             })
     return blocks, warnings
+
+
+def _block_visual_key(item: dict[str, Any]) -> tuple[float, float]:
+    bbox = item.get("block_bbox")
+    y = float(bbox[1]) if isinstance(bbox, list) and len(bbox) == 4 and isinstance(bbox[1], (int, float)) else float("inf")
+    x = float(bbox[0]) if isinstance(bbox, list) and len(bbox) == 4 and isinstance(bbox[0], (int, float)) else float("inf")
+    return y, x
 
 
 def _block_type(label: str) -> str:
@@ -171,6 +209,6 @@ def _package_version() -> str:
     try:
         import paddleocr
 
-        return str(paddleocr.__version__)
+        return f"{paddleocr.__version__}+raglab-worker-{WORKER_VERSION}"
     except Exception:
         return "unknown"

@@ -26,6 +26,15 @@ class PaddleOCRClient:
         self.shared_secret = shared_secret
         self.timeout_seconds = timeout_seconds
 
+    async def ready(self) -> None:
+        headers = {"Authorization": f"Bearer {self.shared_secret}"} if self.shared_secret else {}
+        try:
+            async with httpx.AsyncClient(timeout=min(self.timeout_seconds, 5)) as client:
+                response = await client.get(f"{self.base_url}/healthz", headers=headers)
+                response.raise_for_status()
+        except httpx.HTTPError as exc:
+            raise OCRServiceError(f"PaddleOCR worker readiness failed: {exc}") from exc
+
     async def parse_pdf(self, filename: str, content: bytes, content_type: str) -> DocumentIR:
         headers = {}
         if self.shared_secret:
@@ -59,9 +68,9 @@ class PaddleOCRClient:
             parser_version=result.quality.parser_version or "unknown",
             ocr_used=True,
         )
-        if result.status != "ready" or not normalized:
+        if result.status == "ocr_required" or not normalized:
             status = "ocr_required"
-        elif quality.low_confidence_blocks:
+        elif result.status == "review_required" or quality.low_confidence_blocks:
             status = "review_required"
         else:
             status = "ready"

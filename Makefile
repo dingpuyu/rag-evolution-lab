@@ -20,7 +20,7 @@ parser-test:
 	cd services/document-parser && uv run --extra test pytest
 
 document-quality-export:
-	$(WITH_ENV) sh -c 'uv run --project services/document-parser python scripts/export_document_quality_artifacts.py --output "$${OUTPUT:-../agent-evaluation/data/document-quality/artifacts-latest.json}" --max-runes "$${MAX_RUNES:-700}" --overlap-runes "$${OVERLAP_RUNES:-80}"'
+	$(WITH_ENV) sh -c 'uv run --project services/document-parser python scripts/export_document_quality_artifacts.py --output "$${OUTPUT:-../agent-evaluation/data/document-quality/artifacts-latest.json}" --split "$${SPLIT:-development}" --max-runes "$${MAX_RUNES:-700}" --overlap-runes "$${OVERLAP_RUNES:-80}"'
 
 deploy-test:
 	python3 -m unittest discover -s scripts/tests -p 'test_deploy_init.py'

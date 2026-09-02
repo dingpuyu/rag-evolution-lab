@@ -61,6 +61,70 @@ async def test_paddle_adapter_normalizes_worker_document_ir(monkeypatch):
     assert result.quality.mean_confidence == 0.99
 
 
+@pytest.mark.asyncio
+async def test_paddle_adapter_preserves_review_required_state(monkeypatch):
+    payload = {
+        "schema_version": "document-ir-v4",
+        "status": "review_required",
+        "source_file": "temporary.pdf",
+        "mime_type": "application/pdf",
+        "sha256": "worker-hash",
+        "blocks": [{
+            "block_type": "paragraph",
+            "text": "BeneVision N12",
+            "heading_path": [],
+            "provenance": {"source_file": "temporary.pdf", "page": 1, "sheet": "", "cell_range": ""},
+            "confidence": 0.91,
+        }],
+        "warnings": ["table pipeline failed; retried without table recognition: TypeError"],
+        "quality": {"parser": "paddle-ppstructurev3", "parser_version": "3.7.0+raglab-worker-0.2.0", "ocr_used": True},
+    }
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def post(self, *args, **kwargs):
+            return httpx.Response(200, json=payload)
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+    result = await PaddleOCRClient("http://paddle-ocr:8071").parse_pdf(
+        "degraded-scan.pdf", b"pdf-content", "application/pdf"
+    )
+    assert result.status == "review_required"
+    assert result.blocks[0].text == "BeneVision N12"
+
+
+@pytest.mark.asyncio
+async def test_paddle_adapter_readiness_checks_worker_health(monkeypatch):
+    called = []
+
+    class FakeAsyncClient:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return None
+
+        async def get(self, url, **kwargs):
+            called.append(url)
+            return httpx.Response(200, request=httpx.Request("GET", url), json={"status": "ok"})
+
+    monkeypatch.setattr(httpx, "AsyncClient", FakeAsyncClient)
+    client = PaddleOCRClient("http://paddle-ocr:8071")
+    await client.ready()
+    assert called == ["http://paddle-ocr:8071/healthz"]
+
+
 def test_blank_scanned_pdf_stays_fail_closed_without_worker():
     document = pymupdf.open()
     document.new_page()

@@ -40,6 +40,24 @@ AED 设备故障排查
 
 这个实验说明：OCR 问题必须拆成字符识别与 Layout 输出两层。高 confidence 不能证明没有漏行，单纯调回答 Prompt 更不可能补回缺失证据。后续数据集需要同时校验型号、错误码、版本、批次、整页 CER、Block 数和阅读顺序。
 
+### 一次性 Holdout 触发的 Adapter 修复
+
+后续 `agent-evaluation` 对冻结的 `700/80` 候选运行了一次性 Holdout，真实结果为 `2/3`，没有通过发布门禁。旋转 90° 扫描和 DOCX 结构均通过，150 DPI 低对比扫描失败。最初响应看起来像 PP-StructureV3 内部异常：
+
+```text
+'<' not supported between instances of 'int' and 'NoneType'
+```
+
+逐层复现后发现推理已经返回结果，异常实际来自 Worker Adapter：`parsing_res_list` 中部分 `block_order` 为 `null`，旧代码把它和整数直接排序。修复后的规则是：整页顺序都为数字时使用模型顺序；只要有一个缺失，就整页按 bbox 的 y/x 视觉顺序排序。这样既不会崩溃，也不会把缺失顺序的 Block 全部粗暴放到末尾而静默破坏阅读顺序。
+
+失败模式被转写为新的 Development Case `dev-ocr-degraded-fallback-005`，使用不同型号 `BeneVision N12` 和不同扫描输入。真实 OCR 产出顺序为标题→设备编号，Parser Version 为 `3.7.0+raglab-worker-0.2.0`；随后 Development Retrieval 从 Baseline `4/5` 提升为 Candidate `5/5`。已经见过的 Holdout 没有用新代码重跑，新候选仍需新的未见文档才能晋级。
+
+同一次复跑还发现 OCR Worker 退出时 Parser 进程 `/healthz` 仍为绿色。现在将 liveness 与 readiness 分离：
+
+- `/healthz`：Parser 进程存活，不访问重依赖。
+- `/readyz`：配置 OCR 时请求 Worker `/healthz`；Worker 停止后实测返回 `503`，恢复后返回 `200`。
+- Compose 使用 `/readyz` 作为 Parser 健康检查，避免 API 在 OCR 依赖不可用时继续被当作完整能力实例接流量。
+
 ## 3. 工程边界
 
 ### 为什么独立 OCR Worker
